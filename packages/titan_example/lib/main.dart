@@ -34,6 +34,8 @@ import 'screens/quest_list_screen.dart';
 // ---------------------------------------------------------------------------
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
   // Set up Chronicle logging
   Chronicle.level = LogLevel.debug;
 

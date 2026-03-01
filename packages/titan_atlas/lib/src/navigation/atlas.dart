@@ -422,18 +422,26 @@ class Atlas {
 
   /// Get the RouterConfig for use with MaterialApp.router.
   ///
+  /// Automatically ensures `WidgetsBinding` is initialized before creating
+  /// the route information provider. Safe to call before `runApp()`.
+  ///
   /// ```dart
   /// MaterialApp.router(routerConfig: atlas.config)
   /// ```
-  RouterConfig<Object> get config => RouterConfig(
-        routerDelegate: _delegate,
-        routeInformationParser: _parser,
-        routeInformationProvider: PlatformRouteInformationProvider(
-          initialRouteInformation: RouteInformation(
-            uri: Uri.parse(_initialPath),
-          ),
+  RouterConfig<Object> get config {
+    // Ensure the binding exists — PlatformRouteInformationProvider requires it.
+    WidgetsFlutterBinding.ensureInitialized();
+
+    return RouterConfig(
+      routerDelegate: _delegate,
+      routeInformationParser: _parser,
+      routeInformationProvider: PlatformRouteInformationProvider(
+        initialRouteInformation: RouteInformation(
+          uri: Uri.parse(_initialPath),
         ),
-      );
+      ),
+    );
+  }
 
   // -------------------------------------------------------------------------
   // Static navigation API
