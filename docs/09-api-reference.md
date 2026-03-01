@@ -596,4 +596,299 @@ Atlas(
 
 ---
 
+## Form Management (package:titan)
+
+### Scroll\<T\>
+
+Reactive form field with validation, dirty tracking, and reset. Extends `TitanState<T>`.
+
+#### Constructor
+
+```dart
+Scroll<T>(
+  T initialValue, {
+  String? Function(T value)? validator,
+  String? name,
+  bool Function(T, T)? equals,
+})
+```
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `value` | `T` | Get/set current value (inherited from Core) |
+| `error` | `String?` | Current validation error, or `null` if valid |
+| `isDirty` | `bool` | Whether the value differs from the initial value |
+| `isPristine` | `bool` | Whether the value equals the initial value |
+| `isTouched` | `bool` | Whether the field has been touched |
+| `isValid` | `bool` | Whether the field has no validation error |
+| `initialValue` | `T` | The initial value this field was created with |
+| `managedNodes` | `List<ReactiveNode>` | Internal reactive nodes (error, touched) |
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `validate()` | `bool` | Run validator, update `error`, return `true` if valid |
+| `touch()` | `void` | Mark the field as touched |
+| `reset()` | `void` | Reset to initial value, clear error and touched state |
+| `setError(String?)` | `void` | Set error manually (e.g., server-side validation) |
+| `clearError()` | `void` | Clear error without re-validating |
+| `dispose()` | `void` | Dispose field and internal nodes |
+
+#### Pillar Factory Method
+
+```dart
+@protected
+Scroll<T> scroll<T>(T value, {String? Function(T)? validator, String? name, bool Function(T, T)? equals})
+```
+
+---
+
+### ScrollGroup
+
+Manages a collection of `Scroll` fields as a form.
+
+#### Constructor
+
+```dart
+ScrollGroup(List<Scroll<dynamic>> fields)
+```
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `isValid` | `bool` | Whether all fields are valid |
+| `isDirty` | `bool` | Whether any field has been modified |
+| `isPristine` | `bool` | Whether all fields have their initial values |
+| `isTouched` | `bool` | Whether any field has been touched |
+| `invalidFields` | `List<Scroll>` | Fields that currently have errors |
+| `fieldCount` | `int` | Number of fields in the group |
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `validateAll()` | `bool` | Validate all fields, return `true` if all valid |
+| `resetAll()` | `void` | Reset all fields to initial values and clear errors |
+| `touchAll()` | `void` | Touch all fields |
+| `clearAllErrors()` | `void` | Clear all errors without re-validating |
+
+---
+
+## Data Layer (package:titan)
+
+### Codex\<T\>
+
+Paginated data management with reactive state.
+
+#### Constructor
+
+```dart
+Codex<T>({
+  required Future<CodexPage<T>> Function(CodexRequest request) fetcher,
+  int pageSize = 20,
+  String? name,
+})
+```
+
+#### Reactive State
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `items` | `TitanState<List<T>>` | All accumulated items across loaded pages |
+| `isLoading` | `TitanState<bool>` | Whether a page is currently being fetched |
+| `hasMore` | `TitanState<bool>` | Whether more pages are available |
+| `currentPage` | `TitanState<int>` | Current page number (0-indexed) |
+| `error` | `TitanState<Object?>` | Most recent error, or `null` |
+
+#### Computed Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `isEmpty` | `bool` | Whether items are empty and not loading |
+| `isNotEmpty` | `bool` | Whether any items have been loaded |
+| `itemCount` | `int` | Total number of items loaded so far |
+| `managedNodes` | `List<TitanState>` | All internal reactive nodes |
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `loadFirst()` | `Future<void>` | Load first page, clearing existing data |
+| `loadNext()` | `Future<void>` | Load next page, appending to existing items |
+| `refresh()` | `Future<void>` | Reload from page 0 (alias for `loadFirst`) |
+| `dispose()` | `void` | Dispose all managed state |
+
+#### Pillar Factory Method
+
+```dart
+@protected
+Codex<T> codex<T>(Future<CodexPage<T>> Function(CodexRequest) fetcher, {int pageSize = 20, String? name})
+```
+
+#### Supporting Types
+
+| Type | Description |
+|------|-------------|
+| `CodexPage<T>` | Page result: `items` (List\<T\>), `hasMore` (bool), `nextCursor` (String?) |
+| `CodexRequest` | Page request: `page` (int), `pageSize` (int), `cursor` (String?) |
+
+---
+
+### Quarry\<T\>
+
+Reactive data fetching with caching, stale-while-revalidate, and retry.
+
+#### Constructor
+
+```dart
+Quarry<T>({
+  required Future<T> Function() fetcher,
+  Duration? staleTime,
+  QuarryRetry retry = const QuarryRetry(maxAttempts: 0),
+  String? name,
+})
+```
+
+#### Reactive State
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `data` | `TitanState<T?>` | Fetched data, or `null` if not yet fetched |
+| `isLoading` | `TitanState<bool>` | Whether the initial fetch is in progress (no data yet) |
+| `isFetching` | `TitanState<bool>` | Whether a background refetch is in progress (data exists) |
+| `error` | `TitanState<Object?>` | Most recent error, or `null` |
+
+#### Computed Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `hasData` | `bool` | Whether data exists |
+| `hasError` | `bool` | Whether there is an error |
+| `isStale` | `bool` | Whether cached data is stale |
+| `managedNodes` | `List<TitanState>` | All internal reactive nodes |
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `fetch()` | `Future<void>` | Fetch data (stale-while-revalidate, deduplication) |
+| `refetch()` | `Future<void>` | Force refetch, ignoring staleness |
+| `invalidate()` | `void` | Mark data stale without refetching |
+| `setData(T)` | `void` | Set data manually (optimistic update) |
+| `reset()` | `void` | Clear all data, errors, and timing |
+| `dispose()` | `void` | Dispose all managed state |
+
+#### Pillar Factory Method
+
+```dart
+@protected
+Quarry<T> quarry<T>({required Future<T> Function() fetcher, Duration? staleTime, QuarryRetry retry, String? name})
+```
+
+#### Supporting Types
+
+| Type | Description |
+|------|-------------|
+| `QuarryRetry` | Retry config: `maxAttempts` (int, default 3), `baseDelay` (Duration, default 1s). Exponential backoff. |
+
+---
+
+## Multi-Pillar Widgets (package:titan_bastion)
+
+### Confluence
+
+Auto-tracking consumer widgets that combine multiple typed Pillars in a single builder.
+
+Each Pillar is resolved independently using the same order as Vestige:
+1. Nearest **Beacon** in the widget tree
+2. Global **Titan** registry
+
+#### Confluence2\<A, B\>
+
+```dart
+const Confluence2<A extends Pillar, B extends Pillar>({
+  required Widget Function(BuildContext context, A pillarA, B pillarB) builder,
+})
+```
+
+#### Confluence3\<A, B, C\>
+
+```dart
+const Confluence3<A extends Pillar, B extends Pillar, C extends Pillar>({
+  required Widget Function(BuildContext context, A pillarA, B pillarB, C pillarC) builder,
+})
+```
+
+#### Confluence4\<A, B, C, D\>
+
+```dart
+const Confluence4<A extends Pillar, B extends Pillar, C extends Pillar, D extends Pillar>({
+  required Widget Function(BuildContext context, A pillarA, B pillarB, C pillarC, D pillarD) builder,
+})
+```
+
+---
+
+## Debug Overlay (package:titan_bastion)
+
+### Lens
+
+In-app debug overlay displaying real-time Pillars, Herald events, Vigil errors, and Chronicle logs.
+
+#### Constructor
+
+```dart
+const Lens({
+  required Widget child,
+  bool enabled = true,
+})
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `child` | `Widget` | The app widget to wrap |
+| `enabled` | `bool` | Whether the overlay is enabled (typically `kDebugMode`) |
+
+#### Static Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `Lens.show()` | `void` | Show the debug overlay |
+| `Lens.hide()` | `void` | Hide the debug overlay |
+| `Lens.toggle()` | `void` | Toggle overlay visibility |
+
+#### Overlay Tabs
+
+| Tab | Content |
+|-----|--------|
+| Pillars | All registered Pillars and their types |
+| Herald | Recent cross-domain events |
+| Vigil | Captured errors with severity and context |
+| Chronicle | Structured log output |
+
+---
+
+### LensLogSink
+
+A `LogSink` that captures log entries into a bounded buffer for display by Lens.
+
+#### Constructor
+
+```dart
+LensLogSink({int maxEntries = 200})
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `entries` | `List<LogEntry>` | All captured log entries (read-only, newest last) |
+| `maxEntries` | `int` | Maximum entries to retain (default: 200) |
+| `onEntry` | `void Function()?` | Callback invoked when a new entry is captured |
+| `clear()` | `void` | Clear all captured entries |
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

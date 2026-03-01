@@ -350,4 +350,121 @@ void main() {
       expect(pillar.lastUserId.value, 'before_reset');
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // allEvents — Global event stream
+  // ---------------------------------------------------------------------------
+
+  group('Herald — allEvents', () {
+    setUp(() => Herald.reset());
+    tearDown(() => Herald.reset());
+
+    test('allEvents receives all emitted events', () {
+      final events = <HeraldEvent>[];
+      final sub = Herald.allEvents.listen(events.add);
+
+      Herald.emit(UserLoggedIn('u1'));
+      Herald.emit(OrderPlaced(3));
+
+      expect(events.length, 2);
+      expect(events[0].type, UserLoggedIn);
+      expect(events[0].payload, isA<UserLoggedIn>());
+      expect(events[1].type, OrderPlaced);
+
+      sub.cancel();
+    });
+
+    test('HeraldEvent has timestamp', () {
+      final events = <HeraldEvent>[];
+      final sub = Herald.allEvents.listen(events.add);
+
+      Herald.emit(UserLoggedOut());
+
+      expect(events.single.timestamp, isA<DateTime>());
+      sub.cancel();
+    });
+
+    test('HeraldEvent toString includes type', () {
+      final he = HeraldEvent(String, 'hello');
+      expect(he.toString(), contains('String'));
+    });
+
+    test('allEvents stream survives across multiple listeners', () {
+      final events1 = <HeraldEvent>[];
+      final events2 = <HeraldEvent>[];
+      final sub1 = Herald.allEvents.listen(events1.add);
+      final sub2 = Herald.allEvents.listen(events2.add);
+
+      Herald.emit(UserLoggedOut());
+
+      expect(events1.length, 1);
+      expect(events2.length, 1);
+
+      sub1.cancel();
+      sub2.cancel();
+    });
+
+    test('reset clears the global controller', () {
+      final sub = Herald.allEvents.listen((_) {});
+      Herald.reset();
+      // After reset, the old subscription is dead but we can create new ones
+      final events = <HeraldEvent>[];
+      final sub2 = Herald.allEvents.listen(events.add);
+      Herald.emit(UserLoggedIn('new'));
+      expect(events.length, 1);
+      sub.cancel();
+      sub2.cancel();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Titan — Debug / Introspection APIs
+  // ---------------------------------------------------------------------------
+
+  group('Titan — registeredTypes & instances', () {
+    setUp(() => Titan.reset());
+    tearDown(() => Titan.reset());
+
+    test('registeredTypes returns empty set initially', () {
+      expect(Titan.registeredTypes, isEmpty);
+    });
+
+    test('registeredTypes includes put instances', () {
+      Titan.put<String>('hello');
+      expect(Titan.registeredTypes, contains(String));
+    });
+
+    test('registeredTypes includes lazy factories', () {
+      Titan.lazy<int>(() => 42);
+      expect(Titan.registeredTypes, contains(int));
+    });
+
+    test('instances returns only created instances', () {
+      Titan.put<String>('hello');
+      Titan.lazy<int>(() => 42);
+
+      final ins = Titan.instances;
+      expect(ins.containsKey(String), true);
+      expect(ins[String], 'hello');
+      // Lazy factory not yet instantiated
+      expect(ins.containsKey(int), false);
+    });
+
+    test('instances map is unmodifiable', () {
+      Titan.put<String>('hello');
+      final ins = Titan.instances;
+      expect(() => (ins as Map)[double] = 3.14, throwsUnsupportedError);
+    });
+
+    test('registeredTypes includes Pillar types', () {
+      Titan.put(ListenerPillar());
+      expect(Titan.registeredTypes, contains(ListenerPillar));
+    });
+
+    test('instances contains Pillar instances', () {
+      Titan.put(ListenerPillar());
+      final ins = Titan.instances;
+      expect(ins[ListenerPillar], isA<Pillar>());
+    });
+  });
 }

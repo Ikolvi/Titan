@@ -54,6 +54,29 @@
   - `Relic.enableAutoSave()` / `Relic.disableAutoSave()` — Auto-persist on changes
   - `Relic.clear()` / `Relic.clearKey()` — Remove persisted data
   - Configurable key prefix (default `'titan:'`)
+- **Scroll** — Form field validation with dirty/touch tracking
+  - `Scroll<T>` — Validated form field extending `TitanState<T>`
+  - `validate()`, `touch()`, `reset()`, `setError()`, `clearError()`
+  - Properties: `error`, `isDirty`, `isPristine`, `isTouched`, `isValid`
+  - `ScrollGroup` — Aggregate form state (`validateAll()`, `resetAll()`, `touchAll()`)
+- **Pillar.scroll()** — Create managed Scroll (form field with validation)
+- **Codex** — Paginated data management
+  - `Codex<T>` — Generic paginator supporting offset and cursor modes
+  - `loadFirst()`, `loadNext()`, `refresh()`
+  - Reactive state: `items`, `isLoading`, `hasMore`, `currentPage`, `error`
+  - `CodexPage<T>`, `CodexRequest` — Typed page/request models
+- **Pillar.codex()** — Create managed Codex (paginated data)
+- **Quarry** — Data fetching with stale-while-revalidate, retry, and deduplication
+  - `Quarry<T>` — Managed data fetcher with SWR semantics
+  - `fetch()`, `refetch()`, `invalidate()`, `setData()`, `reset()`
+  - Reactive state: `data`, `isLoading`, `isFetching`, `error`, `isStale`, `hasData`
+  - `QuarryRetry` — Exponential backoff config (`maxAttempts`, `baseDelay`)
+  - Request deduplication via `Completer<T>`
+- **Pillar.quarry()** — Create managed Quarry (data fetching)
+- **Herald.allEvents** — Global event stream for debug tooling
+  - `HeraldEvent` — Typed wrapper with `type`, `payload`, `timestamp`
+- **Titan.registeredTypes** — Set of all registered types (instances + factories)
+- **Titan.instances** — Unmodifiable map of active instances (debug introspection)
 
 ### Fixed
 - **Top-level function shadowing**: Removed top-level `strike()` and `strikeAsync()` from `api.dart` — Dart resolves top-level functions over inherited instance methods in ALL contexts (not just `late final` initializers), causing `_assertNotDisposed()` and auto-capture to be bypassed. Use `titanBatch()` / `titanBatchAsync()` for standalone batching.

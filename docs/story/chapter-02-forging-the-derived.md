@@ -313,3 +313,8 @@ All green. The foundation was solid.
 | [VI](chapter-06-turning-back-the-epochs.md) | Turning Back the Epochs |
 | [VII](chapter-07-the-atlas-unfurls.md) | The Atlas Unfurls |
 | [VIII](chapter-08-the-relic-endures.md) | The Relic Endures |
+| [IX](chapter-09-the-scroll-inscribes.md) | The Scroll Inscribes |
+| [X](chapter-10-the-codex-opens.md) | The Codex Opens |
+| [XI](chapter-11-the-quarry-yields.md) | The Quarry Yields |
+| [XII](chapter-12-the-confluence-converges.md) | The Confluence Converges |
+| [XIII](chapter-13-the-lens-reveals.md) | The Lens Reveals |

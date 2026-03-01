@@ -390,6 +390,7 @@ class _TestObserver extends AtlasObserver {
     this.onPopFn,
     this.onResetFn,
     this.onGuardRedirectFn,
+    // ignore: unused_element_parameter
     this.onDriftRedirectFn,
     this.onNotFoundFn,
   });

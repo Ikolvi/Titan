@@ -1,5 +1,26 @@
 import 'dart:async';
 
+/// A wrapper for globally-captured Herald events.
+///
+/// Used by [Herald.allEvents] to provide both the event type and payload
+/// in a single object.
+class HeraldEvent {
+  /// The Dart [Type] of the event.
+  final Type type;
+
+  /// The event payload.
+  final dynamic payload;
+
+  /// When the event was emitted.
+  final DateTime timestamp;
+
+  /// Creates a [HeraldEvent].
+  HeraldEvent(this.type, this.payload) : timestamp = DateTime.now();
+
+  @override
+  String toString() => 'HeraldEvent($type, $payload)';
+}
+
 /// **Herald** — The Titan Event Bus.
 ///
 /// Carries messages between domains — cross-Pillar communication
@@ -65,6 +86,7 @@ import 'dart:async';
 abstract final class Herald {
   static final Map<Type, StreamController<dynamic>> _controllers = {};
   static final Map<Type, dynamic> _lastEvents = {};
+  static StreamController<HeraldEvent>? _globalController;
 
   // ---------------------------------------------------------------------------
   // Emit
@@ -82,6 +104,14 @@ abstract final class Herald {
   /// ```
   static void emit<T>(T event) {
     _lastEvents[T] = event;
+
+    // Notify global listeners (used by Lens debug overlay).
+    if (_globalController != null &&
+        !_globalController!.isClosed &&
+        _globalController!.hasListener) {
+      _globalController!.add(HeraldEvent(T, event));
+    }
+
     final controller = _controllers[T];
     if (controller != null && !controller.isClosed && controller.hasListener) {
       controller.add(event);
@@ -155,6 +185,21 @@ abstract final class Herald {
   /// ```
   static T? last<T>() => _lastEvents[T] as T?;
 
+  /// Get a broadcast [Stream] of ALL events, regardless of type.
+  ///
+  /// Each element is a [HeraldEvent] containing the event type and payload.
+  /// Used by [Lens] debug overlay and testing.
+  ///
+  /// ```dart
+  /// Herald.allEvents.listen((e) {
+  ///   print('${e.type}: ${e.payload}');
+  /// });
+  /// ```
+  static Stream<HeraldEvent> get allEvents {
+    _globalController ??= StreamController<HeraldEvent>.broadcast(sync: true);
+    return _globalController!.stream;
+  }
+
   // ---------------------------------------------------------------------------
   // Management
   // ---------------------------------------------------------------------------
@@ -188,6 +233,10 @@ abstract final class Herald {
     }
     _controllers.clear();
     _lastEvents.clear();
+    if (_globalController != null && !_globalController!.isClosed) {
+      _globalController!.close();
+    }
+    _globalController = null;
   }
 
   // ---------------------------------------------------------------------------

@@ -898,4 +898,335 @@ Vestige<ThemePillar>(
 
 ---
 
+## Scroll — Form Management
+
+**Scroll** is Titan's form field primitive — a Core enhanced with validation, dirty tracking, touch state, and reset. **ScrollGroup** aggregates multiple Scrolls into a form.
+
+### Basic Form
+
+```dart
+class ProfilePillar extends Pillar {
+  late final name = scroll('',
+    validator: (v) => v.isEmpty ? 'Name is required' : null,
+  );
+
+  late final email = scroll('',
+    validator: (v) => v.contains('@') ? null : 'Invalid email',
+  );
+
+  late final form = ScrollGroup([name, email]);
+
+  void submit() {
+    if (!form.validateAll()) return;
+    // All fields valid — process
+    api.updateProfile(name: name.value, email: email.value);
+  }
+}
+```
+
+### Reactive Validation in UI
+
+Because `error`, `isDirty`, and `isTouched` are reactive, Vestige auto-tracks them:
+
+```dart
+Vestige<ProfilePillar>(
+  builder: (context, pillar) => Column(
+    children: [
+      TextField(
+        onChanged: (v) => pillar.name.value = v,
+        onEditingComplete: () => pillar.name.touch(),
+        decoration: InputDecoration(
+          errorText: pillar.name.isTouched ? pillar.name.error : null,
+        ),
+      ),
+      ElevatedButton(
+        onPressed: pillar.form.isValid ? pillar.submit : null,
+        child: Text('Save'),
+      ),
+    ],
+  ),
+)
+```
+
+### Server-Side Validation
+
+```dart
+Future<void> submit() async {
+  if (!form.validateAll()) return;
+
+  try {
+    await api.updateProfile(name: name.value, email: email.value);
+  } on ValidationException catch (e) {
+    // Apply server errors to individual fields
+    if (e.errors.containsKey('email')) {
+      email.setError(e.errors['email']!);
+    }
+  }
+}
+```
+
+---
+
+## Codex — Paginated Data
+
+**Codex** manages paginated data fetching — loading pages incrementally, tracking loading/error/empty states, and appending results. Supports both offset and cursor-based pagination.
+
+### Offset Pagination
+
+```dart
+class QuestListPillar extends Pillar {
+  late final quests = codex<Quest>(
+    (request) async {
+      final result = await api.getQuests(
+        page: request.page,
+        limit: request.pageSize,
+      );
+      return CodexPage(
+        items: result.items,
+        hasMore: result.hasMore,
+      );
+    },
+    pageSize: 20,
+  );
+
+  @override
+  void onInit() => quests.loadFirst();
+}
+```
+
+### Cursor-Based Pagination
+
+```dart
+late final feed = codex<Post>(
+  (request) async {
+    final result = await api.getFeed(
+      cursor: request.cursor,
+      limit: request.pageSize,
+    );
+    return CodexPage(
+      items: result.posts,
+      hasMore: result.hasMore,
+      nextCursor: result.nextCursor,
+    );
+  },
+  pageSize: 10,
+);
+```
+
+### Infinite Scroll UI
+
+```dart
+Vestige<QuestListPillar>(
+  builder: (context, pillar) {
+    final items = pillar.quests.items.value;
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scroll) {
+        if (scroll.metrics.pixels >= scroll.metrics.maxScrollExtent - 200) {
+          pillar.quests.loadNext();
+        }
+        return false;
+      },
+      child: ListView.builder(
+        itemCount: items.length + (pillar.quests.hasMore.value ? 1 : 0),
+        itemBuilder: (_, i) {
+          if (i >= items.length) return const CircularProgressIndicator();
+          return QuestTile(items[i]);
+        },
+      ),
+    );
+  },
+)
+```
+
+---
+
+## Quarry — Data Fetching & Caching
+
+**Quarry** manages a single async data resource with stale-while-revalidate caching, automatic deduplication, retry with exponential backoff, and optimistic updates.
+
+### Basic Query
+
+```dart
+class UserPillar extends Pillar {
+  late final userQuery = quarry<User>(
+    fetcher: () => api.getUser(),
+    staleTime: Duration(minutes: 5),
+  );
+
+  @override
+  void onInit() => userQuery.fetch();
+}
+```
+
+### Stale-While-Revalidate
+
+When data is stale, Quarry returns cached data immediately while refetching in the background:
+
+```dart
+late final profile = quarry<Profile>(
+  fetcher: () => api.getProfile(),
+  staleTime: Duration(minutes: 10),
+);
+
+// First call — fetches and caches
+await profile.fetch();
+
+// Later — shows cached data, refetches in background
+await profile.fetch();
+```
+
+### Retry with Backoff
+
+```dart
+late final data = quarry<Config>(
+  fetcher: () => api.getConfig(),
+  retry: QuarryRetry(
+    maxAttempts: 3,
+    baseDelay: Duration(seconds: 1), // 1s, 2s, 4s (exponential)
+  ),
+);
+```
+
+### Optimistic Updates
+
+```dart
+void toggleFavorite(String questId) {
+  final current = questQuery.data.value!;
+  // Optimistic update — UI reflects immediately
+  questQuery.setData(current.copyWith(isFavorite: !current.isFavorite));
+  // Sync with server, refetch on failure
+  api.toggleFavorite(questId).catchError((_) => questQuery.refetch());
+}
+```
+
+### Quarry in UI
+
+```dart
+Vestige<UserPillar>(
+  builder: (context, pillar) {
+    if (pillar.userQuery.isLoading.value) {
+      return const CircularProgressIndicator();
+    }
+    if (pillar.userQuery.hasError) {
+      return ErrorWidget(pillar.userQuery.error.value!);
+    }
+    final user = pillar.userQuery.data.value!;
+    return Text(user.name);
+  },
+)
+```
+
+---
+
+## Confluence — Multi-Pillar Widgets
+
+**Confluence** combines multiple typed Pillars in a single auto-tracking builder — eliminating nested Vestiges.
+
+### Two Pillars
+
+```dart
+Confluence2<AuthPillar, CartPillar>(
+  builder: (context, auth, cart) => Text(
+    '${auth.user.value?.name}: ${cart.itemCount.value} items',
+  ),
+)
+```
+
+### Three Pillars
+
+```dart
+Confluence3<AuthPillar, CartPillar, ThemePillar>(
+  builder: (context, auth, cart, theme) => Container(
+    color: theme.backgroundColor.value,
+    child: Text('${auth.user.value?.name} — ${cart.itemCount.value} items'),
+  ),
+)
+```
+
+### Four Pillars
+
+```dart
+Confluence4<AuthPillar, CartPillar, ThemePillar, NavPillar>(
+  builder: (context, auth, cart, theme, nav) => Scaffold(
+    appBar: AppBar(
+      title: Text(nav.currentTitle.value),
+      backgroundColor: theme.primaryColor.value,
+    ),
+    body: Text('${auth.user.value?.name} — ${cart.itemCount.value} items'),
+  ),
+)
+```
+
+### When to Use Confluence vs. Vestige
+
+| Scenario | Widget |
+|----------|--------|
+| Single Pillar | `Vestige<P>` |
+| 2–4 Pillars in one builder | `Confluence2/3/4` |
+| Cross-Pillar derived state | Create a `DashboardPillar` with injected deps |
+
+---
+
+## Lens — Debug Overlay
+
+**Lens** wraps your app with a toggleable floating debug panel that displays real-time Pillars, Herald events, Vigil errors, and Chronicle logs.
+
+### Setup
+
+```dart
+import 'package:flutter/foundation.dart';
+
+void main() {
+  runApp(
+    Lens(
+      enabled: kDebugMode,
+      child: MaterialApp(
+        home: MyHomePage(),
+      ),
+    ),
+  );
+}
+```
+
+When `enabled` is `false`, Lens renders only the child with zero overhead.
+
+### Programmatic Control
+
+```dart
+// Open from a debug button or shortcut
+Lens.show();
+
+// Close programmatically
+Lens.hide();
+
+// Toggle on shake or keyboard shortcut
+Lens.toggle();
+```
+
+### What Lens Shows
+
+| Tab | Content |
+|-----|--------|
+| **Pillars** | All registered Pillars (from `Titan.instances`) and their types |
+| **Herald** | Recent cross-domain events (last 200) |
+| **Vigil** | Captured errors with severity, context, and stack traces |
+| **Chronicle** | Structured log output from all Chronicle sinks |
+
+### Using LensLogSink Standalone
+
+```dart
+final sink = LensLogSink(maxEntries: 500);
+Chronicle.addSink(sink);
+
+// Read captured entries
+for (final entry in sink.entries) {
+  print('${entry.level}: ${entry.message}');
+}
+
+// Clear buffer
+sink.clear();
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)

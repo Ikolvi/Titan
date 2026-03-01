@@ -33,6 +33,12 @@ A uniquely powerful reactive state management architecture for Flutter — struc
 | Undo/Redo State | **Epoch** | A distinct period in time |
 | Stream Operators | **Flux** | Flow of reactive changes |
 | Persistence | **Relic** | Preserved across ages |
+| Form Field | **Scroll** | Reactive form field with validation, dirty tracking |
+| Form Group | **ScrollGroup** | Aggregate form state across multiple Scrolls |
+| Pagination | **Codex** | Paginated data with reactive state |
+| Data Query | **Quarry** | Cached data fetching with stale-while-revalidate |
+| Multi-Consumer | **Confluence** | Multi-Pillar consumer widget |
+| Debug Overlay | **Lens** | In-app debug panel for Pillars, Herald, Vigil, Chronicle |
 
 ---
 
@@ -103,6 +109,11 @@ Vestige<CounterPillar>(
 | Undo/Redo built-in | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Persistence layer | ❌ | ⚠️ | ❌ | ❌ | ✅ |
 | Structured logging | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Form management | ❌ | ❌ | ❌ | ❌ | ✅ Scroll + ScrollGroup |
+| Pagination | ❌ | ❌ | ❌ | ❌ | ✅ Codex |
+| Data fetching/caching | ❌ | ❌ | ❌ | ❌ | ✅ Quarry (SWR) |
+| Multi-store consumer | ❌ | ✅ MultiBlocBuilder | ✅ Multiple watches | ❌ | ✅ Confluence |
+| Debug overlay | ❌ | ❌ DevTools only | ❌ DevTools only | ❌ | ✅ Lens |
 
 ### Vs Bloc
 

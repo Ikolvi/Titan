@@ -8,8 +8,11 @@ import '../core/effect.dart';
 import '../core/epoch.dart';
 import '../core/reactive.dart';
 import '../core/state.dart';
+import '../data/codex.dart';
+import '../data/quarry.dart';
 import '../errors/vigil.dart';
 import '../events/herald.dart';
+import '../form/scroll.dart';
 import '../logging/chronicle.dart';
 
 /// The fundamental organizing unit of Titan's state management.
@@ -171,6 +174,123 @@ abstract class Pillar {
     );
     _managedNodes.add(e);
     return e;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Scroll — form fields with validation
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Scroll] (form field with validation) managed by this Pillar.
+  ///
+  /// A Scroll is a Core with additional form capabilities: validation,
+  /// dirty/pristine tracking, touch state, and reset.
+  ///
+  /// ```dart
+  /// late final email = scroll('',
+  ///   validator: (v) => v.contains('@') ? null : 'Invalid email',
+  /// );
+  ///
+  /// void submit() {
+  ///   if (email.validate()) {
+  ///     // Valid — process
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Scroll<T> scroll<T>(
+    T initialValue, {
+    String? Function(T value)? validator,
+    String? name,
+    bool Function(T previous, T next)? equals,
+  }) {
+    _assertNotDisposed();
+    final s = Scroll<T>(
+      initialValue,
+      validator: validator,
+      name: name,
+      equals: equals,
+    );
+    _managedNodes.add(s);
+    // Also track the internal error and touched nodes
+    _managedNodes.addAll(s.managedNodes);
+    return s;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Codex — paginated data
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Codex] (paginated data manager) managed by this Pillar.
+  ///
+  /// A Codex handles paginated data loading with reactive state for items,
+  /// loading status, errors, and page tracking. Supports both offset-based
+  /// and cursor-based pagination.
+  ///
+  /// ```dart
+  /// late final quests = codex<Quest>(
+  ///   fetcher: (request) async {
+  ///     final result = await api.getQuests(
+  ///       page: request.page,
+  ///       limit: request.pageSize,
+  ///     );
+  ///     return CodexPage(
+  ///       items: result.items,
+  ///       hasMore: result.hasMore,
+  ///     );
+  ///   },
+  ///   pageSize: 20,
+  /// );
+  ///
+  /// Future<void> loadQuests() => quests.loadFirst();
+  /// Future<void> loadMore() => quests.loadNext();
+  /// ```
+  @protected
+  Codex<T> codex<T>(
+    Future<CodexPage<T>> Function(CodexRequest request) fetcher, {
+    int pageSize = 20,
+    String? name,
+  }) {
+    _assertNotDisposed();
+    final c = Codex<T>(fetcher: fetcher, pageSize: pageSize, name: name);
+    _managedNodes.addAll(c.managedNodes);
+    return c;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quarry — data fetching with caching
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Quarry] (data fetching query) managed by this Pillar.
+  ///
+  /// A Quarry manages a single async data resource with reactive state,
+  /// stale-while-revalidate caching, automatic deduplication, retry logic,
+  /// and optimistic update support.
+  ///
+  /// ```dart
+  /// late final userQuery = quarry<User>(
+  ///   fetcher: () => api.getUser(),
+  ///   staleTime: Duration(minutes: 5),
+  /// );
+  ///
+  /// @override
+  /// void onInit() => userQuery.fetch();
+  /// ```
+  @protected
+  Quarry<T> quarry<T>({
+    required Future<T> Function() fetcher,
+    Duration? staleTime,
+    QuarryRetry retry = const QuarryRetry(maxAttempts: 0),
+    String? name,
+  }) {
+    _assertNotDisposed();
+    final q = Quarry<T>(
+      fetcher: fetcher,
+      staleTime: staleTime,
+      retry: retry,
+      name: name,
+    );
+    _managedNodes.addAll(q.managedNodes);
+    return q;
   }
 
   // ---------------------------------------------------------------------------

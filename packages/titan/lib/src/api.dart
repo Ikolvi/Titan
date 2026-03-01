@@ -240,4 +240,25 @@ abstract final class Titan {
     _instances.clear();
     _factories.clear();
   }
+
+  // ---------------------------------------------------------------------------
+  // Debug / Introspection — used by Lens (debug overlay)
+  // ---------------------------------------------------------------------------
+
+  /// Returns the set of currently registered types (instances + factories).
+  ///
+  /// Useful for debug tools like [Lens] to display active registrations.
+  static Set<Type> get registeredTypes => {
+        ..._instances.keys,
+        ..._factories.keys,
+      };
+
+  /// Returns all currently instantiated instances.
+  ///
+  /// Does NOT trigger lazy factory creation. Only returns instances that
+  /// have already been created (via [put], [forge], or previously resolved
+  /// [lazy] registrations).
+  ///
+  /// Useful for debug tools like [Lens] to inspect active Pillars.
+  static Map<Type, dynamic> get instances => Map.unmodifiable(_instances);
 }

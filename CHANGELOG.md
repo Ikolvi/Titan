@@ -45,7 +45,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `RelicEntry<T>` — typed serialization config per Core
   - `Relic.hydrate()`, `Relic.persist()`, `Relic.enableAutoSave()`
   - Configurable key prefix (default `'titan:'`)
-- 83 new tests (Herald: 28, Vigil: 35, Chronicle: 21, Epoch: 22, Flux: 13, Relic: 18) — 221 total in titan core
+- **Scroll** — Form field validation with dirty/touch tracking
+  - `Scroll<T>` — validated form field extending `TitanState<T>`
+  - `validate()`, `touch()`, `reset()`, `setError()`, `clearError()`
+  - Properties: `error`, `isDirty`, `isPristine`, `isTouched`, `isValid`
+  - `ScrollGroup` — aggregate form state (`validateAll()`, `resetAll()`, `touchAll()`)
+- **Pillar.scroll()** — Create managed Scroll (form field with validation)
+- **Codex** — Paginated data management
+  - `Codex<T>` — generic paginator with offset and cursor modes
+  - `loadFirst()`, `loadNext()`, `refresh()`
+  - Reactive state: `items`, `isLoading`, `hasMore`, `currentPage`, `error`
+  - `CodexPage<T>`, `CodexRequest` — typed page/request models
+- **Pillar.codex()** — Create managed Codex (paginated data)
+- **Quarry** — Data fetching with stale-while-revalidate, retry, and deduplication
+  - `Quarry<T>` — managed data fetcher with SWR semantics
+  - `fetch()`, `refetch()`, `invalidate()`, `setData()`, `reset()`
+  - Reactive state: `data`, `isLoading`, `isFetching`, `error`, `isStale`, `hasData`
+  - `QuarryRetry` — exponential backoff config (`maxAttempts`, `baseDelay`)
+  - Request deduplication via `Completer<T>`
+- **Pillar.quarry()** — Create managed Quarry (data fetching)
+- **Herald.allEvents** — Global event stream for debug tooling
+  - `HeraldEvent` — typed wrapper with `type`, `payload`, `timestamp`
+- **Titan.registeredTypes** — Set of all registered types (instances + factories)
+- **Titan.instances** — Unmodifiable map of active instances (debug introspection)
+- 132 new tests (Herald +12, Scroll: 25, Codex: 15, Quarry: 18) — 291 total in titan core
+
+#### Bastion — Flutter Widgets (`titan_bastion`)
+- **Confluence** — Multi-Pillar consumer widgets
+  - `Confluence2<A,B>`, `Confluence3<A,B,C>`, `Confluence4<A,B,C,D>`
+  - Typed builders, Beacon/Titan resolution, auto-tracking via TitanEffect
+- **Lens** — In-app debug overlay
+  - `Lens` — floating debug panel with 4 tabs (Pillars, Herald, Vigil, Chronicle)
+  - `LensLogSink` — buffered Chronicle log capture for overlay display
+  - Static control: `Lens.show()`, `Lens.hide()`, `Lens.toggle()`
+  - Zero-overhead in production via `enabled` flag
+- 21 new tests (Confluence: 8, Lens: 13) — 40 total in titan_bastion
 
 #### Atlas — Routing (`titan_atlas`)
 - **HeraldAtlasObserver** — Bridges Atlas lifecycle to Herald events
@@ -54,6 +88,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `AtlasDriftRedirect` — emitted when Drift redirects
   - `AtlasRouteNotFound` — emitted on 404
 - 9 new tests — 92 total in titan_atlas
+
+#### Documentation
+- **The Chronicles of Titan** — 5 new story chapters (IX–XIII)
+  - Chapter IX: The Scroll Inscribes (form validation)
+  - Chapter X: The Codex Opens (pagination)
+  - Chapter XI: The Quarry Yields (data fetching)
+  - Chapter XII: The Confluence Converges (multi-Pillar consumers)
+  - Chapter XIII: The Lens Reveals (debug overlay)
+- Updated API reference and advanced patterns docs
+- Updated all READMEs with new features, lexicon entries, and comparison tables
 
 ### Fixed
 - **Top-level function shadowing**: Removed `strike()` / `strikeAsync()` from `api.dart` — Dart resolves top-level functions over inherited instance methods, bypassing `_assertNotDisposed()` and auto-capture. Use `titanBatch()` / `titanBatchAsync()` for standalone batching.

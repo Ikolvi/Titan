@@ -57,6 +57,8 @@ export 'package:titan/titan.dart';
 // Primary Widgets — The Titan Architecture
 export 'src/widgets/vestige.dart';
 export 'src/widgets/beacon.dart';
+export 'src/widgets/confluence.dart';
+export 'src/widgets/lens.dart';
 
 // Advanced Widgets (legacy / specialized)
 export 'src/widgets/obs.dart';

@@ -332,3 +332,8 @@ The notes editor now had undo/redo. The search input was debounced. The leaderbo
 | **VI** | **Turning Back the Epochs** ← You are here |
 | [VII](chapter-07-the-atlas-unfurls.md) | The Atlas Unfurls |
 | [VIII](chapter-08-the-relic-endures.md) | The Relic Endures |
+| [IX](chapter-09-the-scroll-inscribes.md) | The Scroll Inscribes |
+| [X](chapter-10-the-codex-opens.md) | The Codex Opens |
+| [XI](chapter-11-the-quarry-yields.md) | The Quarry Yields |
+| [XII](chapter-12-the-confluence-converges.md) | The Confluence Converges |
+| [XIII](chapter-13-the-lens-reveals.md) | The Lens Reveals |

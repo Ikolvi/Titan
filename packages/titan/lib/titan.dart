@@ -58,6 +58,9 @@ export 'src/events/herald.dart';
 export 'src/errors/vigil.dart';
 export 'src/logging/chronicle.dart';
 export 'src/persistence/relic.dart';
+export 'src/form/scroll.dart';
+export 'src/data/codex.dart';
+export 'src/data/quarry.dart';
 
 // Core reactive primitives
 export 'src/core/reactive.dart';

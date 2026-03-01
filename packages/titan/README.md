@@ -32,6 +32,10 @@ A signal-based reactive state management engine for Dart & Flutter — fine-grai
 | Stream Operators | **Flux** | Debounce, throttle, asStream |
 | Persistence | **Relic** | Auto-save & hydrate Cores |
 | Async Data | **Ether** | Loading / error / data wrapper |
+| Form Field | **Scroll** | Reactive form field with validation |
+| Form Group | **ScrollGroup** | Aggregate form state |
+| Pagination | **Codex** | Paginated data with reactive state |
+| Data Query | **Quarry** | Cached data fetching (SWR) |
 
 ---
 
@@ -332,6 +336,56 @@ class SettingsPillar extends Pillar {
 }
 ```
 
+### Scroll — Form Management
+
+```dart
+class LoginPillar extends Pillar {
+  late final email = scroll<String>('',
+    validator: (v) => v.contains('@') ? null : 'Invalid email',
+  );
+  late final password = scroll<String>('',
+    validator: (v) => v.length >= 8 ? null : 'Min 8 characters',
+  );
+  late final form = ScrollGroup([email, password]);
+
+  void submit() {
+    if (form.validateAll()) { /* submit */ }
+  }
+}
+```
+
+### Codex — Pagination
+
+```dart
+class ItemListPillar extends Pillar {
+  late final items = codex<Item>(
+    (req) async {
+      final result = await api.getItems(page: req.page, limit: req.pageSize);
+      return CodexPage(items: result.items, hasMore: result.hasMore);
+    },
+    pageSize: 20,
+  );
+
+  @override
+  void onInit() => items.loadFirst();
+}
+```
+
+### Quarry — Data Fetching
+
+```dart
+class ProfilePillar extends Pillar {
+  late final profile = quarry<User>(
+    fetcher: () => api.getProfile(),
+    staleTime: Duration(minutes: 5),
+    retry: QuarryRetry(maxAttempts: 3),
+  );
+
+  @override
+  void onInit() => profile.fetch();
+}
+```
+
 ---
 
 ## Why Titan?
@@ -348,6 +402,9 @@ class SettingsPillar extends Pillar {
 | Undo/Redo built-in | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Persistence layer | ❌ | ⚠️ | ❌ | ❌ | ✅ |
 | Structured logging | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Form management | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Pagination | ❌ | ❌ | ❌ | ❌ | ✅ |
+| SWR data fetching | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ---
 

@@ -325,6 +325,11 @@ void main() {
 | Architecture | [11-architecture.md](https://github.com/Ikolvi/titan/blob/main/docs/11-architecture.md) |
 | Atlas Routing | [12-atlas-routing.md](https://github.com/Ikolvi/titan/blob/main/docs/12-atlas-routing.md) |
 | **Chronicles of Titan** | **[Story-driven tutorial](https://github.com/Ikolvi/titan/blob/main/docs/story/README.md)** |
+| [Chapter IX: The Scroll Inscribes](../../docs/story/chapter-09-the-scroll-inscribes.md) | Form management with Scroll |
+| [Chapter X: The Codex Opens](../../docs/story/chapter-10-the-codex-opens.md) | Pagination with Codex |
+| [Chapter XI: The Quarry Yields](../../docs/story/chapter-11-the-quarry-yields.md) | Data fetching with Quarry |
+| [Chapter XII: The Confluence Converges](../../docs/story/chapter-12-the-confluence-converges.md) | Multi-Pillar consumer |
+| [Chapter XIII: The Lens Reveals](../../docs/story/chapter-13-the-lens-reveals.md) | Debug overlay |
 
 ## License
 

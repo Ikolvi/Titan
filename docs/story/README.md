@@ -22,6 +22,11 @@
 | [VI](chapter-06-turning-back-the-epochs.md) | **Turning Back the Epochs** | `Epoch`, undo/redo, `Flux`, debounce, throttle |
 | [VII](chapter-07-the-atlas-unfurls.md) | **The Atlas Unfurls** | `Atlas`, `Passage`, `Sentinel`, `Sanctum`, `Shift` |
 | [VIII](chapter-08-the-relic-endures.md) | **The Relic Endures** | `Relic`, persistence, hydration, the full picture |
+| [IX](chapter-09-the-scroll-inscribes.md) | **The Scroll Inscribes** | `Scroll`, `ScrollGroup`, form validation, dirty/touch tracking |
+| [X](chapter-10-the-codex-opens.md) | **The Codex Opens** | `Codex`, pagination, cursor-based, infinite scrolling |
+| [XI](chapter-11-the-quarry-yields.md) | **The Quarry Yields** | `Quarry`, data fetching, stale-while-revalidate, retry, caching |
+| [XII](chapter-12-the-confluence-converges.md) | **The Confluence Converges** | `Confluence2/3/4`, multi-Pillar consumers |
+| [XIII](chapter-13-the-lens-reveals.md) | **The Lens Reveals** | `Lens`, debug overlay, runtime introspection |
 
 ---
 
