@@ -1,4 +1,4 @@
-## 0.0.3
+## [0.0.3] - 2025-07-12
 
 ### Added
 - **Herald** — Cross-domain event bus for decoupled Pillar-to-Pillar communication
@@ -81,13 +81,13 @@
 ### Fixed
 - **Top-level function shadowing**: Removed top-level `strike()` and `strikeAsync()` from `api.dart` — Dart resolves top-level functions over inherited instance methods in ALL contexts (not just `late final` initializers), causing `_assertNotDisposed()` and auto-capture to be bypassed. Use `titanBatch()` / `titanBatchAsync()` for standalone batching.
 
-## 0.0.2
+## [0.0.2] - 2025-07-12
 
 ### Added
 - **`Titan.forge()`** — Register a Pillar by its runtime type for dynamic registration (e.g., Atlas DI integration)
 - **`Titan.removeByType()`** — Remove a Pillar by runtime Type without needing a generic parameter
 
-## 0.0.1
+## [0.0.1] - 2025-07-11
 
 ### Added
 - **Pillar** — Structured state module with lifecycle (`onInit`, `onDispose`)

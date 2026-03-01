@@ -1,4 +1,4 @@
-## 0.0.2
+## [0.0.2] - 2025-07-12
 
 ### Added
 - **Confluence** — Multi-Pillar consumer widgets
@@ -10,6 +10,6 @@
   - Static control: `Lens.show()`, `Lens.hide()`, `Lens.toggle()`
   - Zero-overhead in production via `enabled` flag
 
-## 0.0.1
+## [0.0.1] - 2025-07-11
 
 * TODO: Describe initial release.
