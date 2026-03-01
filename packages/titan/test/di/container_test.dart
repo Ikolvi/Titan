@@ -132,5 +132,25 @@ void main() {
       container.dispose();
       expect(userStore.isDisposed, true);
     });
+
+    test('has() checks parent container', () {
+      container.register(() => _CounterStore());
+
+      final child = container.createChild();
+      // Child has no local registration but parent does
+      expect(child.has<_CounterStore>(), true);
+      // Neither child nor parent has this
+      expect(child.has<_UserStore>(), false);
+
+      child.dispose();
+    });
+
+    test('double dispose is safe', () {
+      container.register(() => _CounterStore());
+      container.get<_CounterStore>();
+
+      container.dispose();
+      container.dispose(); // Should not throw
+    });
   });
 }
