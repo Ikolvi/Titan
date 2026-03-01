@@ -1,0 +1,53 @@
+# The Chronicles of Titan
+
+### A Developer's Odyssey
+
+*Learn Titan by building Questboard — a hero quest-tracking app where every chapter introduces real framework concepts through an engaging narrative.*
+
+---
+
+> *"Before the world had form, there was nothing but chaos — scattered state, tangled callbacks, widgets that rebuilt when they shouldn't have. Then a Titan raised the first Pillar, and the sky held steady."*
+
+---
+
+## Chapters
+
+| # | Chapter | You Will Learn |
+|---|---------|---------------|
+| [I](chapter-01-the-first-pillar.md) | **The First Pillar** | `Pillar`, `Core`, `Strike`, lifecycle |
+| [II](chapter-02-forging-the-derived.md) | **Forging the Derived** | `Derived`, `Watch`, auto-tracking, testing |
+| [III](chapter-03-the-beacon-shines.md) | **The Beacon Shines** | `Beacon`, `Vestige`, Flutter integration, scoping |
+| [IV](chapter-04-the-herald-rides.md) | **The Herald Rides** | `Herald`, cross-Pillar events, decoupling |
+| [V](chapter-05-the-vigilant-watch.md) | **The Vigilant Watch** | `Vigil`, `Chronicle`, error tracking, logging |
+| [VI](chapter-06-turning-back-the-epochs.md) | **Turning Back the Epochs** | `Epoch`, undo/redo, `Flux`, debounce, throttle |
+| [VII](chapter-07-the-atlas-unfurls.md) | **The Atlas Unfurls** | `Atlas`, `Passage`, `Sentinel`, `Sanctum`, `Shift` |
+| [VIII](chapter-08-the-relic-endures.md) | **The Relic Endures** | `Relic`, persistence, hydration, the full picture |
+
+---
+
+## The Story
+
+You are Kael, a developer at Ironclad Labs. Your mission: build **Questboard**, a team task-tracking app where developers are "heroes" and tasks are "quests."
+
+Previous attempts with other frameworks ended in architectural rubble. Then you discovered **Titan** — and everything changed.
+
+Each chapter follows Kael as the app grows from a single counter to a full-featured, production-ready application. Every concept is introduced when the story demands it, paired with real code examples using the actual Titan API.
+
+---
+
+## Prerequisites
+
+- Basic Dart knowledge
+- Familiarity with Flutter widgets
+- `flutter pub add titan_bastion` (for Flutter integration)
+- `flutter pub add titan_atlas` (for routing, from Chapter VII)
+
+---
+
+## Start Reading
+
+**[Chapter I: The First Pillar →](chapter-01-the-first-pillar.md)**
+
+---
+
+*Part of the [Titan](https://github.com/Ikolvi/titan) documentation — [Ikolvi](https://ikolvi.com)*
