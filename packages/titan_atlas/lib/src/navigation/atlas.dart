@@ -449,6 +449,9 @@ class Atlas {
 
   /// Navigate to a path.
   ///
+  /// Pushes a new route onto the stack. Use [go] for declarative
+  /// navigation that reuses existing stack entries.
+  ///
   /// ```dart
   /// Atlas.to('/profile/42');
   /// Atlas.to('/search?q=dart');
@@ -461,6 +464,23 @@ class Atlas {
     } else {
       _instance!._delegate._push(path, extra: extra);
     }
+  }
+
+  /// Navigate to a path (declarative / go-style).
+  ///
+  /// If the path already exists in the stack, pops back to it instead
+  /// of creating a duplicate entry. If the path is new, replaces the
+  /// entire stack. Use this for tab navigation, bottom nav bars, and
+  /// any scenario where you want to "go to" a destination rather than
+  /// "push" it.
+  ///
+  /// ```dart
+  /// Atlas.go('/');        // go to home (reuse existing)
+  /// Atlas.go('/hero');    // go to hero tab
+  /// ```
+  static void go(String path, {Object? extra}) {
+    _ensureInstance();
+    _instance!._delegate._go(path, extra: extra);
   }
 
   /// Navigate to a named route.
@@ -610,6 +630,36 @@ class AtlasDelegate extends RouterDelegate<AtlasConfiguration>
     _stack.add(result);
     for (final observer in _atlas._observers) {
       observer.onNavigate(from, result.waypoint);
+    }
+    notifyListeners();
+  }
+
+  void _go(String path, {Object? extra}) {
+    // No-op if already at this path
+    if (_currentWaypoint.path == path) return;
+
+    final from = _currentWaypoint;
+
+    // If path exists in the stack, pop back to it
+    final index = _stack.indexWhere((r) => r.waypoint.path == path);
+    if (index >= 0) {
+      while (_stack.length > index + 1) {
+        _stack.last.disposePillars();
+        _stack.removeLast();
+      }
+    } else {
+      // Clear stack and navigate fresh
+      for (final entry in _stack) {
+        entry.disposePillars();
+      }
+      final result = _atlas._resolve(path, extra: extra);
+      _stack
+        ..clear()
+        ..add(result);
+    }
+
+    for (final observer in _atlas._observers) {
+      observer.onNavigate(from, _currentWaypoint);
     }
     notifyListeners();
   }

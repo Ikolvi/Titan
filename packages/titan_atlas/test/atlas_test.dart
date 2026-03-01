@@ -132,6 +132,78 @@ void main() {
       expect(Atlas.canBack, isFalse);
     });
 
+    testWidgets('Atlas.go() reuses existing stack entry', (tester) async {
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/a', (_) => const Text('A')),
+          Passage('/b', (_) => const Text('B')),
+        ],
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+      expect(find.text('Home'), findsOneWidget);
+
+      // Push onto stack
+      Atlas.to('/a');
+      await tester.pumpAndSettle();
+      Atlas.to('/b');
+      await tester.pumpAndSettle();
+      expect(find.text('B'), findsOneWidget);
+      expect(Atlas.current.path, '/b');
+
+      // go() back to '/' — should pop to existing entry, not duplicate
+      Atlas.go('/');
+      await tester.pumpAndSettle();
+      expect(find.text('Home'), findsOneWidget);
+      expect(Atlas.current.path, '/');
+      expect(Atlas.canBack, isFalse); // stack is just [/]
+    });
+
+    testWidgets('Atlas.go() navigates fresh when path not in stack',
+        (tester) async {
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/a', (_) => const Text('A')),
+          Passage('/b', (_) => const Text('B')),
+        ],
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      // go() to a path NOT in the stack — replaces stack entirely
+      Atlas.go('/b');
+      await tester.pumpAndSettle();
+      expect(find.text('B'), findsOneWidget);
+      expect(Atlas.current.path, '/b');
+      expect(Atlas.canBack, isFalse);
+    });
+
+    testWidgets('Atlas.go() is no-op when already at path', (tester) async {
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/a', (_) => const Text('A')),
+        ],
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      Atlas.to('/a');
+      await tester.pumpAndSettle();
+
+      // go() to current path — no change
+      Atlas.go('/a');
+      await tester.pumpAndSettle();
+      expect(find.text('A'), findsOneWidget);
+      expect(Atlas.current.path, '/a');
+      expect(Atlas.canBack, isTrue); // stack still [/, /a]
+    });
+
     testWidgets('Atlas.current returns current waypoint', (tester) async {
       final atlas = Atlas(
         passages: [

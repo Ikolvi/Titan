@@ -143,7 +143,7 @@ class _QuestboardShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (i) {
-          context.atlas.to(i == 0 ? '/' : '/hero');
+          context.atlas.go(i == 0 ? '/' : '/hero');
         },
         destinations: const [
           NavigationDestination(

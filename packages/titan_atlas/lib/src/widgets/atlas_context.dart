@@ -31,13 +31,25 @@ extension AtlasContext on BuildContext {
 class AtlasContextProxy {
   const AtlasContextProxy();
 
-  /// Navigate to a path.
+  /// Navigate to a path (push).
   ///
   /// ```dart
   /// context.atlas.to('/profile/42');
   /// context.atlas.to('/search?q=dart', extra: searchData);
   /// ```
   void to(String path, {Object? extra}) => Atlas.to(path, extra: extra);
+
+  /// Navigate to a path (declarative / go-style).
+  ///
+  /// If the path already exists in the stack, pops back to it.
+  /// If new, replaces the entire stack. Ideal for tab/bottom-nav
+  /// navigation.
+  ///
+  /// ```dart
+  /// context.atlas.go('/');
+  /// context.atlas.go('/hero');
+  /// ```
+  void go(String path, {Object? extra}) => Atlas.go(path, extra: extra);
 
   /// Navigate to a named route.
   ///
