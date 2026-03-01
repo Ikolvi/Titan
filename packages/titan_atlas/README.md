@@ -155,6 +155,58 @@ Atlas uses a **trie-based route matcher** for O(k) path resolution where k is th
 
 ---
 
+## Observer — Analytics & Logging
+
+```dart
+class AnalyticsObserver extends AtlasObserver {
+  @override
+  void onNavigate(Waypoint from, Waypoint to) {
+    analytics.trackScreen(to.path);
+  }
+  
+  @override
+  void onGuardRedirect(String from, String to) {
+    analytics.trackRedirect(from, to);
+  }
+}
+
+Atlas(
+  passages: [...],
+  observers: [AnalyticsObserver(), AtlasLoggingObserver()],
+)
+```
+
+## Type-Safe Runes
+
+```dart
+Passage('/user/:id', (wp) {
+  final id = wp.intRune('id')!;    // int
+  final page = wp.intQuery('page'); // int?
+  return UserScreen(id: id, page: page);
+})
+```
+
+## Per-Route Redirects
+
+```dart
+Passage('/old-page', (_) => Container(),
+  redirect: (wp) => '/new-page',
+)
+```
+
+## Route Metadata
+
+```dart
+Passage('/admin', (wp) => AdminScreen(),
+  metadata: {'title': 'Admin Panel', 'icon': 'shield'},
+)
+
+// Access in builder or observer
+final title = waypoint.metadata?['title'];
+```
+
+---
+
 ## Works with Titan State
 
 ```dart

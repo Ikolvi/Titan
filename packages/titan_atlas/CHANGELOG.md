@@ -9,7 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Atlas — Routing & Navigation (`titan_atlas`)
+#### Enterprise Features
+- **AtlasObserver** — Navigation lifecycle observer for analytics, logging, and debugging
+  - `onNavigate`, `onReplace`, `onPop`, `onReset`, `onGuardRedirect`, `onDriftRedirect`, `onNotFound`
+- **AtlasLoggingObserver** — Built-in console logging observer
+- **Async Sentinel resolution** — Async route guards now fully evaluated during navigation
+- **Type-safe Rune accessors** — `waypoint.intRune('id')`, `doubleRune()`, `boolRune()` + query equivalents
+- **Per-route redirects** — `Passage('/old', ..., redirect: (wp) => '/new')`
+- **Route metadata** — `Passage('/admin', ..., metadata: {'title': 'Admin'})` accessible via `waypoint.metadata`
+- **Route name on Waypoint** — `waypoint.name` returns the Passage's named identifier
+- 21 new tests (67 total)
+
+---
+
+## [0.0.1] - 2025-07-12
+
+### Added
+
+#### Atlas — Routing & Navigation
 - **Atlas** — Declarative router with Navigator 2.0, deep linking, and zero-boilerplate API
 - **Passage** — Route definitions with static, dynamic (`:param`), and wildcard (`*`) patterns
 - **Sanctum** — Shell routes for persistent layouts (tab bars, nav rails, drawers)
@@ -24,10 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stack navigation** — `Atlas.to()`, `.back()`, `.backTo()`, `.replace()`, `.reset()`
 - **404 handling** — Default and custom error pages via `onError`
 - 46 tests covering trie matching, waypoint, sentinel, and full widget integration
-
----
-
-## [0.0.1] - 2025-07-11
 
 ### Added
 

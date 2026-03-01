@@ -65,6 +65,18 @@ class Passage extends AtlasRoute {
   /// Custom metadata attached to this route.
   final Map<String, dynamic>? metadata;
 
+  /// Per-route redirect function.
+  ///
+  /// Called when this Passage is matched. Return a path to redirect,
+  /// or null to allow normal passage.
+  ///
+  /// ```dart
+  /// Passage('/old-page', (_) => Container(),
+  ///   redirect: (wp) => '/new-page',
+  /// )
+  /// ```
+  final String? Function(Waypoint waypoint)? redirect;
+
   /// Create a Passage.
   ///
   /// ```dart
@@ -83,6 +95,7 @@ class Passage extends AtlasRoute {
     this.passages = const [],
     this.name,
     this.metadata,
+    this.redirect,
   });
 }
 

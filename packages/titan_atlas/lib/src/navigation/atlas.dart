@@ -33,6 +33,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../core/atlas_observer.dart';
 import '../core/passage.dart';
 import '../core/route_trie.dart';
 import '../core/sentinel.dart';
@@ -50,6 +51,7 @@ class _ResolvedRoute {
   final Widget Function(Widget child)? shell;
   final String? name;
   final Map<String, dynamic>? metadata;
+  final String? Function(Waypoint waypoint)? redirect;
 
   const _ResolvedRoute({
     required this.pattern,
@@ -58,6 +60,7 @@ class _ResolvedRoute {
     this.shell,
     this.name,
     this.metadata,
+    this.redirect,
   });
 }
 
@@ -118,6 +121,9 @@ class Atlas {
   /// Route guards.
   final List<Sentinel> _sentinels;
 
+  /// Navigation observers.
+  final List<AtlasObserver> _observers;
+
   /// Global redirect function.
   final String? Function(String path, Waypoint waypoint)? _drift;
 
@@ -144,16 +150,19 @@ class Atlas {
   ///     Passage('/', (_) => Home()),
   ///     Passage('/about', (_) => About()),
   ///   ],
+  ///   observers: [AtlasLoggingObserver()],
   /// );
   /// ```
   Atlas({
     required List<AtlasRoute> passages,
     List<Sentinel> sentinels = const [],
+    List<AtlasObserver> observers = const [],
     String? Function(String path, Waypoint waypoint)? drift,
     Widget Function(String path)? onError,
     String initialPath = '/',
     Shift? defaultShift,
   })  : _sentinels = sentinels,
+        _observers = observers,
         _drift = drift,
         _onError = onError,
         _initialPath = initialPath,
@@ -184,6 +193,7 @@ class Atlas {
             shell: parentShell,
             name: route.name,
             metadata: route.metadata,
+            redirect: route.redirect,
           );
           _trie.insert(route.path, resolved);
           if (route.name != null) {
@@ -200,7 +210,7 @@ class Atlas {
     }
   }
 
-  /// Resolve a path to a widget, applying Sentinels and Drifts.
+  /// Resolve a path to a widget, applying Drifts, Sentinels, and per-route redirects.
   _NavigationResult _resolve(String path, {Object? extra}) {
     // Parse the URI
     final uri = Uri.parse(path);
@@ -219,15 +229,21 @@ class Atlas {
     if (_drift != null) {
       final redirect = _drift(cleanPath, waypoint);
       if (redirect != null && redirect != cleanPath) {
+        for (final observer in _observers) {
+          observer.onDriftRedirect(cleanPath, redirect);
+        }
         return _resolve(redirect, extra: extra);
       }
     }
 
-    // Apply sentinels
+    // Apply sentinels (sync)
     for (final sentinel in _sentinels) {
       if (!sentinel.isAsync) {
         final redirect = sentinel.evaluate(cleanPath, waypoint);
         if (redirect != null && redirect != cleanPath) {
+          for (final observer in _observers) {
+            observer.onGuardRedirect(cleanPath, redirect);
+          }
           return _resolve(redirect, extra: extra);
         }
       }
@@ -237,6 +253,9 @@ class Atlas {
     final match = _trie.match(cleanPath);
     if (match == null) {
       // 404 — not found
+      for (final observer in _observers) {
+        observer.onNotFound(cleanPath);
+      }
       return _NavigationResult(
         waypoint: waypoint,
         widget: _onError?.call(cleanPath) ??
@@ -246,7 +265,9 @@ class Atlas {
       );
     }
 
-    // Update waypoint with matched data
+    final resolved = match.value;
+
+    // Update waypoint with matched data + metadata + name
     waypoint = Waypoint(
       path: cleanPath,
       pattern: match.pattern,
@@ -254,9 +275,18 @@ class Atlas {
       query: query,
       extra: extra,
       remaining: match.remaining,
+      metadata: resolved.metadata,
+      name: resolved.name,
     );
 
-    final resolved = match.value;
+    // Apply per-route redirect
+    if (resolved.redirect != null) {
+      final redirect = resolved.redirect!(waypoint);
+      if (redirect != null && redirect != cleanPath) {
+        return _resolve(redirect, extra: extra);
+      }
+    }
+
     final widget = resolved.builder(waypoint);
 
     return _NavigationResult(
@@ -266,6 +296,91 @@ class Atlas {
       shell: resolved.shell,
     );
   }
+
+  /// Resolve a path asynchronously (applies async Sentinels).
+  ///
+  /// Call this instead of `_resolve` when you have `Sentinel.async` guards.
+  Future<_NavigationResult> _resolveAsync(String path, {Object? extra}) async {
+    final uri = Uri.parse(path);
+    final cleanPath = uri.path.isEmpty ? '/' : uri.path;
+    final query = uri.queryParameters;
+
+    var waypoint = Waypoint(
+      path: cleanPath,
+      pattern: cleanPath,
+      query: query,
+      extra: extra,
+    );
+
+    // Apply drift
+    if (_drift != null) {
+      final redirect = _drift(cleanPath, waypoint);
+      if (redirect != null && redirect != cleanPath) {
+        for (final observer in _observers) {
+          observer.onDriftRedirect(cleanPath, redirect);
+        }
+        return _resolveAsync(redirect, extra: extra);
+      }
+    }
+
+    // Apply ALL sentinels (sync + async)
+    for (final sentinel in _sentinels) {
+      final redirect = await sentinel.evaluateAsync(cleanPath, waypoint);
+      if (redirect != null && redirect != cleanPath) {
+        for (final observer in _observers) {
+          observer.onGuardRedirect(cleanPath, redirect);
+        }
+        return _resolveAsync(redirect, extra: extra);
+      }
+    }
+
+    // Match route in trie
+    final match = _trie.match(cleanPath);
+    if (match == null) {
+      for (final observer in _observers) {
+        observer.onNotFound(cleanPath);
+      }
+      return _NavigationResult(
+        waypoint: waypoint,
+        widget: _onError?.call(cleanPath) ??
+            _DefaultErrorPage(path: cleanPath),
+        shift: null,
+        shell: null,
+      );
+    }
+
+    final resolved = match.value;
+
+    waypoint = Waypoint(
+      path: cleanPath,
+      pattern: match.pattern,
+      runes: match.runes,
+      query: query,
+      extra: extra,
+      remaining: match.remaining,
+      metadata: resolved.metadata,
+      name: resolved.name,
+    );
+
+    if (resolved.redirect != null) {
+      final redirect = resolved.redirect!(waypoint);
+      if (redirect != null && redirect != cleanPath) {
+        return _resolveAsync(redirect, extra: extra);
+      }
+    }
+
+    final widget = resolved.builder(waypoint);
+
+    return _NavigationResult(
+      waypoint: waypoint,
+      widget: widget,
+      shift: resolved.shift ?? _defaultShift,
+      shell: resolved.shell,
+    );
+  }
+
+  /// Whether any registered Sentinel is async.
+  bool get _hasAsyncSentinels => _sentinels.any((s) => s.isAsync);
 
   /// Get the RouterConfig for use with MaterialApp.router.
   ///
@@ -295,7 +410,11 @@ class Atlas {
   /// ```
   static void to(String path, {Object? extra}) {
     _ensureInstance();
-    _instance!._delegate._push(path, extra: extra);
+    if (_instance!._hasAsyncSentinels) {
+      _instance!._delegate._pushAsync(path, extra: extra);
+    } else {
+      _instance!._delegate._push(path, extra: extra);
+    }
   }
 
   /// Navigate to a named route.
@@ -428,28 +547,54 @@ class AtlasDelegate extends RouterDelegate<AtlasConfiguration>
   bool get _canPop => _stack.length > 1;
 
   void _push(String path, {Object? extra}) {
+    final from = _currentWaypoint;
     final result = _atlas._resolve(path, extra: extra);
     _stack.add(result);
+    for (final observer in _atlas._observers) {
+      observer.onNavigate(from, result.waypoint);
+    }
+    notifyListeners();
+  }
+
+  Future<void> _pushAsync(String path, {Object? extra}) async {
+    final from = _currentWaypoint;
+    final result = await _atlas._resolveAsync(path, extra: extra);
+    _stack.add(result);
+    for (final observer in _atlas._observers) {
+      observer.onNavigate(from, result.waypoint);
+    }
     notifyListeners();
   }
 
   void _replace(String path, {Object? extra}) {
+    final from = _currentWaypoint;
     final result = _atlas._resolve(path, extra: extra);
     if (_stack.isNotEmpty) _stack.removeLast();
     _stack.add(result);
+    for (final observer in _atlas._observers) {
+      observer.onReplace(from, result.waypoint);
+    }
     notifyListeners();
   }
 
   void _pop() {
     if (_stack.length > 1) {
+      final from = _currentWaypoint;
       _stack.removeLast();
+      for (final observer in _atlas._observers) {
+        observer.onPop(from, _currentWaypoint);
+      }
       notifyListeners();
     }
   }
 
   void _popUntil(String path) {
+    final from = _currentWaypoint;
     while (_stack.length > 1 && _stack.last.waypoint.path != path) {
       _stack.removeLast();
+    }
+    for (final observer in _atlas._observers) {
+      observer.onPop(from, _currentWaypoint);
     }
     notifyListeners();
   }
@@ -459,6 +604,9 @@ class AtlasDelegate extends RouterDelegate<AtlasConfiguration>
     _stack
       ..clear()
       ..add(result);
+    for (final observer in _atlas._observers) {
+      observer.onReset(result.waypoint);
+    }
     notifyListeners();
   }
 

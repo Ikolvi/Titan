@@ -48,6 +48,7 @@
 library;
 
 // Core types
+export 'src/core/atlas_observer.dart';
 export 'src/core/passage.dart';
 export 'src/core/sentinel.dart';
 export 'src/core/shift.dart';

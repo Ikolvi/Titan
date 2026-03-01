@@ -49,6 +49,18 @@ class Waypoint {
   /// The remaining path after a wildcard match.
   final String? remaining;
 
+  /// Route metadata attached to the matching Passage.
+  ///
+  /// ```dart
+  /// Passage('/admin', (_) => Admin(), metadata: {'title': 'Admin Panel', 'icon': Icons.admin})
+  /// // In builder or observer:
+  /// waypoint.metadata?['title'] // 'Admin Panel'
+  /// ```
+  final Map<String, dynamic>? metadata;
+
+  /// The named route identifier (if the matching Passage has one).
+  final String? name;
+
   /// The full URI including query string.
   Uri get uri => Uri.parse(path).replace(queryParameters: query.isEmpty ? null : query);
 
@@ -59,7 +71,55 @@ class Waypoint {
     this.query = const {},
     this.extra,
     this.remaining,
+    this.metadata,
+    this.name,
   });
+
+  // -------------------------------------------------------------------------
+  // Type-safe Rune accessors
+  // -------------------------------------------------------------------------
+
+  /// Get a Rune as an `int`, or `null` if not present or not parseable.
+  ///
+  /// ```dart
+  /// final id = waypoint.intRune('id'); // 42
+  /// ```
+  int? intRune(String key) {
+    final v = runes[key];
+    return v == null ? null : int.tryParse(v);
+  }
+
+  /// Get a Rune as a `double`, or `null` if not present or not parseable.
+  double? doubleRune(String key) {
+    final v = runes[key];
+    return v == null ? null : double.tryParse(v);
+  }
+
+  /// Get a Rune as a `bool` (`'true'`/`'1'` → true, else false).
+  bool? boolRune(String key) {
+    final v = runes[key];
+    if (v == null) return null;
+    return v == 'true' || v == '1';
+  }
+
+  /// Get a query parameter as an `int`, or `null`.
+  int? intQuery(String key) {
+    final v = query[key];
+    return v == null ? null : int.tryParse(v);
+  }
+
+  /// Get a query parameter as a `double`, or `null`.
+  double? doubleQuery(String key) {
+    final v = query[key];
+    return v == null ? null : double.tryParse(v);
+  }
+
+  /// Get a query parameter as a `bool`, or `null`.
+  bool? boolQuery(String key) {
+    final v = query[key];
+    if (v == null) return null;
+    return v == 'true' || v == '1';
+  }
 
   /// Create a copy with updated fields.
   Waypoint copyWith({
@@ -69,6 +129,8 @@ class Waypoint {
     Map<String, String>? query,
     Object? extra,
     String? remaining,
+    Map<String, dynamic>? metadata,
+    String? name,
   }) {
     return Waypoint(
       path: path ?? this.path,
@@ -77,6 +139,8 @@ class Waypoint {
       query: query ?? this.query,
       extra: extra ?? this.extra,
       remaining: remaining ?? this.remaining,
+      metadata: metadata ?? this.metadata,
+      name: name ?? this.name,
     );
   }
 
