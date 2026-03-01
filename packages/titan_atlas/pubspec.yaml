@@ -1,6 +1,6 @@
 name: titan_atlas
 description: "Atlas — Titan's routing & navigation system. Declarative, type-safe, zero-boilerplate page management with Passages, Sentinels, and deep linking."
-version: 0.1.0
+version: 0.1.1
 homepage: https://ikolvi.com
 repository: https://github.com/Ikolvi/titan
 issue_tracker: https://github.com/Ikolvi/titan/issues
@@ -12,6 +12,10 @@ topics:
   - state-management
   - deep-linking
 
+screenshots:
+  - description: 'Titan Atlas — declarative routing & navigation for Flutter'
+    path: assets/titan_banner.webp
+
 resolution: workspace
 
 environment:
@@ -21,7 +25,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  titan: ^0.1.0
+  titan: ^0.1.1
 
 dev_dependencies:
   flutter_test:

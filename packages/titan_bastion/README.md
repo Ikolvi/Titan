@@ -1,3 +1,11 @@
+<p align="center">
+  <img 
+    src="https://raw.githubusercontent.com/Ikolvi/titan/main/assets/titan_banner.webp" 
+    alt="Titan Banner" 
+    width="100%"
+  />
+</p>
+
 # Titan Bastion
 
 **The Bastion — where Titan's power meets the screen**
