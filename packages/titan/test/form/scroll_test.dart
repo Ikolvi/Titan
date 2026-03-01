@@ -169,6 +169,30 @@ void main() {
       expect(name.isTouched, false);
       expect(email.isTouched, false);
     });
+
+    test('clearAllErrors() clears errors on all fields', () {
+      group.validateAll(); // Both fields invalid — triggers errors
+      expect(name.error, isNotNull);
+      expect(email.error, isNotNull);
+
+      group.clearAllErrors();
+      expect(name.error, isNull);
+      expect(email.error, isNull);
+    });
+
+    test('invalidFields returns only fields with errors', () {
+      group.validateAll(); // Both empty, both invalid
+      expect(group.invalidFields.length, 2);
+
+      name.value = 'Kael';
+      group.validateAll();
+      expect(group.invalidFields.length, 1);
+      expect(group.invalidFields.first, same(email));
+    });
+
+    test('fieldCount returns correct count', () {
+      expect(group.fieldCount, 2);
+    });
   });
 
   group('Scroll — Pillar integration', () {

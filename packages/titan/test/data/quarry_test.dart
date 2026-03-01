@@ -250,6 +250,71 @@ void main() {
       expect(q.data.value, 'data');
       q.dispose();
     });
+
+    test('dispose() disposes all managed nodes', () {
+      final q = Quarry<String>(fetcher: () async => 'data');
+      q.dispose();
+
+      for (final node in q.managedNodes) {
+        expect(node.isDisposed, isTrue);
+      }
+    });
+
+    test('QuarryRetry defaults are maxAttempts=3 and baseDelay=1s', () {
+      const retry = QuarryRetry();
+      expect(retry.maxAttempts, 3);
+      expect(retry.baseDelay, const Duration(seconds: 1));
+    });
+
+    test('Quarry default retry has maxAttempts=0 (no retry)', () async {
+      var callCount = 0;
+      final q = Quarry<String>(
+        fetcher: () async {
+          callCount++;
+          throw Exception('fail');
+        },
+      );
+
+      await q.fetch();
+      expect(callCount, 1); // No retries — just one attempt
+      expect(q.hasError, true);
+      q.dispose();
+    });
+
+    test('reset() clears all state', () async {
+      final q = Quarry<String>(fetcher: () async => 'hello');
+      await q.fetch();
+      expect(q.hasData, true);
+
+      q.reset();
+      expect(q.data.value, isNull);
+      expect(q.error.value, isNull);
+      expect(q.isLoading.value, false);
+      expect(q.isFetching.value, false);
+      expect(q.isStale, true);
+      q.dispose();
+    });
+
+    test('setData() manually sets data', () {
+      final q = Quarry<String>(fetcher: () async => 'from-fetch');
+      q.setData('manual');
+      expect(q.data.value, 'manual');
+      expect(q.hasData, true);
+      q.dispose();
+    });
+
+    test('invalidate() marks data as stale', () async {
+      final q = Quarry<String>(
+        fetcher: () async => 'data',
+        staleTime: const Duration(hours: 1),
+      );
+      await q.fetch();
+      expect(q.isStale, false);
+
+      q.invalidate();
+      expect(q.isStale, true);
+      q.dispose();
+    });
   });
 
   group('Quarry — Pillar integration', () {

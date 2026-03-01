@@ -192,6 +192,60 @@ void main() {
       expect(req.pageSize, 10);
       expect(req.cursor, 'abc');
     });
+
+    test('dispose() disposes all managed nodes', () {
+      final codex = Codex<int>(
+        fetcher: (_) async => const CodexPage(items: [], hasMore: false),
+      );
+
+      codex.dispose();
+
+      // All managed nodes should be disposed
+      for (final node in codex.managedNodes) {
+        expect(node.isDisposed, isTrue);
+      }
+    });
+
+    test('loadNext() concurrent guard prevents double-fetch', () async {
+      var callCount = 0;
+      final codex = Codex<int>(
+        fetcher: (req) async {
+          callCount++;
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          return const CodexPage(items: [1], hasMore: true);
+        },
+      );
+
+      await codex.loadFirst();
+      expect(callCount, 1);
+
+      // Launch two loadNext calls concurrently
+      final f1 = codex.loadNext();
+      final f2 = codex.loadNext(); // Should be blocked by isLoading guard
+      await Future.wait([f1, f2]);
+
+      expect(callCount, 2); // Only one additional fetch, not two
+      codex.dispose();
+    });
+
+    test('loadFirst() after error clears error state', () async {
+      var shouldFail = true;
+      final codex = Codex<int>(
+        fetcher: (req) async {
+          if (shouldFail) throw Exception('fail');
+          return const CodexPage(items: [42], hasMore: false);
+        },
+      );
+
+      await codex.loadFirst();
+      expect(codex.error.value, isNotNull);
+
+      shouldFail = false;
+      await codex.loadFirst();
+      expect(codex.error.value, isNull);
+      expect(codex.items.value, [42]);
+      codex.dispose();
+    });
   });
 
   group('Codex — Pillar integration', () {

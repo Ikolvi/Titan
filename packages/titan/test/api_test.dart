@@ -293,6 +293,65 @@ void main() {
       expect(pillar.isInitialized, isTrue);
     });
   });
+
+  group('Pillar — strikeAsync', () {
+    test('strikeAsync() performs async mutation', () async {
+      final pillar = _TestCounterPillar();
+      pillar.initialize();
+
+      await pillar.strikeAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        pillar.count.value = 99;
+      });
+
+      expect(pillar.count.value, 99);
+      pillar.dispose();
+    });
+
+    test('strikeAsync() captures error via Vigil and rethrows', () async {
+      final pillar = _TestCounterPillar();
+      pillar.initialize();
+
+      expect(
+        () => pillar.strikeAsync(() async {
+          throw StateError('async failure');
+        }),
+        throwsStateError,
+      );
+
+      pillar.dispose();
+    });
+  });
+
+  group('Pillar — watch with immediate', () {
+    test('watch(immediate: false) does not run at creation time', () {
+      final pillar = _TestDeferredWatchPillar();
+      pillar.initialize();
+
+      // With immediate: false the effect does NOT run at creation time
+      expect(pillar.watchLog, isEmpty);
+
+      // Since the effect never ran, it has no tracked dependencies,
+      // so changing data does not trigger it either.
+      pillar.data.value = 1;
+      expect(pillar.watchLog, isEmpty);
+
+      pillar.dispose();
+    });
+
+    test('watch(immediate: true) runs at creation time (default)', () {
+      final pillar = _TestWatchPillar();
+      pillar.initialize();
+
+      // Default immediate: true — effect runs immediately
+      expect(pillar.sideEffectLog, ['value: 0']);
+
+      pillar.data.value = 1;
+      expect(pillar.sideEffectLog, ['value: 0', 'value: 1']);
+
+      pillar.dispose();
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -336,5 +395,17 @@ class _TestLifecyclePillar extends Pillar {
   @override
   void onDispose() {
     disposeCalled = true;
+  }
+}
+
+class _TestDeferredWatchPillar extends Pillar {
+  late final data = core(0);
+  final List<String> watchLog = [];
+
+  @override
+  void onInit() {
+    watch(() {
+      watchLog.add('value: ${data.value}');
+    }, immediate: false);
   }
 }

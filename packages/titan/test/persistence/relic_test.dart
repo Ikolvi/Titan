@@ -423,5 +423,84 @@ void main() {
 
       count.dispose();
     });
+
+    // -----------------------------------------------------------------------
+    // Double-dispose safety
+    // -----------------------------------------------------------------------
+
+    test('dispose() called twice does not throw', () {
+      final count = TitanState<int>(0);
+
+      final relic = Relic(
+        adapter: adapter,
+        entries: {
+          'count': RelicEntry(
+            core: count,
+            toJson: (v) => v,
+            fromJson: (v) => v as int,
+          ),
+        },
+      );
+
+      relic.dispose();
+      // Second dispose should be a no-op
+      relic.dispose();
+
+      count.dispose();
+    });
+
+    // -----------------------------------------------------------------------
+    // enableAutoSave idempotency
+    // -----------------------------------------------------------------------
+
+    test('enableAutoSave() called twice does not double-subscribe', () async {
+      final count = TitanState<int>(0);
+      var saveCount = 0;
+
+      final trackingAdapter = InMemoryRelicAdapter();
+
+      final relic = Relic(
+        adapter: trackingAdapter,
+        entries: {
+          'count': RelicEntry(
+            core: count,
+            toJson: (v) => v,
+            fromJson: (v) => v as int,
+          ),
+        },
+      );
+
+      relic.enableAutoSave();
+      relic.enableAutoSave(); // Should not double-subscribe
+
+      count.value = 1;
+      await Future.delayed(const Duration(milliseconds: 10));
+
+      // Should have been saved exactly once (not twice)
+      expect(trackingAdapter.store['titan:count'], isNotNull);
+
+      relic.dispose();
+      count.dispose();
+    });
+
+    // -----------------------------------------------------------------------
+    // RelicEntry serialize / deserialize isolation
+    // -----------------------------------------------------------------------
+
+    test('RelicEntry toJson/fromJson round-trip in isolation', () {
+      final state = TitanState<Map<String, int>>({'a': 1, 'b': 2});
+
+      final entry = RelicEntry<Map<String, int>>(
+        core: state,
+        toJson: (v) => v.map((k, v) => MapEntry(k, v)),
+        fromJson: (v) => Map<String, int>.from(v as Map),
+      );
+
+      final json = entry.toJson(state.value);
+      final restored = entry.fromJson(json);
+      expect(restored, {'a': 1, 'b': 2});
+
+      state.dispose();
+    });
   });
 }

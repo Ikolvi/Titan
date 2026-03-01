@@ -321,5 +321,13 @@ void main() {
       e.undo();
       expect(e.value, 0);
     });
+
+    test('silent() does not record undo history', () {
+      final e = Epoch<int>(0);
+      e.silent(42);
+      expect(e.value, 42);
+      expect(e.undoCount, 0); // No history entry — silent bypasses recording
+      expect(e.canUndo, false);
+    });
   });
 }

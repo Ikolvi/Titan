@@ -1,5 +1,11 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Ikolvi/titan/main/assets/titan_banner.webp" alt="Titan Banner" width="100%" />
+  <div style="width:100%; height:220px; overflow:hidden;">
+    <img 
+      src="assets/titan_banner.webp" 
+      alt="Titan Banner" 
+      style="width:100%; height:100%; object-fit:cover; object-position:center;"
+    />
+  </div>
 </p>
 
 # Titan
