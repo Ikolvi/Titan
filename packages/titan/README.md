@@ -31,10 +31,11 @@ A signal-based reactive state management engine for Dart & Flutter — fine-grai
 
 ## Quick Start
 
-```yaml
-dependencies:
-  titan: ^0.0.1
+```bash
+flutter pub add titan
 ```
+
+Or see the latest version on [pub.dev](https://pub.dev/packages/titan/install).
 
 ### Define a Pillar
 

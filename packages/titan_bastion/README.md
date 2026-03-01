@@ -12,10 +12,11 @@ Vestige, Beacon, and auto-tracking reactive UI — powered by the Pillar archite
 
 ## Quick Start
 
-```yaml
-dependencies:
-  titan_bastion: ^0.0.1
+```bash
+flutter pub add titan_bastion
 ```
+
+Or see the latest version on [pub.dev](https://pub.dev/packages/titan_bastion/install).
 
 ### 1. Define a Pillar
 
