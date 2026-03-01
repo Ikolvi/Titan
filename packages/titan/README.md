@@ -31,7 +31,6 @@ A signal-based reactive state management engine for Dart & Flutter — fine-grai
 | Side Effect | **Watch** | Reactive side effect — re-runs on change |
 | Global DI | **Titan** | Global Pillar registry |
 | Observer | **Oracle** | All-seeing state monitor |
-| Middleware | **Aegis** | State change interceptor |
 | DI Container | **Vault** | Hierarchical dependency container |
 | Module | **Forge** | Dependency assembly unit |
 | Config | **Edict** | Global Titan configuration |
@@ -264,18 +263,6 @@ class LoggingOracle extends TitanObserver {
 TitanConfig.observer = LoggingOracle();
 ```
 
-### Aegis — Middleware
-
-```dart
-class ValidationAegis extends TitanMiddleware {
-  @override
-  bool beforeChange(String name, dynamic prev, dynamic next) {
-    if (name == 'age' && next < 0) return false; // Block
-    return true;
-  }
-}
-```
-
 ### Chronicle — Structured Logging
 
 ```dart
@@ -452,7 +439,7 @@ test('counter pillar works', () {
 | Core Concepts | [03-core-concepts.md](https://github.com/Ikolvi/titan/blob/main/docs/03-core-concepts.md) |
 | Pillars | [04-stores.md](https://github.com/Ikolvi/titan/blob/main/docs/04-stores.md) |
 | Flutter Integration | [05-flutter-integration.md](https://github.com/Ikolvi/titan/blob/main/docs/05-flutter-integration.md) |
-| Middleware | [06-middleware.md](https://github.com/Ikolvi/titan/blob/main/docs/06-middleware.md) |
+| Oracle & Observation | [06-middleware.md](https://github.com/Ikolvi/titan/blob/main/docs/06-middleware.md) |
 | Testing | [07-testing.md](https://github.com/Ikolvi/titan/blob/main/docs/07-testing.md) |
 | Advanced Patterns | [08-advanced-patterns.md](https://github.com/Ikolvi/titan/blob/main/docs/08-advanced-patterns.md) |
 | API Reference | [09-api-reference.md](https://github.com/Ikolvi/titan/blob/main/docs/09-api-reference.md) |

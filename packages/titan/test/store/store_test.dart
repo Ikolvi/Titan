@@ -77,25 +77,6 @@ void main() {
       expect(store.isInitialized, true);
     });
 
-    test('addMiddleware and removeMiddleware (deprecated)', () {
-      final store = _TestStore();
-      // ignore: deprecated_member_use
-      final mw = _RecordingMiddleware();
-
-      // ignore: deprecated_member_use
-      store.addMiddleware(mw);
-      // Middleware list is internal; verify remove doesn't throw
-      // ignore: deprecated_member_use
-      store.removeMiddleware(mw);
-
-      // Re-add and dispose — dispose clears middleware list
-      // ignore: deprecated_member_use
-      store.addMiddleware(mw);
-      store.dispose();
-      // After dispose, middleware list is cleared
-      expect(store.isDisposed, true);
-    });
-
     test('createEffect is managed and disposed with store', () {
       final store = _EffectStore();
       store.initialize();
@@ -117,21 +98,6 @@ void main() {
       expect(store.isDisposed, true);
     });
   });
-}
-
-// ignore: deprecated_member_use
-class _RecordingMiddleware extends TitanMiddleware {
-  // ignore: deprecated_member_use
-  final List<StateChangeEvent> events = [];
-
-  @override
-  // ignore: deprecated_member_use
-  void onStateChange(StateChangeEvent event) {
-    events.add(event);
-  }
-
-  @override
-  void onError(Object error, StackTrace stackTrace) {}
 }
 
 class _EffectStore extends TitanStore {

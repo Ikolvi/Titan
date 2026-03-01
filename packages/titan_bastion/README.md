@@ -209,7 +209,7 @@ void main() => runApp(
 | Core Concepts | [03-core-concepts.md](https://github.com/Ikolvi/titan/blob/main/docs/03-core-concepts.md) |
 | Pillars | [04-stores.md](https://github.com/Ikolvi/titan/blob/main/docs/04-stores.md) |
 | Flutter Integration | [05-flutter-integration.md](https://github.com/Ikolvi/titan/blob/main/docs/05-flutter-integration.md) |
-| Middleware | [06-middleware.md](https://github.com/Ikolvi/titan/blob/main/docs/06-middleware.md) |
+| Oracle & Observation | [06-middleware.md](https://github.com/Ikolvi/titan/blob/main/docs/06-middleware.md) |
 | Testing | [07-testing.md](https://github.com/Ikolvi/titan/blob/main/docs/07-testing.md) |
 | Advanced Patterns | [08-advanced-patterns.md](https://github.com/Ikolvi/titan/blob/main/docs/08-advanced-patterns.md) |
 | API Reference | [09-api-reference.md](https://github.com/Ikolvi/titan/blob/main/docs/09-api-reference.md) |

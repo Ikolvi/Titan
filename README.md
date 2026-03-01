@@ -365,7 +365,6 @@ See [Atlas Routing docs](docs/12-atlas-routing.md) for full guide.
 Titan also includes advanced patterns for large-scale apps:
 
 - **`AsyncValue`/`TitanAsyncState`** — Loading/error/data handling
-- **`TitanMiddleware`** — State change interception
 - **`TitanObserver`** — Global state monitoring & time-travel debugging
 - **`TitanContainer`** — Hierarchical DI containers
 
@@ -412,7 +411,7 @@ Titan's reactive engine is built for speed. Benchmarks run automatically in CI o
 | [Core Concepts](docs/03-core-concepts.md) | Core, Derived, Strike, Watch |
 | [Pillars](docs/04-stores.md) | Organized state management |
 | [Flutter Integration](docs/05-flutter-integration.md) | Vestige, Beacon, extensions |
-| [Middleware](docs/06-middleware.md) | Middleware and observability |
+| [Oracle & Observation](docs/06-middleware.md) | State observation and monitoring |
 | [Testing](docs/07-testing.md) | Testing guide |
 | [Advanced Patterns](docs/08-advanced-patterns.md) | Forms, pagination, undo/redo |
 | [API Reference](docs/09-api-reference.md) | Complete API reference |

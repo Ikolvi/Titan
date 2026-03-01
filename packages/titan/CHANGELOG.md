@@ -97,7 +97,6 @@
 - **Watch** — Managed reactive side effects (`watch(() { ... })`)
 - **Titan** — Global Pillar registry (`Titan.put()`, `Titan.get()`, `Titan.lazy()`)
 - **TitanObserver** (Oracle) — Global state change observer
-- **TitanMiddleware** (Aegis) — State change interceptor
 - **TitanContainer** (Vault) — Hierarchical DI container
 - **TitanModule** (Forge) — Dependency assembly modules
 - **AsyncValue** (Ether) — Loading / error / data async wrapper

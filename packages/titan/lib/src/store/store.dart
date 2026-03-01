@@ -4,7 +4,6 @@ import '../core/computed.dart';
 import '../core/effect.dart';
 import '../core/reactive.dart';
 import '../core/state.dart';
-import 'middleware.dart';
 
 /// Base class for organized state containers.
 ///
@@ -53,8 +52,6 @@ import 'middleware.dart';
 abstract class TitanStore {
   final List<ReactiveNode> _managedNodes = [];
   final List<TitanEffect> _managedEffects = [];
-  // ignore: deprecated_member_use_from_same_package
-  final List<TitanMiddleware> _middlewares = [];
   bool _isInitialized = false;
   bool _isDisposed = false;
 
@@ -133,28 +130,6 @@ abstract class TitanStore {
     return effect;
   }
 
-  /// Adds a middleware to this store.
-  ///
-  /// **Deprecated**: [TitanMiddleware] hooks are never invoked.
-  /// Use [TitanObserver] for state-change observation.
-  @Deprecated('TitanMiddleware hooks are never invoked. '
-      'Use TitanObserver (Oracle) instead.')
-  // ignore: deprecated_member_use_from_same_package
-  void addMiddleware(TitanMiddleware middleware) {
-    _middlewares.add(middleware);
-  }
-
-  /// Removes a middleware from this store.
-  ///
-  /// **Deprecated**: [TitanMiddleware] hooks are never invoked.
-  /// Use [TitanObserver] for state-change observation.
-  @Deprecated('TitanMiddleware hooks are never invoked. '
-      'Use TitanObserver (Oracle) instead.')
-  // ignore: deprecated_member_use_from_same_package
-  void removeMiddleware(TitanMiddleware middleware) {
-    _middlewares.remove(middleware);
-  }
-
   /// Called once after the store is created and registered.
   ///
   /// Override to perform initialization logic like loading initial data.
@@ -194,8 +169,6 @@ abstract class TitanStore {
       node.dispose();
     }
     _managedNodes.clear();
-
-    _middlewares.clear();
   }
 
   void _assertNotDisposed() {
