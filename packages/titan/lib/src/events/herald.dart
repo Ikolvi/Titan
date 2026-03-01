@@ -88,6 +88,11 @@ abstract final class Herald {
   static final Map<Type, dynamic> _lastEvents = {};
   static StreamController<HeraldEvent>? _globalController;
 
+  /// Maximum number of event types to cache in `_lastEvents`.
+  /// Set to 0 to disable last-event caching entirely.
+  /// Defaults to 100.
+  static int maxLastEventTypes = 100;
+
   // ---------------------------------------------------------------------------
   // Emit
   // ---------------------------------------------------------------------------
@@ -103,7 +108,13 @@ abstract final class Herald {
   /// Herald.emit(CartCleared());
   /// ```
   static void emit<T>(T event) {
-    _lastEvents[T] = event;
+    if (maxLastEventTypes > 0) {
+      _lastEvents[T] = event;
+      // Evict oldest entries if over the cap
+      while (_lastEvents.length > maxLastEventTypes) {
+        _lastEvents.remove(_lastEvents.keys.first);
+      }
+    }
 
     // Notify global listeners (used by Lens debug overlay).
     if (_globalController != null &&
@@ -215,6 +226,11 @@ abstract final class Herald {
     _lastEvents.remove(T);
   }
 
+  /// Clear the entire last-event cache.
+  static void clearAllLast() {
+    _lastEvents.clear();
+  }
+
   /// Reset the entire Herald — close all streams and clear history.
   ///
   /// Typically used in tests:
@@ -233,6 +249,7 @@ abstract final class Herald {
     }
     _controllers.clear();
     _lastEvents.clear();
+    maxLastEventTypes = 100;
     if (_globalController != null && !_globalController!.isClosed) {
       _globalController!.close();
     }

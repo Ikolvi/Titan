@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import '../errors/vigil.dart';
 import 'reactive.dart';
 
 /// A derived reactive value that automatically tracks its dependencies.
@@ -85,8 +86,18 @@ class TitanComputed<T> extends ReactiveNode {
       final newValue = _compute();
       _value = newValue;
       _isDirty = false;
-    } catch (e) {
+    } catch (e, stackTrace) {
       _isDirty = false;
+      // Capture to Vigil if active, then rethrow so consumers still see the error
+      Vigil.capture(
+        e,
+        stackTrace: stackTrace,
+        context: ErrorContext(
+          source: TitanComputed,
+          action: 'recompute',
+          metadata: {'name': _name ?? 'unnamed'},
+        ),
+      );
       rethrow;
     } finally {
       ReactiveScope.popTracker(previous);

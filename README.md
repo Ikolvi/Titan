@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/titan_banner.webp" alt="Titan Banner" width="100%" />
+</p>
+
 # Titan
 
 **Total Integrated Transfer Architecture Network**

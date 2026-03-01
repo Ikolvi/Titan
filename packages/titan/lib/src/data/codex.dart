@@ -1,3 +1,4 @@
+import '../core/batch.dart';
 import '../core/state.dart';
 
 // ---------------------------------------------------------------------------
@@ -184,19 +185,23 @@ class Codex<T> {
 
       final result = await _fetcher(request);
 
-      if (page == 0) {
-        items.value = result.items;
-      } else {
-        items.value = [...items.value, ...result.items];
-      }
+      titanBatch(() {
+        if (page == 0) {
+          items.value = result.items;
+        } else {
+          items.value = [...items.value, ...result.items];
+        }
 
-      currentPage.value = page;
-      hasMore.value = result.hasMore;
-      _nextCursor = result.nextCursor;
+        currentPage.value = page;
+        hasMore.value = result.hasMore;
+        _nextCursor = result.nextCursor;
+        isLoading.value = false;
+      });
     } catch (e) {
-      error.value = e;
-    } finally {
-      isLoading.value = false;
+      titanBatch(() {
+        error.value = e;
+        isLoading.value = false;
+      });
     }
   }
 

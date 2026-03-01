@@ -175,26 +175,21 @@ class BeaconScope {
   ///
   /// Returns null if no Beacon provides a Pillar of type [P].
   static P? findPillar<P extends Pillar>(BuildContext context) {
-    // Walk up the tree looking for Beacons that have our type
+    P? found;
     context.visitAncestorElements((element) {
       final widget = element.widget;
       if (widget is _BeaconInherited) {
         final pillar = widget.pillars[P];
         if (pillar != null) {
-          _result = pillar;
+          found = pillar as P;
           return false; // Stop walking
         }
       }
       return true; // Continue walking
     });
 
-    final result = _result as P?;
-    _result = null;
-    return result;
+    return found;
   }
-
-  // Workaround for returning values from visitAncestorElements
-  static Pillar? _result;
 
   /// Finds a [Pillar] of type [P] or throws.
   ///
