@@ -375,6 +375,7 @@ See the [full documentation](docs/) for details.
 | [Migration Guide](docs/10-migration-guide.md) | Migrate from Provider/Bloc/Riverpod/GetX |
 | [Architecture](docs/11-architecture.md) | Internal design for contributors |
 | [Atlas Routing](docs/12-atlas-routing.md) | Navigation with Passages, Sentinels, and Shifts |
+| **[The Chronicles of Titan](docs/story/README.md)** | **Story-driven tutorial — learn by building Questboard** |
 
 ## Development
 

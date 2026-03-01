@@ -191,6 +191,7 @@ void main() => runApp(
 | Migration Guide | [10-migration-guide.md](https://github.com/Ikolvi/titan/blob/main/docs/10-migration-guide.md) |
 | Architecture | [11-architecture.md](https://github.com/Ikolvi/titan/blob/main/docs/11-architecture.md) |
 | Atlas Routing | [12-atlas-routing.md](https://github.com/Ikolvi/titan/blob/main/docs/12-atlas-routing.md) |
+| **Chronicles of Titan** | **[Story-driven tutorial](https://github.com/Ikolvi/titan/blob/main/docs/story/README.md)** |
 
 ## License
 
