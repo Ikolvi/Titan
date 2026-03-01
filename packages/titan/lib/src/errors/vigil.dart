@@ -290,10 +290,14 @@ class FilteredErrorHandler extends ErrorHandler {
 /// - **Pillar integration** — Auto-capture in `strikeAsync`, manual `captureError`
 abstract final class Vigil {
   static final List<ErrorHandler> _handlers = [];
-  static final List<TitanError> _history = [];
   static final StreamController<TitanError> _controller =
       StreamController<TitanError>.broadcast(sync: true);
   static int _maxHistorySize = 100;
+
+  // Ring buffer for O(1) insertion at capacity
+  static List<TitanError?> _buffer = List<TitanError?>.filled(100, null);
+  static int _head = 0; // next write position
+  static int _count = 0;
 
   // ---------------------------------------------------------------------------
   // Configuration
@@ -303,8 +307,28 @@ abstract final class Vigil {
   ///
   /// Defaults to 100. Set to 0 to disable history.
   static set maxHistorySize(int value) {
+    if (value == _maxHistorySize) return;
+    if (value <= 0) {
+      _maxHistorySize = value;
+      _buffer = [];
+      _head = 0;
+      _count = 0;
+      return;
+    }
+
+    // Rebuild buffer at new size, preserving most recent entries
+    final old = _orderedHistory();
     _maxHistorySize = value;
-    _trimHistory();
+    _buffer = List<TitanError?>.filled(value, null);
+    _head = 0;
+    _count = 0;
+    // Copy most recent entries that fit
+    final start = old.length > value ? old.length - value : 0;
+    for (var i = start; i < old.length; i++) {
+      _buffer[_head] = old[i];
+      _head = (_head + 1) % value;
+      _count++;
+    }
   }
 
   /// Get the current max history size.
@@ -375,10 +399,11 @@ abstract final class Vigil {
       context: context,
     );
 
-    // Store in history
+    // Store in history (ring buffer — O(1))
     if (_maxHistorySize > 0) {
-      _history.add(titanError);
-      _trimHistory();
+      _buffer[_head] = titanError;
+      _head = (_head + 1) % _maxHistorySize;
+      if (_count < _maxHistorySize) _count++;
     }
 
     // Dispatch to handlers
@@ -418,22 +443,32 @@ abstract final class Vigil {
   // ---------------------------------------------------------------------------
 
   /// Get a read-only view of the error history (most recent last).
-  static List<TitanError> get history => List.unmodifiable(_history);
+  static List<TitanError> get history => _orderedHistory();
 
   /// Get the most recently captured error, or `null` if none.
-  static TitanError? get lastError => _history.isEmpty ? null : _history.last;
+  static TitanError? get lastError {
+    if (_count == 0) return null;
+    // Most recent is at (_head - 1) wrapped around
+    final idx = (_head - 1 + _maxHistorySize) % _maxHistorySize;
+    return _buffer[idx];
+  }
 
   /// Get all errors matching a severity level.
   static List<TitanError> bySeverity(ErrorSeverity severity) =>
-      _history.where((e) => e.severity == severity).toList();
+      _orderedHistory().where((e) => e.severity == severity).toList();
 
   /// Get all errors from a specific source type.
   static List<TitanError> bySource(Type source) =>
-      _history.where((e) => e.context?.source == source).toList();
+      _orderedHistory().where((e) => e.context?.source == source).toList();
 
   /// Clear the error history.
   static void clearHistory() {
-    _history.clear();
+    _buffer = List<TitanError?>.filled(
+      _maxHistorySize > 0 ? _maxHistorySize : 1,
+      null,
+    );
+    _head = 0;
+    _count = 0;
   }
 
   // ---------------------------------------------------------------------------
@@ -520,17 +555,29 @@ abstract final class Vigil {
   /// ```
   static void reset() {
     _handlers.clear();
-    _history.clear();
     _maxHistorySize = 100;
+    _buffer = List<TitanError?>.filled(100, null);
+    _head = 0;
+    _count = 0;
   }
 
   // ---------------------------------------------------------------------------
   // Internal
   // ---------------------------------------------------------------------------
 
-  static void _trimHistory() {
-    while (_history.length > _maxHistorySize && _maxHistorySize > 0) {
-      _history.removeAt(0);
+  /// Returns history entries in chronological order (oldest first).
+  static List<TitanError> _orderedHistory() {
+    if (_count == 0) return const [];
+    final result = <TitanError>[];
+    if (_count < _maxHistorySize) {
+      for (var i = 0; i < _count; i++) {
+        result.add(_buffer[i]!);
+      }
+    } else {
+      for (var i = 0; i < _count; i++) {
+        result.add(_buffer[(_head + i) % _maxHistorySize]!);
+      }
     }
+    return result;
   }
 }

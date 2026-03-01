@@ -67,6 +67,8 @@ class TitanLoggingObserver extends TitanObserver {
 
 /// An observer that records state change history for time-travel debugging.
 ///
+/// Uses a ring buffer internally for O(1) insertion even at capacity.
+///
 /// ```dart
 /// final observer = TitanHistoryObserver();
 /// TitanObserver.instance = observer;
@@ -77,22 +79,45 @@ class TitanLoggingObserver extends TitanObserver {
 /// }
 /// ```
 class TitanHistoryObserver extends TitanObserver {
-  final List<StateChangeRecord> _history = [];
   final int _maxHistory;
+  late List<StateChangeRecord?> _buffer;
+  int _head = 0; // next write position
+  int _count = 0;
 
   /// Creates a history observer.
   ///
   /// - [maxHistory] — Maximum number of records to keep. Defaults to 1000.
-  TitanHistoryObserver({int maxHistory = 1000}) : _maxHistory = maxHistory;
+  TitanHistoryObserver({int maxHistory = 1000})
+      : _maxHistory = maxHistory,
+        _buffer = List<StateChangeRecord?>.filled(maxHistory, null);
 
   /// The recorded state change history (oldest first).
-  List<StateChangeRecord> get history => List.unmodifiable(_history);
+  List<StateChangeRecord> get history {
+    if (_count == 0) return const [];
+    final result = List<StateChangeRecord>.filled(_count, _buffer[0]!);
+    if (_count < _maxHistory) {
+      // Buffer not yet full — entries are at 0.._count-1
+      for (var i = 0; i < _count; i++) {
+        result[i] = _buffer[i]!;
+      }
+    } else {
+      // Buffer full — oldest is at _head, wrap around
+      for (var i = 0; i < _count; i++) {
+        result[i] = _buffer[(_head + i) % _maxHistory]!;
+      }
+    }
+    return result;
+  }
 
   /// The number of recorded changes.
-  int get length => _history.length;
+  int get length => _count;
 
   /// Clears all recorded history.
-  void clear() => _history.clear();
+  void clear() {
+    _buffer = List<StateChangeRecord?>.filled(_maxHistory, null);
+    _head = 0;
+    _count = 0;
+  }
 
   @override
   void onStateChanged({
@@ -100,15 +125,14 @@ class TitanHistoryObserver extends TitanObserver {
     required dynamic oldValue,
     required dynamic newValue,
   }) {
-    if (_history.length >= _maxHistory) {
-      _history.removeAt(0);
-    }
-    _history.add(StateChangeRecord(
+    _buffer[_head] = StateChangeRecord(
       stateName: state.name ?? state.runtimeType.toString(),
       oldValue: oldValue,
       newValue: newValue,
       timestamp: DateTime.now(),
-    ));
+    );
+    _head = (_head + 1) % _maxHistory;
+    if (_count < _maxHistory) _count++;
   }
 }
 

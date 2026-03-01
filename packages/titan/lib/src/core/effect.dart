@@ -37,9 +37,10 @@ class TitanEffect extends ReactiveNode {
   final Function() _fn;
   final void Function()? _onNotify;
   Function()? _cleanup;
-  final Set<ReactiveNode> _dependencies = {};
+  Set<ReactiveNode> _dependencies = {};
   final String? _name;
   bool _isRunning = false;
+  bool _hasEverExecuted = false;
 
   /// Creates a reactive effect.
   ///
@@ -80,8 +81,10 @@ class TitanEffect extends ReactiveNode {
     // Run cleanup from previous execution
     _runCleanup();
 
-    // Clear old dependency registrations
-    _clearDependencies();
+    // Dependency diffing: swap in a fresh set for tracking, keep old for diff
+    final oldDeps = _dependencies;
+    final newDeps = <ReactiveNode>{};
+    _dependencies = newDeps;
 
     // Push this as the current tracker
     final previous = ReactiveScope.pushTracker(this);
@@ -95,6 +98,16 @@ class TitanEffect extends ReactiveNode {
       ReactiveScope.popTracker(previous);
       _isRunning = false;
     }
+
+    // Diff: remove stale dependencies
+    if (_hasEverExecuted) {
+      for (final dep in oldDeps) {
+        if (!newDeps.contains(dep)) {
+          dep.removeDependent(this);
+        }
+      }
+    }
+    _hasEverExecuted = true;
   }
 
   void _runCleanup() {
