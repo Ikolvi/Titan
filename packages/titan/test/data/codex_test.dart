@@ -275,6 +275,81 @@ void main() {
       // Should not throw
     });
   });
+
+  group('Codex — Item Mutations', () {
+    late Codex<String> codex;
+
+    setUp(() async {
+      codex = Codex<String>(
+        fetcher: (req) async => CodexPage(
+          items: ['a', 'b', 'c'],
+          hasMore: false,
+        ),
+        pageSize: 10,
+      );
+      await codex.loadFirst();
+    });
+
+    tearDown(() => codex.dispose());
+
+    test('insertItem prepends by default', () {
+      codex.insertItem('z');
+      expect(codex.items.value, ['z', 'a', 'b', 'c']);
+    });
+
+    test('insertItem at specific index', () {
+      codex.insertItem('x', index: 2);
+      expect(codex.items.value, ['a', 'b', 'x', 'c']);
+    });
+
+    test('removeItemWhere removes matching item', () {
+      final removed = codex.removeItemWhere((i) => i == 'b');
+      expect(removed, true);
+      expect(codex.items.value, ['a', 'c']);
+    });
+
+    test('removeItemWhere returns false when no match', () {
+      final removed = codex.removeItemWhere((i) => i == 'z');
+      expect(removed, false);
+      expect(codex.items.value, ['a', 'b', 'c']);
+    });
+
+    test('removeItemAt removes by index', () {
+      final item = codex.removeItemAt(1);
+      expect(item, 'b');
+      expect(codex.items.value, ['a', 'c']);
+    });
+
+    test('updateItemWhere updates matching item', () {
+      final updated = codex.updateItemWhere(
+        (i) => i == 'b',
+        (i) => '${i}_updated',
+      );
+      expect(updated, true);
+      expect(codex.items.value, ['a', 'b_updated', 'c']);
+    });
+
+    test('updateItemWhere returns false when no match', () {
+      final updated = codex.updateItemWhere(
+        (i) => i == 'z',
+        (i) => '${i}_updated',
+      );
+      expect(updated, false);
+    });
+
+    test('updateItemAt updates by index', () {
+      codex.updateItemAt(0, (i) => '${i}_first');
+      expect(codex.items.value, ['a_first', 'b', 'c']);
+    });
+
+    test('itemCount reflects mutations', () {
+      expect(codex.itemCount, 3);
+      codex.insertItem('d');
+      expect(codex.itemCount, 4);
+      codex.removeItemAt(0);
+      expect(codex.itemCount, 3);
+    });
+  });
 }
 
 class _PaginatedPillar extends Pillar {

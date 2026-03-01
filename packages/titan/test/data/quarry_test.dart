@@ -345,6 +345,130 @@ void main() {
       // Should not throw
     });
   });
+
+  group('Quarry — Polling', () {
+    test('isPolling is false initially', () {
+      final q = Quarry<int>(fetcher: () async => 1);
+      expect(q.isPolling, false);
+      q.dispose();
+    });
+
+    test('startPolling activates periodic refetch', () async {
+      var fetchCount = 0;
+      final q = Quarry<int>(
+        fetcher: () async {
+          fetchCount++;
+          return fetchCount;
+        },
+      );
+
+      await q.startPolling(
+        Duration(milliseconds: 50),
+        fetchImmediately: true,
+      );
+      expect(q.isPolling, true);
+      expect(fetchCount, 1); // Immediate fetch
+
+      // Wait for 2-3 polling ticks
+      await Future<void>.delayed(Duration(milliseconds: 130));
+      expect(fetchCount, greaterThanOrEqualTo(3));
+
+      q.stopPolling();
+      expect(q.isPolling, false);
+      q.dispose();
+    });
+
+    test('stopPolling halts periodic fetch', () async {
+      var fetchCount = 0;
+      final q = Quarry<int>(
+        fetcher: () async {
+          fetchCount++;
+          return fetchCount;
+        },
+      );
+
+      await q.startPolling(Duration(milliseconds: 50));
+      q.stopPolling();
+      final countAfterStop = fetchCount;
+
+      await Future<void>.delayed(Duration(milliseconds: 120));
+      expect(fetchCount, countAfterStop); // No more fetches
+      q.dispose();
+    });
+
+    test('startPolling with fetchImmediately false skips initial fetch',
+        () async {
+      var fetchCount = 0;
+      final q = Quarry<int>(
+        fetcher: () async {
+          fetchCount++;
+          return fetchCount;
+        },
+      );
+
+      await q.startPolling(
+        Duration(milliseconds: 200),
+        fetchImmediately: false,
+      );
+      expect(fetchCount, 0); // No immediate fetch
+      q.stopPolling();
+      q.dispose();
+    });
+
+    test('dispose stops polling', () async {
+      var fetchCount = 0;
+      final q = Quarry<int>(
+        fetcher: () async {
+          fetchCount++;
+          return fetchCount;
+        },
+      );
+
+      await q.startPolling(Duration(milliseconds: 50));
+      q.dispose();
+      final countAfterDispose = fetchCount;
+
+      await Future<void>.delayed(Duration(milliseconds: 120));
+      expect(fetchCount, countAfterDispose);
+    });
+
+    test('reset stops polling', () async {
+      var fetchCount = 0;
+      final q = Quarry<int>(
+        fetcher: () async {
+          fetchCount++;
+          return fetchCount;
+        },
+      );
+
+      await q.startPolling(Duration(milliseconds: 50));
+      q.reset();
+      expect(q.isPolling, false);
+      q.dispose();
+    });
+
+    test('restarting polling resets interval', () async {
+      var fetchCount = 0;
+      final q = Quarry<int>(
+        fetcher: () async {
+          fetchCount++;
+          return fetchCount;
+        },
+      );
+
+      await q.startPolling(Duration(milliseconds: 1000));
+      // Restart with shorter interval
+      await q.startPolling(Duration(milliseconds: 50));
+      expect(q.isPolling, true);
+
+      await Future<void>.delayed(Duration(milliseconds: 130));
+      // Should have multiple fetches from the short interval
+      expect(fetchCount, greaterThanOrEqualTo(3));
+
+      q.stopPolling();
+      q.dispose();
+    });
+  });
 }
 
 class _DataPillar extends Pillar {

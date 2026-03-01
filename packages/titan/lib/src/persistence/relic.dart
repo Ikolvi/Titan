@@ -56,6 +56,7 @@
 /// ```
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import '../core/state.dart';
@@ -200,6 +201,7 @@ class Relic {
   final String prefix;
 
   final List<void Function()> _unsubscribers = [];
+  final Map<String, Timer> _debounceTimers = {};
   bool _disposed = false;
 
   /// Creates a [Relic] persistence manager.
@@ -301,15 +303,22 @@ class Relic {
   // Auto-save — persist on every Core change
   // ---------------------------------------------------------------------------
 
-  /// Enables auto-saving: every Core change is immediately persisted.
+  /// Enables auto-saving: every Core change is persisted.
+  ///
+  /// If [debounce] is provided, saves are debounced per-key — rapid
+  /// mutations only trigger a single write after the debounce period.
+  /// This prevents I/O storms from high-frequency state changes.
   ///
   /// Call [disableAutoSave] or [dispose] to stop.
   ///
   /// ```dart
+  /// // Immediate save on every change
   /// relic.enableAutoSave();
-  /// count.value = 42; // Automatically persisted
+  ///
+  /// // Debounced save — at most one write per 500 ms per key
+  /// relic.enableAutoSave(debounce: Duration(milliseconds: 500));
   /// ```
-  void enableAutoSave() {
+  void enableAutoSave({Duration? debounce}) {
     _assertNotDisposed();
 
     // Avoid double-subscribing
@@ -320,18 +329,29 @@ class Relic {
       final relicEntry = entry.value;
 
       final unsub = relicEntry.core.listen((_) {
-        _persistKey(key, relicEntry);
+        if (debounce != null) {
+          _debounceTimers[key]?.cancel();
+          _debounceTimers[key] = Timer(debounce, () {
+            _persistKey(key, relicEntry);
+          });
+        } else {
+          _persistKey(key, relicEntry);
+        }
       });
       _unsubscribers.add(unsub);
     }
   }
 
-  /// Disables auto-saving.
+  /// Disables auto-saving and cancels any pending debounce timers.
   void disableAutoSave() {
     for (final unsub in _unsubscribers) {
       unsub();
     }
     _unsubscribers.clear();
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    _debounceTimers.clear();
   }
 
   // ---------------------------------------------------------------------------

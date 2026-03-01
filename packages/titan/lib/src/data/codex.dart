@@ -183,6 +183,83 @@ class Codex<T> {
     await loadFirst();
   }
 
+  /// Insert an item at the given [index] (optimistic mutation).
+  ///
+  /// If [index] is omitted, prepends to the beginning.
+  ///
+  /// ```dart
+  /// // Optimistic insert at top
+  /// codex.insertItem(newQuest);
+  ///
+  /// // Insert at specific position
+  /// codex.insertItem(quest, index: 3);
+  /// ```
+  void insertItem(T item, {int? index}) {
+    final list = [...items.value];
+    list.insert(index ?? 0, item);
+    items.value = list;
+  }
+
+  /// Remove the first item matching [test] (optimistic mutation).
+  ///
+  /// Returns `true` if an item was removed, `false` otherwise.
+  ///
+  /// ```dart
+  /// codex.removeItemWhere((q) => q.id == questId);
+  /// ```
+  bool removeItemWhere(bool Function(T item) test) {
+    final list = [...items.value];
+    final index = list.indexWhere(test);
+    if (index == -1) return false;
+    list.removeAt(index);
+    items.value = list;
+    return true;
+  }
+
+  /// Remove the item at [index] (optimistic mutation).
+  ///
+  /// Returns the removed item.
+  ///
+  /// ```dart
+  /// final removed = codex.removeItemAt(2);
+  /// ```
+  T removeItemAt(int index) {
+    final list = [...items.value];
+    final removed = list.removeAt(index);
+    items.value = list;
+    return removed;
+  }
+
+  /// Update the first item matching [test] with [update] (optimistic mutation).
+  ///
+  /// Returns `true` if an item was updated, `false` otherwise.
+  ///
+  /// ```dart
+  /// codex.updateItemWhere(
+  ///   (q) => q.id == questId,
+  ///   (q) => q.copyWith(completed: true),
+  /// );
+  /// ```
+  bool updateItemWhere(bool Function(T item) test, T Function(T item) update) {
+    final list = [...items.value];
+    final index = list.indexWhere(test);
+    if (index == -1) return false;
+    list[index] = update(list[index]);
+    items.value = list;
+    return true;
+  }
+
+  /// Update the item at [index] with [update] (optimistic mutation).
+  ///
+  /// ```dart
+  /// codex.updateItemAt(0, (q) => q.copyWith(pinned: true));
+  /// ```
+  void updateItemAt(int index, T Function(T item) update) {
+    final list = [...items.value];
+    list[index] = update(list[index]);
+    items.value = list;
+  }
+
   Future<void> _loadPage(int page) async {
     isLoading.value = true;
     error.value = null;

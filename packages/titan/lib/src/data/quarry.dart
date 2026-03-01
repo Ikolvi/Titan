@@ -112,6 +112,9 @@ class Quarry<T> {
   /// Whether a fetch is currently in progress (deduplication).
   Completer<void>? _activeFetch;
 
+  /// Active polling timer, if any.
+  Timer? _pollTimer;
+
   /// Creates a Quarry with a fetcher function and optional configuration.
   Quarry({
     required Future<T> Function() fetcher,
@@ -232,12 +235,48 @@ class Quarry<T> {
 
   /// Reset to initial state — clear all data, errors, and timing.
   void reset() {
+    stopPolling();
     data.value = null;
     error.value = null;
     isLoading.value = false;
     isFetching.value = false;
     _lastFetchTime = null;
     _activeFetch = null;
+  }
+
+  /// Whether polling is currently active.
+  bool get isPolling => _pollTimer != null;
+
+  /// Start periodic polling at the given [interval].
+  ///
+  /// Each tick calls [refetch] to fetch fresh data regardless of staleness.
+  /// If polling is already active, it is restarted with the new interval.
+  ///
+  /// Optionally set [fetchImmediately] to `true` (default) to trigger
+  /// an immediate fetch before polling starts.
+  ///
+  /// ```dart
+  /// // Poll every 30 seconds
+  /// query.startPolling(Duration(seconds: 30));
+  ///
+  /// // Stop when no longer needed
+  /// query.stopPolling();
+  /// ```
+  Future<void> startPolling(
+    Duration interval, {
+    bool fetchImmediately = true,
+  }) async {
+    stopPolling();
+    if (fetchImmediately) {
+      await refetch();
+    }
+    _pollTimer = Timer.periodic(interval, (_) => refetch());
+  }
+
+  /// Stop polling if active.
+  void stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
   }
 
   Future<T> _fetchWithRetry() async {
@@ -268,6 +307,7 @@ class Quarry<T> {
 
   /// Dispose all managed state.
   void dispose() {
+    stopPolling();
     for (final node in managedNodes) {
       node.dispose();
     }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../core/reactive.dart';
 import '../core/state.dart';
 
@@ -43,6 +45,7 @@ import '../core/state.dart';
 class Scroll<T> extends TitanState<T> {
   final T _initialValue;
   final String? Function(T value)? _validator;
+  final Future<String?> Function(T value)? _asyncValidator;
 
   /// The error state for this field. `null` means no error.
   ///
@@ -53,21 +56,34 @@ class Scroll<T> extends TitanState<T> {
   /// Whether this field has been touched (focused and blurred).
   final TitanState<bool> _touched;
 
+  /// Whether an async validation is currently in progress.
+  final TitanState<bool> _isValidating;
+
   /// Creates a form field with an initial value and optional validator.
+  ///
+  /// - [validator] — Synchronous validator.
+  /// - [asyncValidator] — Asynchronous validator (e.g., server-side checks).
+  ///   Called after the sync validator passes. Results update [error] reactively.
   ///
   /// ```dart
   /// late final username = scroll('',
   ///   validator: (v) => v.length < 3 ? 'Too short' : null,
+  ///   asyncValidator: (v) async {
+  ///     final available = await api.checkUsername(v);
+  ///     return available ? null : 'Username taken';
+  ///   },
   ///   name: 'username',
   /// );
   /// ```
   Scroll(
     super.initialValue, {
     String? Function(T value)? validator,
+    Future<String?> Function(T value)? asyncValidator,
     super.name,
     super.equals,
   }) : _initialValue = initialValue,
        _validator = validator,
+       _asyncValidator = asyncValidator,
        _error = TitanState<String?>(
          null,
          name: name != null ? '${name}_error' : null,
@@ -75,6 +91,10 @@ class Scroll<T> extends TitanState<T> {
        _touched = TitanState<bool>(
          false,
          name: name != null ? '${name}_touched' : null,
+       ),
+       _isValidating = TitanState<bool>(
+         false,
+         name: name != null ? '${name}_validating' : null,
        );
 
   // ---------------------------------------------------------------------------
@@ -101,6 +121,11 @@ class Scroll<T> extends TitanState<T> {
   /// Call [validate()] first to ensure freshness.
   bool get isValid => _error.value == null;
 
+  /// Whether an async validation is currently in progress.
+  ///
+  /// Reading this inside a [Derived] or [Vestige] auto-tracks it.
+  bool get isValidating => _isValidating.value;
+
   /// The initial value this field was created with.
   T get initialValue => _initialValue;
 
@@ -108,9 +133,10 @@ class Scroll<T> extends TitanState<T> {
   // Actions
   // ---------------------------------------------------------------------------
 
-  /// Run the validator against the current value and update [error].
+  /// Run the synchronous validator against the current value and update [error].
   ///
   /// Returns `true` if valid, `false` if invalid.
+  /// Does NOT run the async validator — use [validateAsync] for that.
   ///
   /// ```dart
   /// if (email.validate()) {
@@ -119,6 +145,35 @@ class Scroll<T> extends TitanState<T> {
   /// ```
   bool validate() {
     _error.value = _validator?.call(value);
+    return _error.value == null;
+  }
+
+  /// Run both synchronous and asynchronous validators.
+  ///
+  /// The sync validator runs first. If it fails, the async validator
+  /// is skipped. Returns `true` if all validations pass.
+  ///
+  /// ```dart
+  /// if (await username.validateAsync()) {
+  ///   // Username is valid and available
+  /// }
+  /// ```
+  Future<bool> validateAsync() async {
+    // Run sync validator first
+    _error.value = _validator?.call(value);
+    if (_error.value != null) return false;
+
+    // Run async validator if provided
+    if (_asyncValidator != null) {
+      _isValidating.value = true;
+      try {
+        _error.value = await _asyncValidator(value);
+      } catch (e) {
+        _error.value = e.toString();
+      } finally {
+        _isValidating.value = false;
+      }
+    }
     return _error.value == null;
   }
 
@@ -145,12 +200,13 @@ class Scroll<T> extends TitanState<T> {
   }
 
   /// Returns all managed reactive nodes (for disposal by Pillar).
-  List<ReactiveNode> get managedNodes => [_error, _touched];
+  List<ReactiveNode> get managedNodes => [_error, _touched, _isValidating];
 
   @override
   void dispose() {
     _error.dispose();
     _touched.dispose();
+    _isValidating.dispose();
     super.dispose();
   }
 }
@@ -200,11 +256,32 @@ class ScrollGroup {
   /// Whether any field has been touched.
   bool get isTouched => _fields.any((f) => f.isTouched);
 
-  /// Validate all fields. Returns `true` if all are valid.
+  /// Validate all fields synchronously. Returns `true` if all are valid.
   bool validateAll() {
     bool allValid = true;
     for (final field in _fields) {
       if (!field.validate()) {
+        allValid = false;
+      }
+    }
+    return allValid;
+  }
+
+  /// Validate all fields including async validators.
+  ///
+  /// Runs sync validators first, then async validators for all fields
+  /// that passed sync validation. Returns `true` if all pass.
+  ///
+  /// ```dart
+  /// void submit() async {
+  ///   if (!await form.validateAllAsync()) return;
+  ///   // All valid — process form
+  /// }
+  /// ```
+  Future<bool> validateAllAsync() async {
+    bool allValid = true;
+    for (final field in _fields) {
+      if (!await field.validateAsync()) {
         allValid = false;
       }
     }

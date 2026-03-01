@@ -292,6 +292,45 @@ void main() {
       final pillar = Titan.get<_TestLifecyclePillar>();
       expect(pillar.isInitialized, isTrue);
     });
+
+    test('putIfAbsent registers only if absent', () {
+      Titan.put('first');
+      final result = Titan.putIfAbsent('second');
+      expect(result, false);
+      expect(Titan.get<String>(), 'first'); // Not replaced
+    });
+
+    test('putIfAbsent registers when absent', () {
+      final result = Titan.putIfAbsent('hello');
+      expect(result, true);
+      expect(Titan.get<String>(), 'hello');
+    });
+
+    test('putIfAbsent respects lazy factories', () {
+      Titan.lazy<int>(() => 42);
+      final result = Titan.putIfAbsent<int>(99);
+      expect(result, false);
+      expect(Titan.get<int>(), 42); // Lazy factory wins
+    });
+
+    test('replace disposes old Pillar and sets new one', () {
+      final old = _TestLifecyclePillar();
+      Titan.put(old);
+      expect(old.isDisposed, false);
+
+      final replacement = _TestLifecyclePillar();
+      Titan.replace(replacement);
+      expect(old.isDisposed, true);
+      expect(Titan.get<_TestLifecyclePillar>(), same(replacement));
+      expect(replacement.isInitialized, true);
+    });
+
+    test('replace works when no previous registration exists', () {
+      final pillar = _TestLifecyclePillar();
+      Titan.replace(pillar);
+      expect(Titan.has<_TestLifecyclePillar>(), true);
+      expect(pillar.isInitialized, true);
+    });
   });
 
   group('Pillar — strikeAsync', () {

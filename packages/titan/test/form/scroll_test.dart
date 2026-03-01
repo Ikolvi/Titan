@@ -100,7 +100,7 @@ void main() {
     });
 
     test('managedNodes returns error and touched nodes', () {
-      expect(field.managedNodes.length, 2);
+      expect(field.managedNodes.length, 3);
     });
   });
 
@@ -237,6 +237,124 @@ void main() {
     test('Pillar disposal cleans up scroll nodes', () {
       pillar.dispose();
       // Should not throw — nodes are properly cleaned up
+    });
+  });
+
+  group('Scroll — Async Validation', () {
+    late Scroll<String> field;
+
+    setUp(() {
+      field = Scroll<String>(
+        '',
+        validator: (v) => v.isEmpty ? 'Required' : null,
+        asyncValidator: (v) async {
+          await Future<void>.delayed(Duration(milliseconds: 10));
+          return v == 'taken' ? 'Already taken' : null;
+        },
+      );
+    });
+
+    tearDown(() {
+      field.dispose();
+      for (final node in field.managedNodes) {
+        node.dispose();
+      }
+    });
+
+    test('isValidating is false initially', () {
+      expect(field.isValidating, false);
+    });
+
+    test('validateAsync returns true when sync and async both pass', () async {
+      field.value = 'available';
+      final result = await field.validateAsync();
+      expect(result, true);
+      expect(field.isValid, true);
+      expect(field.error, isNull);
+    });
+
+    test('validateAsync returns false when sync fails (skips async)', () async {
+      // Empty string triggers sync validator
+      final result = await field.validateAsync();
+      expect(result, false);
+      expect(field.error, 'Required');
+    });
+
+    test('validateAsync returns false when async fails', () async {
+      field.value = 'taken';
+      final result = await field.validateAsync();
+      expect(result, false);
+      expect(field.error, 'Already taken');
+    });
+
+    test('isValidating is true during async validation', () async {
+      field.value = 'available';
+      final future = field.validateAsync();
+      // After starting, isValidating should be true
+      expect(field.isValidating, true);
+      await future;
+      expect(field.isValidating, false);
+    });
+
+    test('validateAsync works without async validator', () async {
+      final noAsync = Scroll<String>(
+        'hello',
+        validator: (v) => v.isEmpty ? 'Required' : null,
+      );
+      final result = await noAsync.validateAsync();
+      expect(result, true);
+      noAsync.dispose();
+      for (final node in noAsync.managedNodes) {
+        node.dispose();
+      }
+    });
+  });
+
+  group('ScrollGroup — Async Validation', () {
+    late Scroll<String> name;
+    late Scroll<String> email;
+    late ScrollGroup group;
+
+    setUp(() {
+      name = Scroll<String>(
+        '',
+        validator: (v) => v.isEmpty ? 'Required' : null,
+      );
+      email = Scroll<String>(
+        '',
+        validator: (v) => v.contains('@') ? null : 'Invalid email',
+        asyncValidator: (v) async {
+          await Future<void>.delayed(Duration(milliseconds: 10));
+          return v == 'taken@test.com' ? 'Email taken' : null;
+        },
+      );
+      group = ScrollGroup([name, email]);
+    });
+
+    tearDown(() {
+      name.dispose();
+      email.dispose();
+      for (final node in name.managedNodes) {
+        node.dispose();
+      }
+      for (final node in email.managedNodes) {
+        node.dispose();
+      }
+    });
+
+    test('validateAllAsync returns true when all pass', () async {
+      name.value = 'Kael';
+      email.value = 'kael@titan.io';
+      final result = await group.validateAllAsync();
+      expect(result, true);
+      expect(group.isValid, true);
+    });
+
+    test('validateAllAsync returns false when async validator fails', () async {
+      name.value = 'Kael';
+      email.value = 'taken@test.com';
+      final result = await group.validateAllAsync();
+      expect(result, false);
     });
   });
 }

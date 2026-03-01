@@ -501,5 +501,68 @@ void main() {
 
       state.dispose();
     });
+
+    // -----------------------------------------------------------------------
+    // Debounced auto-save
+    // -----------------------------------------------------------------------
+
+    test('enableAutoSave with debounce coalesces rapid writes', () async {
+      final adapter = InMemoryRelicAdapter();
+      final counter = TitanState<int>(0);
+
+      final relic = Relic(
+        adapter: adapter,
+        entries: {
+          'counter': RelicEntry<int>(
+            core: counter,
+            toJson: (v) => v,
+            fromJson: (v) => v as int,
+          ),
+        },
+      );
+
+      relic.enableAutoSave(debounce: Duration(milliseconds: 100));
+
+      // Rapid mutations — should coalesce into 1 write
+      counter.value = 1;
+      counter.value = 2;
+      counter.value = 3;
+
+      // Before debounce fires, nothing should be written
+      expect(adapter.store.containsKey('titan:counter'), false);
+
+      // Wait for debounce
+      await Future<void>.delayed(Duration(milliseconds: 150));
+      expect(adapter.store['titan:counter'], '3');
+
+      relic.dispose();
+      counter.dispose();
+    });
+
+    test('disableAutoSave cancels pending debounce timers', () async {
+      final adapter = InMemoryRelicAdapter();
+      final counter = TitanState<int>(0);
+
+      final relic = Relic(
+        adapter: adapter,
+        entries: {
+          'counter': RelicEntry<int>(
+            core: counter,
+            toJson: (v) => v,
+            fromJson: (v) => v as int,
+          ),
+        },
+      );
+
+      relic.enableAutoSave(debounce: Duration(milliseconds: 100));
+      counter.value = 42;
+      relic.disableAutoSave(); // Should cancel pending timer
+
+      await Future<void>.delayed(Duration(milliseconds: 150));
+      expect(adapter.store.containsKey('titan:counter'), false);
+
+      relic.dispose();
+      counter.dispose();
+    });
   });
 }

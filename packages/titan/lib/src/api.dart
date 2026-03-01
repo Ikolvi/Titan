@@ -161,6 +161,46 @@ abstract final class Titan {
     _factories[T] = factory;
   }
 
+  /// Register only if [T] is not already registered.
+  ///
+  /// Returns `true` if the instance was registered, `false` if [T]
+  /// was already present. Useful for idempotent plugin initialization.
+  ///
+  /// ```dart
+  /// Titan.putIfAbsent(AnalyticsPillar()); // Registers
+  /// Titan.putIfAbsent(AnalyticsPillar()); // No-op, returns false
+  /// ```
+  static bool putIfAbsent<T>(T instance) {
+    if (has<T>()) return false;
+    put<T>(instance);
+    return true;
+  }
+
+  /// Replace an existing registration with a new instance.
+  ///
+  /// If [T] is already registered, the old instance is disposed (if it
+  /// is a [Pillar]) and replaced. If not registered, behaves like [put].
+  ///
+  /// Useful for hot-reloading or swapping implementations at runtime.
+  ///
+  /// ```dart
+  /// // Initial registration
+  /// Titan.put<AuthService>(RealAuthService());
+  ///
+  /// // Hot-swap with mock
+  /// Titan.replace<AuthService>(MockAuthService());
+  /// ```
+  static void replace<T>(T instance) {
+    if (_instances.containsKey(T)) {
+      final old = _instances[T];
+      if (old is Pillar) {
+        old.dispose();
+      }
+    }
+    _factories.remove(T);
+    put<T>(instance);
+  }
+
   /// Retrieve a registered instance.
   ///
   /// Throws [StateError] if not registered.

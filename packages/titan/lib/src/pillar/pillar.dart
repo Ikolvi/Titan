@@ -202,6 +202,7 @@ abstract class Pillar {
   Scroll<T> scroll<T>(
     T initialValue, {
     String? Function(T value)? validator,
+    Future<String?> Function(T value)? asyncValidator,
     String? name,
     bool Function(T previous, T next)? equals,
   }) {
@@ -209,6 +210,7 @@ abstract class Pillar {
     final s = Scroll<T>(
       initialValue,
       validator: validator,
+      asyncValidator: asyncValidator,
       name: name,
       equals: equals,
     );
