@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 
@@ -120,12 +121,19 @@ class _ShadeLensPillar extends Pillar {
 
     // Auto-stop recording when Lens reopens — gives the user immediate
     // access to Save/Replay without having to manually click Stop.
+    // Scheduled to post-frame to avoid setState during build (onInit
+    // runs during Beacon initState, and setting Core values would
+    // trigger a Vestige rebuild mid-build).
     if (colossus.shade.isRecording) {
-      final session = colossus.shade.stopRecording();
-      lastSession.value = session;
-      status.value =
-          'Recording auto-stopped — ${session.eventCount} events in '
-          '${session.duration.inMilliseconds}ms';
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (colossus.shade.isRecording) {
+          final session = colossus.shade.stopRecording();
+          lastSession.value = session;
+          status.value =
+              'Recording auto-stopped — ${session.eventCount} events in '
+              '${session.duration.inMilliseconds}ms';
+        }
+      });
     }
   }
 

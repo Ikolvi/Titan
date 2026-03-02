@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 
 /// Spark Demo Screen — comprehensive hooks showcase.
@@ -59,12 +60,17 @@ class SparkDemoScreen extends Spark {
     // --- Fire a snackbar when count crosses a milestone ---
     useValueChanged<int, void>(count.value, (oldValue, _) {
       if (count.value > 0 && count.value % 5 == 0 && isMounted()) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('🏆 Milestone! Count reached ${count.value}'),
-            duration: const Duration(seconds: 1),
-          ),
-        );
+        // Schedule to post-frame — showSnackBar cannot be called during build.
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (isMounted()) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('🏆 Milestone! Count reached ${count.value}'),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          }
+        });
       }
       return;
     });
