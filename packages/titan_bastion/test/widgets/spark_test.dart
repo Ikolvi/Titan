@@ -1352,6 +1352,160 @@ void main() {
       expect(find.text('kept alive'), findsOneWidget);
     });
   });
+
+  // ===========================================================================
+  // useReducer
+  // ===========================================================================
+
+  group('useReducer', () {
+    testWidgets('renders initial state', (tester) async {
+      await tester.pumpWidget(_app(_ReducerSpark(onStore: (_) {})));
+      expect(find.text('0'), findsOneWidget);
+    });
+
+    testWidgets('dispatch updates state', (tester) async {
+      late SparkStore<int, String> store;
+      await tester.pumpWidget(_app(_ReducerSpark(onStore: (s) => store = s)));
+      expect(find.text('0'), findsOneWidget);
+
+      store.dispatch('increment');
+      await tester.pump();
+      expect(find.text('1'), findsOneWidget);
+
+      store.dispatch('increment');
+      await tester.pump();
+      expect(find.text('2'), findsOneWidget);
+
+      store.dispatch('decrement');
+      await tester.pump();
+      expect(find.text('1'), findsOneWidget);
+
+      store.dispatch('reset');
+      await tester.pump();
+      expect(find.text('0'), findsOneWidget);
+    });
+
+    testWidgets('does not rebuild on same state', (tester) async {
+      final builds = <int>[];
+      late SparkStore<int, String> store;
+      await tester.pumpWidget(
+        _app(
+          _ReducerBuildCountSpark(
+            onStore: (s) => store = s,
+            buildCount: builds,
+          ),
+        ),
+      );
+      final initialBuilds = builds.length;
+
+      store.dispatch('unknown'); // Reducer returns same state
+      await tester.pump();
+      expect(builds.length, initialBuilds); // No extra rebuild
+    });
+  });
+
+  // ===========================================================================
+  // useStreamController
+  // ===========================================================================
+
+  group('useStreamController', () {
+    testWidgets('creates a working stream controller', (tester) async {
+      final events = <String>[];
+      await tester.pumpWidget(_app(_StreamControllerSpark(onEvents: events)));
+      await tester.pump();
+      expect(events, isEmpty);
+
+      // Widget should have set up a listener internally
+    });
+
+    testWidgets('auto-closes controller on dispose', (tester) async {
+      late StreamController<int> ref;
+      await tester.pumpWidget(
+        _app(_StreamControllerRefSpark(onController: (c) => ref = c)),
+      );
+      expect(ref.isClosed, isFalse);
+
+      await tester.pumpWidget(_app(const SizedBox()));
+      expect(ref.isClosed, isTrue);
+    });
+  });
+
+  // ===========================================================================
+  // useValueChanged
+  // ===========================================================================
+
+  group('useValueChanged', () {
+    testWidgets('does not call callback on first build', (tester) async {
+      final calls = <(int, String?)>[];
+      await tester.pumpWidget(
+        _app(
+          _ValueChangedSpark(
+            value: 'hello',
+            onChanged: (old, prev) {
+              calls.add((0, prev));
+              return 'result';
+            },
+          ),
+        ),
+      );
+      expect(calls, isEmpty);
+    });
+
+    testWidgets('calls callback when value changes', (tester) async {
+      final results = <String?>[];
+      await tester.pumpWidget(
+        _app(
+          _ValueChangedSpark(
+            value: 'a',
+            onChanged: (old, prev) {
+              results.add(old);
+              return 'tracked-$old';
+            },
+          ),
+        ),
+      );
+      expect(results, isEmpty); // First build — no change
+
+      await tester.pumpWidget(
+        _app(
+          _ValueChangedSpark(
+            value: 'b',
+            onChanged: (old, prev) {
+              results.add(old);
+              return 'tracked-$old';
+            },
+          ),
+        ),
+      );
+      expect(results, ['a']); // Changed from 'a' to 'b'
+    });
+  });
+
+  // ===========================================================================
+  // useValueNotifier
+  // ===========================================================================
+
+  group('useValueNotifier', () {
+    testWidgets('creates a ValueNotifier with initial value', (tester) async {
+      late ValueNotifier<int> ref;
+      await tester.pumpWidget(
+        _app(_ValueNotifierSpark(initialValue: 42, onNotifier: (n) => ref = n)),
+      );
+      expect(ref.value, 42);
+    });
+
+    testWidgets('disposes notifier on widget disposal', (tester) async {
+      late ValueNotifier<int> ref;
+      await tester.pumpWidget(
+        _app(_ValueNotifierSpark(initialValue: 0, onNotifier: (n) => ref = n)),
+      );
+      expect(ref.value, 0);
+
+      await tester.pumpWidget(_app(const SizedBox()));
+      // After dispose, adding a listener should throw
+      expect(() => ref.addListener(() {}), throwsFlutterError);
+    });
+  });
 }
 
 /// Spark for tracking disposal of multiple hook types.
@@ -1704,5 +1858,127 @@ class _KeepAliveSpark extends Spark {
   Widget ignite(BuildContext context) {
     useAutomaticKeepAlive();
     return const Text('kept alive', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useReducer helpers
+// =============================================================================
+
+/// Spark that uses useReducer.
+class _ReducerSpark extends Spark {
+  const _ReducerSpark({required this.onStore});
+  final void Function(SparkStore<int, String>) onStore;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final store = useReducer<int, String>(
+      (state, action) => switch (action) {
+        'increment' => state + 1,
+        'decrement' => state - 1,
+        'reset' => 0,
+        _ => state,
+      },
+      initialState: 0,
+    );
+    onStore(store);
+    return Text('${store.state}', textDirection: TextDirection.ltr);
+  }
+}
+
+/// Spark that uses useReducer and tracks build count.
+class _ReducerBuildCountSpark extends Spark {
+  const _ReducerBuildCountSpark({
+    required this.onStore,
+    required this.buildCount,
+  });
+  final void Function(SparkStore<int, String>) onStore;
+  final List<int> buildCount;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final store = useReducer<int, String>(
+      (state, action) => switch (action) {
+        'increment' => state + 1,
+        'decrement' => state - 1,
+        'reset' => 0,
+        _ => state,
+      },
+      initialState: 0,
+    );
+    buildCount.add(buildCount.length);
+    onStore(store);
+    return Text('${store.state}', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useStreamController helpers
+// =============================================================================
+
+/// Spark that uses useStreamController and listens to events.
+class _StreamControllerSpark extends Spark {
+  const _StreamControllerSpark({required this.onEvents});
+  final List<String> onEvents;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final controller = useStreamController<String>();
+    useEffect(() {
+      final sub = controller.stream.listen(onEvents.add);
+      return sub.cancel;
+    }, []);
+    return const Text('stream', textDirection: TextDirection.ltr);
+  }
+}
+
+/// Spark that exposes the StreamController ref for testing auto-close.
+class _StreamControllerRefSpark extends Spark {
+  const _StreamControllerRefSpark({required this.onController});
+  final void Function(StreamController<int>) onController;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final controller = useStreamController<int>();
+    onController(controller);
+    return const Text('ref', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useValueChanged helpers
+// =============================================================================
+
+/// Spark that uses useValueChanged.
+class _ValueChangedSpark extends Spark {
+  const _ValueChangedSpark({required this.value, required this.onChanged});
+  final String value;
+  final String Function(String oldValue, String? oldResult) onChanged;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final result = useValueChanged<String, String>(value, onChanged);
+    return Text('result: $result', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useValueNotifier helpers
+// =============================================================================
+
+/// Spark that uses useValueNotifier.
+class _ValueNotifierSpark extends Spark {
+  const _ValueNotifierSpark({
+    required this.initialValue,
+    required this.onNotifier,
+  });
+  final int initialValue;
+  final void Function(ValueNotifier<int>) onNotifier;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final notifier = useValueNotifier(initialValue);
+    onNotifier(notifier);
+    return Text('${notifier.value}', textDirection: TextDirection.ltr);
   }
 }

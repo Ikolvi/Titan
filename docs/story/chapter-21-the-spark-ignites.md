@@ -485,6 +485,67 @@ useAutomaticKeepAlive(); // Widget state survives scrolling
 
 ---
 
+### useReducer — Complex State Machines
+
+When state has many transitions, `useReducer` brings the reducer pattern directly into hooks:
+
+```dart
+final store = useReducer<int, String>(
+  (state, action) => switch (action) {
+    'increment' => state + 1,
+    'decrement' => state - 1,
+    'reset' => 0,
+    _ => state,
+  },
+  initialState: 0,
+);
+
+// store.state — current value
+// store.dispatch('increment') — apply action
+```
+
+The Spark only rebuilds when the state actually changes. Dispatching an action that produces the same state is a no-op.
+
+---
+
+### useStreamController — Local Event Buses
+
+Need a `StreamController` that auto-closes on disposal? One hook:
+
+```dart
+final controller = useStreamController<String>();
+```
+
+Pair it with `useEffect` for listeners or with Titan's Flux operators for debouncing.
+
+---
+
+### useValueChanged — Transition Watcher
+
+When you need to *react* to a specific value transitioning — trigger an animation, log an event, fire analytics:
+
+```dart
+useValueChanged(count.value, (int oldValue, _) {
+  controller.forward(from: 0); // Animate on every change
+  return controller;
+});
+```
+
+The callback receives the old value and the prior callback result, enabling chains of reactions.
+
+---
+
+### useValueNotifier — Flutter Bridge
+
+Some Flutter APIs demand a `ValueNotifier`. This hook creates one that auto-disposes:
+
+```dart
+final counter = useValueNotifier(0);
+// Pass to ValueListenableBuilder, SearchAnchor, etc.
+```
+
+---
+
 ### Spark vs StatefulWidget
 
 | Aspect | StatefulWidget | Spark |

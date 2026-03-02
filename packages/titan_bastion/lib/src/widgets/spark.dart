@@ -1739,3 +1739,256 @@ class _KeepAliveHookState extends _HookState<void> {
     _releaseHandle();
   }
 }
+
+// =============================================================================
+// useReducer — Reducer-pattern state management
+// =============================================================================
+
+/// A store returned by [useReducer], containing the current [state]
+/// and a [dispatch] function to apply actions.
+class SparkStore<S, A> {
+  SparkStore._(this._hookState);
+
+  final _ReducerHookState<S, A> _hookState;
+
+  /// The current state.
+  S get state => _hookState.state;
+
+  /// Dispatches an [action] through the reducer. If the state changes,
+  /// the Spark rebuilds.
+  void dispatch(A action) {
+    final next = _hookState._reducer(state, action);
+    if (!identical(next, state) && next != state) {
+      _hookState.state = next;
+      _hookState._state.rebuild();
+    }
+  }
+}
+
+/// Creates a reducer-based state store local to this Spark.
+///
+/// Use this for complex state with many possible transitions — form wizards,
+/// multi-step workflows, or any state machine. Aligns with Titan's Strike
+/// pattern philosophy.
+///
+/// ```dart
+/// class CounterWidget extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final store = useReducer<int, String>(
+///       (state, action) => switch (action) {
+///         'increment' => state + 1,
+///         'decrement' => state - 1,
+///         'reset' => 0,
+///         _ => state,
+///       },
+///       initialState: 0,
+///     );
+///
+///     return Column(children: [
+///       Text('${store.state}'),
+///       FilledButton(
+///         onPressed: () => store.dispatch('increment'),
+///         child: Text('+'),
+///       ),
+///     ]);
+///   }
+/// }
+/// ```
+SparkStore<S, A> useReducer<S, A>(
+  S Function(S state, A action) reducer, {
+  required S initialState,
+}) {
+  final state = SparkState.current!;
+  final hook = state.use(() => _ReducerHookState<S, A>(reducer, initialState));
+  hook._reducer = reducer; // Always use latest reducer closure
+  return hook.store;
+}
+
+class _ReducerHookState<S, A> extends _HookState<S> {
+  _ReducerHookState(this._reducer, this.state);
+
+  S Function(S, A) _reducer;
+  S state;
+  late final SparkStore<S, A> store = SparkStore<S, A>._(this);
+}
+
+// =============================================================================
+// useStreamController — Auto-disposed StreamController
+// =============================================================================
+
+/// Creates a [StreamController] that auto-disposes with the Spark.
+///
+/// Useful for bridging user input to stream-based APIs, local event buses,
+/// or debouncing without Titan's Flux.
+///
+/// ```dart
+/// class EventWidget extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final controller = useStreamController<String>();
+///
+///     useEffect(() {
+///       final sub = controller.stream
+///         .distinct()
+///         .listen((event) => print('Event: \$event'));
+///       return sub.cancel;
+///     }, []);
+///
+///     return TextField(
+///       onChanged: (v) => controller.add(v),
+///     );
+///   }
+/// }
+/// ```
+StreamController<T> useStreamController<T>({
+  bool sync = false,
+  VoidCallback? onListen,
+  VoidCallback? onCancel,
+}) {
+  final state = SparkState.current!;
+  return state
+      .use(
+        () => _StreamControllerHookState<T>(
+          sync: sync,
+          onListen: onListen,
+          onCancel: onCancel,
+        ),
+      )
+      .controller;
+}
+
+class _StreamControllerHookState<T> extends _HookState<T> {
+  _StreamControllerHookState({
+    required bool sync,
+    VoidCallback? onListen,
+    VoidCallback? onCancel,
+  }) : _sync = sync,
+       _onListen = onListen,
+       _onCancel = onCancel;
+
+  final bool _sync;
+  final VoidCallback? _onListen;
+  final VoidCallback? _onCancel;
+  late final StreamController<T> controller;
+
+  @override
+  void init() {
+    controller = StreamController<T>(
+      sync: _sync,
+      onListen: _onListen,
+      onCancel: _onCancel,
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.close();
+  }
+}
+
+// =============================================================================
+// useValueChanged — Watch value & trigger callback
+// =============================================================================
+
+/// Watches [value] and calls [valueChange] when it changes.
+///
+/// Returns the result of the last [valueChange] call, or `null` if the
+/// value hasn't changed yet. Useful for triggering animations, analytics,
+/// or navigation when a specific value transitions.
+///
+/// ```dart
+/// class AnimatedCounter extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final count = useCore(0);
+///     final controller = useAnimationController(
+///       duration: Duration(milliseconds: 200),
+///     );
+///
+///     useValueChanged(count.value, (int oldValue, AnimationController? old) {
+///       controller.forward(from: 0);
+///       return controller;
+///     });
+///
+///     return Text('${count.value}');
+///   }
+/// }
+/// ```
+R? useValueChanged<T, R>(
+  T value,
+  R Function(T oldValue, R? oldResult) valueChange,
+) {
+  final state = SparkState.current!;
+  final hook = state.use(() => _ValueChangedHookState<T, R>());
+  return hook.maybeUpdate(value, valueChange);
+}
+
+class _ValueChangedHookState<T, R> extends _HookState<T> {
+  bool _hasValue = false;
+  late T _value;
+  R? _result;
+
+  R? maybeUpdate(T value, R Function(T oldValue, R? oldResult) valueChange) {
+    if (_hasValue && _value != value) {
+      final old = _value;
+      _value = value;
+      _result = valueChange(old, _result);
+    } else if (!_hasValue) {
+      _hasValue = true;
+      _value = value;
+    }
+    return _result;
+  }
+}
+
+// =============================================================================
+// useValueNotifier — Auto-disposed ValueNotifier
+// =============================================================================
+
+/// Creates a [ValueNotifier] that auto-disposes with the Spark.
+///
+/// Useful for bridging Spark state to Flutter widgets that expect
+/// `ValueNotifier` (e.g., `ValueListenableBuilder`, `SearchAnchor`, etc.).
+///
+/// ```dart
+/// class BridgeWidget extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final counter = useValueNotifier(0);
+///
+///     return Column(children: [
+///       // Use in a ValueListenableBuilder downstream
+///       ValueListenableBuilder<int>(
+///         valueListenable: counter,
+///         builder: (_, value, __) => Text('Count: \$value'),
+///       ),
+///       FilledButton(
+///         onPressed: () => counter.value++,
+///         child: Text('Increment'),
+///       ),
+///     ]);
+///   }
+/// }
+/// ```
+ValueNotifier<T> useValueNotifier<T>(T initialValue) {
+  final state = SparkState.current!;
+  return state.use(() => _ValueNotifierHookState<T>(initialValue)).notifier;
+}
+
+class _ValueNotifierHookState<T> extends _HookState<T> {
+  _ValueNotifierHookState(this._initialValue);
+
+  final T _initialValue;
+  late final ValueNotifier<T> notifier;
+
+  @override
+  void init() {
+    notifier = ValueNotifier<T>(_initialValue);
+  }
+
+  @override
+  void dispose() {
+    notifier.dispose();
+  }
+}
