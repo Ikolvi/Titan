@@ -34,6 +34,7 @@
 library;
 
 import 'dart:async';
+import 'dart:collection';
 
 /// A single entry in the audit trail.
 ///
@@ -123,7 +124,7 @@ class Annals {
 
   static bool _enabled = false;
   static int _maxEntries = 10000;
-  static final List<AnnalEntry> _entries = [];
+  static final Queue<AnnalEntry> _entries = Queue<AnnalEntry>();
   static final StreamController<AnnalEntry> _controller =
       StreamController<AnnalEntry>.broadcast();
 
@@ -178,9 +179,9 @@ class Annals {
 
     _entries.add(entry);
 
-    // Evict oldest when over capacity
+    // Evict oldest when over capacity — O(1) with Queue.removeFirst()
     while (_entries.length > _maxEntries) {
-      _entries.removeAt(0);
+      _entries.removeFirst();
     }
 
     if (!_controller.isClosed) {
@@ -193,7 +194,7 @@ class Annals {
   // ---------------------------------------------------------------------------
 
   /// All recorded entries (oldest first).
-  static List<AnnalEntry> get entries => List.unmodifiable(_entries);
+  static List<AnnalEntry> get entries => List.unmodifiable(_entries.toList());
 
   /// The number of recorded entries.
   static int get length => _entries.length;
@@ -221,32 +222,31 @@ class Annals {
     DateTime? before,
     int? limit,
   }) {
-    Iterable<AnnalEntry> result = _entries;
-
-    if (coreName != null) {
-      result = result.where((e) => e.coreName == coreName);
-    }
-    if (pillarType != null) {
-      result = result.where((e) => e.pillarType == pillarType);
-    }
-    if (action != null) {
-      result = result.where((e) => e.action == action);
-    }
-    if (userId != null) {
-      result = result.where((e) => e.userId == userId);
-    }
-    if (after != null) {
-      result = result.where((e) => e.timestamp.isAfter(after));
-    }
-    if (before != null) {
-      result = result.where((e) => e.timestamp.isBefore(before));
+    bool matches(AnnalEntry e) {
+      if (coreName != null && e.coreName != coreName) return false;
+      if (pillarType != null && e.pillarType != pillarType) return false;
+      if (action != null && e.action != action) return false;
+      if (userId != null && e.userId != userId) return false;
+      if (after != null && !e.timestamp.isAfter(after)) return false;
+      if (before != null && !e.timestamp.isBefore(before)) return false;
+      return true;
     }
 
-    final list = result.toList();
-    if (limit != null && list.length > limit) {
-      return list.sublist(list.length - limit);
+    // Fast path: when limit is specified, collect the last N matches
+    // by iterating backwards — avoids materializing the full result.
+    if (limit != null && limit > 0) {
+      final collected = <AnnalEntry>[];
+      final snapshot = _entries.toList();
+      for (var i = snapshot.length - 1; i >= 0 && collected.length < limit; i--) {
+        if (matches(snapshot[i])) {
+          collected.add(snapshot[i]);
+        }
+      }
+      return collected.reversed.toList();
     }
-    return list;
+
+    // No limit — iterate forward and collect all matches.
+    return _entries.where(matches).toList();
   }
 
   // ---------------------------------------------------------------------------

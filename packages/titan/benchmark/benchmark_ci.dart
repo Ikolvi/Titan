@@ -26,6 +26,10 @@ void main() {
   _benchDiamondDependency();
   _benchEpochOverhead();
   _benchVigilCapture();
+  _benchLoomTransition();
+  _benchSigilLookup();
+  _benchAnnalsRecord();
+  _benchTetherCall();
 
   // Output JSON
   print(
@@ -330,6 +334,98 @@ void _benchVigilCapture() {
   Vigil.reset();
 }
 
+// ---------------------------------------------------------------------------
+// 11. Loom Transition Throughput
+// ---------------------------------------------------------------------------
+void _benchLoomTransition() {
+  final loom = Loom<_QuestState, _QuestAction>(
+    initial: _QuestState.available,
+    transitions: {
+      (_QuestState.available, _QuestAction.claim): _QuestState.claiming,
+      (_QuestState.claiming, _QuestAction.start): _QuestState.active,
+      (_QuestState.active, _QuestAction.complete): _QuestState.completed,
+    },
+    maxHistory: 0,
+  );
+
+  const cycles = 10000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < cycles; i++) {
+    loom.send(_QuestAction.claim);
+    loom.send(_QuestAction.start);
+    loom.send(_QuestAction.complete);
+    loom.reset(_QuestState.available);
+  }
+  sw.stop();
+
+  final perTransition = sw.elapsedMicroseconds / (cycles * 3);
+  _record('Loom Transition (30K)', 'µs/transition', perTransition);
+  loom.state.dispose();
+}
+
+// ---------------------------------------------------------------------------
+// 12. Sigil Lookup Throughput
+// ---------------------------------------------------------------------------
+void _benchSigilLookup() {
+  Sigil.reset();
+  for (var i = 0; i < 100; i++) {
+    Sigil.register('flag_$i', i.isEven);
+  }
+
+  const lookups = 1000000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < lookups; i++) {
+    Sigil.isEnabled('flag_0');
+  }
+  sw.stop();
+
+  final throughput = lookups / sw.elapsedMicroseconds * 1e6;
+  _record('Sigil Lookup (1M)', 'lookups/sec', throughput);
+  Sigil.reset();
+}
+
+// ---------------------------------------------------------------------------
+// 13. Annals Record Throughput
+// ---------------------------------------------------------------------------
+void _benchAnnalsRecord() {
+  Annals.reset();
+  Annals.enable(maxEntries: 1000);
+
+  const records = 100000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < records; i++) {
+    Annals.record(AnnalEntry(
+      coreName: 'count',
+      oldValue: i,
+      newValue: i + 1,
+    ));
+  }
+  sw.stop();
+
+  final throughput = records / sw.elapsedMicroseconds * 1e6;
+  _record('Annals Record (100K, cap=1K)', 'records/sec', throughput);
+  Annals.reset();
+}
+
+// ---------------------------------------------------------------------------
+// 14. Tether Call Throughput
+// ---------------------------------------------------------------------------
+void _benchTetherCall() {
+  Tether.reset();
+  Tether.register<int, int>('multiply', (req) async => req * 2);
+
+  const calls = 10000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < calls; i++) {
+    Tether.call<int, int>('multiply', i);
+  }
+  sw.stop();
+
+  final throughput = calls / sw.elapsedMicroseconds * 1e6;
+  _record('Tether Call (10K)', 'calls/sec', throughput);
+  Tether.reset();
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -351,3 +447,7 @@ class _BenchPillar extends Pillar {
     });
   }
 }
+
+enum _QuestState { available, claiming, active, completed }
+
+enum _QuestAction { claim, start, complete }
