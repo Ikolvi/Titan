@@ -176,7 +176,7 @@ class Imprint {
   /// Creates an [Imprint] from a deserialized map.
   factory Imprint.fromMap(Map<String, dynamic> map) {
     return Imprint(
-      type: ImprintType.values.byName(map['type'] as String),
+      type: _imprintTypeByName[map['type'] as String]!,
       positionX: (map['x'] as num).toDouble(),
       positionY: (map['y'] as num).toDouble(),
       timestamp: Duration(microseconds: map['ts'] as int),
@@ -273,6 +273,11 @@ enum ImprintType {
   textAction,
 }
 
+/// Precomputed name → [ImprintType] lookup for O(1) deserialization.
+final Map<String, ImprintType> _imprintTypeByName = {
+  for (final v in ImprintType.values) v.name: v,
+};
+
 // ---------------------------------------------------------------------------
 // ShadeSession — Complete recorded session
 // ---------------------------------------------------------------------------
@@ -354,7 +359,7 @@ class ShadeSession {
     'eventCount': eventCount,
     if (description != null) 'description': description,
     if (startRoute != null) 'startRoute': startRoute,
-    'imprints': imprints.map((i) => i.toMap()).toList(),
+    'imprints': List.generate(imprints.length, (i) => imprints[i].toMap()),
   };
 
   /// Serializes this session to a JSON string.

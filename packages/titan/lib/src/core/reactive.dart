@@ -74,8 +74,10 @@ typedef ReactiveListener = void Function();
 /// It can track dependents (nodes that depend on it) and be tracked
 /// as a dependency when read within a reactive scope.
 abstract class ReactiveNode {
-  final Set<ReactiveNode> _dependents = {};
-  List<ReactiveListener> _listeners = [];
+  // Lazy-initialized: most nodes never acquire dependents or listeners,
+  // so we avoid allocating a Set/List per node.
+  Set<ReactiveNode>? _dependents;
+  List<ReactiveListener>? _listeners;
   bool _isDisposed = false;
   bool _isNotifying = false;
 
@@ -83,10 +85,10 @@ abstract class ReactiveNode {
   bool get isDisposed => _isDisposed;
 
   /// The number of active dependents.
-  int get dependentCount => _dependents.length;
+  int get dependentCount => _dependents?.length ?? 0;
 
   /// The number of active listeners.
-  int get listenerCount => _listeners.length;
+  int get listenerCount => _listeners?.length ?? 0;
 
   /// Registers the current tracker (if any) as a dependent of this node.
   ///
@@ -96,7 +98,7 @@ abstract class ReactiveNode {
   void track() {
     final tracker = ReactiveScope.currentTracker;
     if (tracker != null && tracker != this) {
-      _dependents.add(tracker);
+      (_dependents ??= {}).add(tracker);
       tracker.onTracked(this);
     }
   }
@@ -117,18 +119,21 @@ abstract class ReactiveNode {
       return;
     }
 
+    final deps = _dependents;
+    final listeners = _listeners;
+
     // Fast path: nothing to notify.
-    if (_dependents.isEmpty && _listeners.isEmpty) return;
+    if (deps == null && listeners == null) return;
 
     _isNotifying = true;
 
     // Notify dependent reactive nodes.
     // We must snapshot because dependents may re-register during notification
     // (computed nodes clear and re-track their dependencies).
-    if (_dependents.isNotEmpty) {
-      final deps = _dependents.toList(growable: false);
-      for (var i = 0; i < deps.length; i++) {
-        final dep = deps[i];
+    if (deps != null && deps.isNotEmpty) {
+      final snapshot = deps.toList(growable: false);
+      for (var i = 0; i < snapshot.length; i++) {
+        final dep = snapshot[i];
         if (!dep.isDisposed) {
           dep.onDependencyChanged(this);
         }
@@ -138,10 +143,9 @@ abstract class ReactiveNode {
     // Notify imperative listeners (iterate by index — no allocation).
     // Listeners that remove themselves during callback are handled safely
     // via snapshot if the list was modified during iteration.
-    if (_listeners.isNotEmpty) {
-      final snapshot = _listeners;
-      for (var i = 0; i < snapshot.length; i++) {
-        snapshot[i]();
+    if (listeners != null && listeners.isNotEmpty) {
+      for (var i = 0; i < listeners.length; i++) {
+        listeners[i]();
       }
     }
 
@@ -158,32 +162,34 @@ abstract class ReactiveNode {
   void addListener(ReactiveListener listener) {
     if (_isNotifying) {
       // Copy-on-write: don't mutate the list being iterated
-      _listeners = List.of(_listeners)..add(listener);
+      _listeners = List.of(_listeners ?? [])..add(listener);
     } else {
-      _listeners.add(listener);
+      (_listeners ??= []).add(listener);
     }
   }
 
   /// Removes a previously added listener.
   void removeListener(ReactiveListener listener) {
+    final listeners = _listeners;
+    if (listeners == null) return;
     if (_isNotifying) {
-      _listeners = List.of(_listeners)..remove(listener);
+      _listeners = List.of(listeners)..remove(listener);
     } else {
-      _listeners.remove(listener);
+      listeners.remove(listener);
     }
   }
 
   /// Removes a specific dependent from this node.
   @internal
   void removeDependent(ReactiveNode dependent) {
-    _dependents.remove(dependent);
+    _dependents?.remove(dependent);
   }
 
   /// Disposes this node, clearing all dependents and listeners.
   @mustCallSuper
   void dispose() {
     _isDisposed = true;
-    _dependents.clear();
-    _listeners.clear();
+    _dependents = null;
+    _listeners = null;
   }
 }

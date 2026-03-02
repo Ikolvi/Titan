@@ -144,8 +144,11 @@ class Scroll<T> extends TitanState<T> {
   /// }
   /// ```
   bool validate() {
-    _error.value = _validator?.call(value);
-    return _error.value == null;
+    final result = _validator?.call(value);
+    // Only update if error actually changed — avoids triggering
+    // the full notification chain when error is already null.
+    if (result != _error.peek()) _error.value = result;
+    return result == null;
   }
 
   /// Run both synchronous and asynchronous validators.

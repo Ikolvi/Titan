@@ -46,6 +46,13 @@ abstract class TitanObserver {
   /// All registered observers (both [instance] and added observers).
   static final List<TitanObserver> _observers = [];
 
+  /// Whether any observers are currently registered.
+  ///
+  /// Use this to skip observer notifications in hot paths when
+  /// no observers are present, avoiding method call and parameter
+  /// boxing overhead.
+  static bool get hasObservers => instance != null || _observers.isNotEmpty;
+
   /// Registers an additional observer.
   ///
   /// Multiple observers can be registered simultaneously. Each receives

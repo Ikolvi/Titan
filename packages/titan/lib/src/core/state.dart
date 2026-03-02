@@ -98,12 +98,15 @@ class TitanState<T> extends ReactiveNode {
     _previousValue = oldValue;
     _value = piped;
 
-    // Notify all observers
-    TitanObserver.notifyStateChanged(
-      state: this,
-      oldValue: oldValue,
-      newValue: piped,
-    );
+    // Notify all observers (skip method call to avoid boxing overhead
+    // when no observers are registered — the common production case).
+    if (TitanObserver.hasObservers) {
+      TitanObserver.notifyStateChanged(
+        state: this,
+        oldValue: oldValue,
+        newValue: piped,
+      );
+    }
 
     notifyDependents();
 
