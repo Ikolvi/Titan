@@ -60,6 +60,7 @@ export 'src/widgets/beacon.dart';
 export 'src/widgets/confluence.dart';
 export 'src/widgets/lens.dart';
 export 'src/widgets/animated_vestige.dart';
+export 'src/widgets/pillar_scope.dart';
 
 // Advanced Widgets (legacy / specialized)
 export 'src/widgets/obs.dart';

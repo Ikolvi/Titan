@@ -60,6 +60,7 @@ export 'src/persistence/relic.dart';
 export 'src/form/scroll.dart';
 export 'src/data/codex.dart';
 export 'src/data/quarry.dart';
+export 'src/data/bulwark.dart';
 
 // Core reactive primitives
 export 'src/core/reactive.dart';
@@ -70,6 +71,7 @@ export 'src/core/batch.dart';
 export 'src/core/epoch.dart';
 export 'src/core/flux.dart';
 export 'src/core/extensions.dart';
+export 'src/core/loom.dart';
 export 'src/core/observer.dart';
 
 // Store pattern (advanced / legacy)
@@ -85,3 +87,6 @@ export 'src/async/async_state.dart';
 
 // Utilities
 export 'src/utils/titan_config.dart';
+
+// Testing
+export 'src/testing/crucible.dart';

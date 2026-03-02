@@ -6,11 +6,13 @@ import '../core/batch.dart';
 import '../core/computed.dart';
 import '../core/effect.dart';
 import '../core/epoch.dart';
+import '../core/loom.dart';
 import '../core/observer.dart';
 import '../core/reactive.dart';
 import '../core/state.dart';
 import '../data/codex.dart';
 import '../data/quarry.dart';
+import '../data/bulwark.dart';
 import '../errors/vigil.dart';
 import '../events/herald.dart';
 import '../form/scroll.dart';
@@ -190,6 +192,51 @@ abstract class Pillar {
   }
 
   // ---------------------------------------------------------------------------
+  // Loom — finite state machine
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Loom] (finite state machine) managed by this Pillar.
+  ///
+  /// A Loom manages state transitions with guarded rules, lifecycle
+  /// callbacks, and full reactive tracking.
+  ///
+  /// ```dart
+  /// late final auth = loom<AuthState, AuthEvent>(
+  ///   initial: AuthState.unauthenticated,
+  ///   transitions: {
+  ///     (AuthState.unauthenticated, AuthEvent.login): AuthState.authenticating,
+  ///     (AuthState.authenticating, AuthEvent.success): AuthState.authenticated,
+  ///     (AuthState.authenticated, AuthEvent.logout): AuthState.unauthenticated,
+  ///   },
+  /// );
+  ///
+  /// void login() => auth.send(AuthEvent.login);
+  /// ```
+  @protected
+  Loom<S, E> loom<S, E>({
+    required S initial,
+    required Map<(S, E), S> transitions,
+    Map<S, void Function()>? onEnter,
+    Map<S, void Function()>? onExit,
+    void Function(S from, E event, S to)? onTransition,
+    int maxHistory = 50,
+    String? name,
+  }) {
+    _assertNotDisposed();
+    final l = Loom<S, E>(
+      initial: initial,
+      transitions: transitions,
+      onEnter: onEnter,
+      onExit: onExit,
+      onTransition: onTransition,
+      maxHistory: maxHistory,
+      name: name,
+    );
+    _managedNodes.add(l.state);
+    return l;
+  }
+
+  // ---------------------------------------------------------------------------
   // Scroll — form fields with validation
   // ---------------------------------------------------------------------------
 
@@ -313,6 +360,49 @@ abstract class Pillar {
   }
 
   // ---------------------------------------------------------------------------
+  // Bulwark — circuit breaker
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Bulwark] (circuit breaker) managed by this Pillar.
+  ///
+  /// A Bulwark shields your app from cascading failures by tracking
+  /// error rates and automatically opening the circuit when a failure
+  /// threshold is breached. All state fields are reactive [Core]s.
+  ///
+  /// ```dart
+  /// late final apiBreaker = bulwark<String>(
+  ///   failureThreshold: 3,
+  ///   resetTimeout: Duration(seconds: 30),
+  ///   name: 'api',
+  /// );
+  ///
+  /// Future<String> fetchData() async {
+  ///   return apiBreaker.call(() => api.getData());
+  /// }
+  /// ```
+  @protected
+  Bulwark<T> bulwark<T>({
+    int failureThreshold = 3,
+    Duration resetTimeout = const Duration(seconds: 30),
+    void Function(Object error)? onOpen,
+    void Function()? onClose,
+    void Function()? onHalfOpen,
+    String? name,
+  }) {
+    _assertNotDisposed();
+    final b = Bulwark<T>(
+      failureThreshold: failureThreshold,
+      resetTimeout: resetTimeout,
+      onOpen: onOpen,
+      onClose: onClose,
+      onHalfOpen: onHalfOpen,
+      name: name,
+    );
+    _managedNodes.addAll(b.managedNodes);
+    return b;
+  }
+
+  // ---------------------------------------------------------------------------
   // Strike — batched, tracked mutations
   // ---------------------------------------------------------------------------
 
@@ -420,6 +510,88 @@ abstract class Pillar {
       }
       captureError(e, stackTrace: s, action: 'strikeAsync');
       rethrow;
+    }
+  }
+
+  /// A map of debounce timers keyed by tag.
+  final Map<String, Timer> _debounceTimers = {};
+
+  /// A map of throttle timestamps keyed by tag.
+  final Map<String, DateTime> _throttleTimestamps = {};
+
+  /// Executes a **debounced Strike** — delays execution until no more
+  /// calls arrive within [duration].
+  ///
+  /// Ideal for search-as-you-type, auto-save, or any scenario where
+  /// rapid successive calls should coalesce into a single execution.
+  ///
+  /// The [tag] groups related debounced strikes — only strikes with the
+  /// same tag debounce against each other. Defaults to `'default'`.
+  ///
+  /// ```dart
+  /// void onSearchChanged(String query) {
+  ///   strikeDebounced(
+  ///     () => searchQuery.value = query,
+  ///     duration: Duration(milliseconds: 300),
+  ///     tag: 'search',
+  ///   );
+  /// }
+  ///
+  /// void onAutoSave() {
+  ///   strikeDebounced(
+  ///     () => save(document.peek()),
+  ///     duration: Duration(seconds: 2),
+  ///     tag: 'save',
+  ///   );
+  /// }
+  /// ```
+  @protected
+  void strikeDebounced(
+    void Function() action, {
+    required Duration duration,
+    String tag = 'default',
+  }) {
+    _assertNotDisposed();
+    _debounceTimers[tag]?.cancel();
+    _debounceTimers[tag] = Timer(duration, () {
+      _debounceTimers.remove(tag);
+      if (!_isDisposed) {
+        strike(action);
+      }
+    });
+  }
+
+  /// Executes a **throttled Strike** — ensures at most one execution
+  /// per [duration] window.
+  ///
+  /// Unlike [strikeDebounced] (which waits for silence), throttled
+  /// strikes execute immediately on the first call and then ignore
+  /// subsequent calls until [duration] has elapsed.
+  ///
+  /// The [tag] groups related throttled strikes. Defaults to `'default'`.
+  ///
+  /// ```dart
+  /// void onScroll(double offset) {
+  ///   strikeThrottled(
+  ///     () => scrollPosition.value = offset,
+  ///     duration: Duration(milliseconds: 100),
+  ///     tag: 'scroll',
+  ///   );
+  /// }
+  /// ```
+  @protected
+  void strikeThrottled(
+    void Function() action, {
+    required Duration duration,
+    String tag = 'default',
+  }) {
+    _assertNotDisposed();
+    final lastExecution = _throttleTimestamps[tag];
+    final now = DateTime.now();
+    if (lastExecution == null ||
+        now.difference(lastExecution) >= duration) {
+      _throttleTimestamps[tag] = now;
+      strike(action);
     }
   }
 
@@ -712,6 +884,13 @@ abstract class Pillar {
 
     onDispose();
     TitanObserver.notifyPillarDispose(this);
+
+    // Cancel debounce timers
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    _debounceTimers.clear();
+    _throttleTimestamps.clear();
 
     // Cancel Herald subscriptions first
     for (final subscription in _managedSubscriptions) {

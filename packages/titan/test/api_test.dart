@@ -568,6 +568,84 @@ void main() {
       count.dispose();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Debounced & Throttled Strikes
+  // -------------------------------------------------------------------------
+
+  group('Pillar — debounced strikes', () {
+    test('strikeDebounced delays execution', () async {
+      final pillar = _TestDebouncedPillar();
+      pillar.initialize();
+
+      pillar.onSearch('he');
+      pillar.onSearch('hel');
+      pillar.onSearch('hello');
+
+      // Not yet executed — still within debounce window
+      expect(pillar.search.peek(), '');
+
+      await Future<void>.delayed(Duration(milliseconds: 80));
+      expect(pillar.search.peek(), 'hello');
+
+      pillar.dispose();
+    });
+
+    test('strikeDebounced cancels previous timer', () async {
+      final pillar = _TestDebouncedPillar();
+      pillar.initialize();
+
+      pillar.onSearch('first');
+      await Future<void>.delayed(Duration(milliseconds: 30));
+
+      pillar.onSearch('second');
+      await Future<void>.delayed(Duration(milliseconds: 80));
+
+      // Only 'second' should have executed
+      expect(pillar.search.peek(), 'second');
+
+      pillar.dispose();
+    });
+
+    test('strikeThrottled executes immediately then blocks', () {
+      final pillar = _TestDebouncedPillar();
+      pillar.initialize();
+
+      pillar.onScroll(100.0);
+      expect(pillar.scrollPos.peek(), 100.0); // immediate
+
+      pillar.onScroll(200.0); // blocked by throttle
+      expect(pillar.scrollPos.peek(), 100.0); // still 100
+
+      pillar.dispose();
+    });
+
+    test('strikeThrottled allows after duration', () async {
+      final pillar = _TestDebouncedPillar();
+      pillar.initialize();
+
+      pillar.onScroll(100.0);
+      expect(pillar.scrollPos.peek(), 100.0);
+
+      await Future<void>.delayed(Duration(milliseconds: 60));
+
+      pillar.onScroll(200.0);
+      expect(pillar.scrollPos.peek(), 200.0);
+
+      pillar.dispose();
+    });
+
+    test('debounce timers cancelled on dispose', () async {
+      final pillar = _TestDebouncedPillar();
+      pillar.initialize();
+
+      pillar.onSearch('test');
+      pillar.dispose();
+
+      // No error after dispose, timer was cancelled
+      await Future<void>.delayed(Duration(milliseconds: 80));
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -658,6 +736,27 @@ class _TestGuardedWatchPillar extends Pillar {
     watch(
       () => watchLog.add(data.value),
       when: () => enabled.value,
+    );
+  }
+}
+
+class _TestDebouncedPillar extends Pillar {
+  late final search = core('');
+  late final scrollPos = core(0.0);
+
+  void onSearch(String query) {
+    strikeDebounced(
+      () => search.value = query,
+      duration: Duration(milliseconds: 50),
+      tag: 'search',
+    );
+  }
+
+  void onScroll(double pos) {
+    strikeThrottled(
+      () => scrollPos.value = pos,
+      duration: Duration(milliseconds: 50),
+      tag: 'scroll',
     );
   }
 }

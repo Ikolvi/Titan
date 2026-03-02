@@ -577,6 +577,77 @@ class Atlas {
     return _instance!._delegate._canPop;
   }
 
+  /// The current navigation stack depth.
+  ///
+  /// Returns the number of routes in the stack.
+  ///
+  /// ```dart
+  /// if (Atlas.depth > 1) {
+  ///   showBackButton();
+  /// }
+  /// ```
+  static int get depth {
+    _ensureInstance();
+    return _instance!._delegate._stack.length;
+  }
+
+  /// The full navigation stack as a list of [Waypoint]s.
+  ///
+  /// Returns an unmodifiable view of the current navigation history.
+  /// Useful for breadcrumb navigation, analytics, and debugging.
+  ///
+  /// ```dart
+  /// // Build breadcrumbs
+  /// final breadcrumbs = Atlas.stack;
+  /// for (final waypoint in breadcrumbs) {
+  ///   print('${waypoint.path} → ');
+  /// }
+  /// ```
+  static List<Waypoint> get stack {
+    _ensureInstance();
+    return List.unmodifiable(
+      _instance!._delegate._stack.map((r) => r.waypoint),
+    );
+  }
+
+  /// Whether the current route matches the given [path].
+  ///
+  /// Compares the current waypoint's path with the provided path.
+  ///
+  /// ```dart
+  /// if (Atlas.isAt('/home')) {
+  ///   highlightHomeTab();
+  /// }
+  /// ```
+  static bool isAt(String path) {
+    _ensureInstance();
+    return _instance!._delegate._currentWaypoint.path == path;
+  }
+
+  /// Whether the given [path] exists in the current navigation stack.
+  ///
+  /// ```dart
+  /// if (Atlas.canBackTo('/home')) {
+  ///   Atlas.backTo('/home');
+  /// }
+  /// ```
+  static bool hasInStack(String path) {
+    _ensureInstance();
+    return _instance!._delegate._stack.any((r) => r.waypoint.path == path);
+  }
+
+  /// Whether the given [path] exists in the registered routes.
+  ///
+  /// ```dart
+  /// if (Atlas.hasRoute('/admin')) {
+  ///   showAdminLink();
+  /// }
+  /// ```
+  static bool hasRoute(String path) {
+    _ensureInstance();
+    return _instance!._trie.match(path) != null;
+  }
+
   static void _ensureInstance() {
     if (_instance == null) {
       throw StateError(
