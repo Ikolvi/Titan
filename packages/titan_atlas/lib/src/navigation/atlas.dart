@@ -264,15 +264,19 @@ class Atlas {
 
     try {
       final currentWaypoint = _delegate._currentWaypoint;
-      final currentPath = currentWaypoint.uri.toString();
+      // Use the full URI (with query params) for resolution so Sentinels
+      // can read query params like ?redirect=..., but compare only the
+      // path portion to detect actual route changes.
+      final currentUri = currentWaypoint.uri.toString();
+      final currentPath = currentWaypoint.path;
 
       if (_hasAsyncSentinels) {
-        _resolveAsync(currentPath).then((result) {
+        _resolveAsync(currentUri).then((result) {
           _applyRefreshResult(currentPath, result);
           _isRefreshing = false;
         });
       } else {
-        final result = _resolve(currentPath);
+        final result = _resolve(currentUri);
         _applyRefreshResult(currentPath, result);
         _isRefreshing = false;
       }
@@ -283,9 +287,9 @@ class Atlas {
 
   /// Applies the result of a refresh re-evaluation. If the resolved path
   /// differs from the current path, resets the navigation stack.
-  void _applyRefreshResult(String originalPath, _NavigationResult result) {
+  void _applyRefreshResult(String currentPath, _NavigationResult result) {
     final resolvedPath = result.waypoint.path;
-    if (resolvedPath != originalPath) {
+    if (resolvedPath != currentPath) {
       // Sentinel or Drift redirected — navigate to the new destination
       _delegate._reset(resolvedPath);
     } else {

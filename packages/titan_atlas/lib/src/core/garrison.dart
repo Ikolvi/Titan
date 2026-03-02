@@ -271,11 +271,13 @@ class Garrison {
       if (!guestPaths.contains(path)) return null;
       if (!isAuthenticated()) return null;
 
-      // Check for redirect query parameter from preserveRedirect
+      // Check for redirect query parameter from preserveRedirect.
+      // The value is already URI-decoded by Uri.queryParameters, since
+      // authGuard encodes it via Uri.encodeComponent.
       if (useRedirectQuery) {
         final redirect = waypoint.query['redirect'];
         if (redirect != null && redirect.isNotEmpty) {
-          return Uri.decodeComponent(redirect);
+          return redirect;
         }
       }
 

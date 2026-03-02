@@ -620,11 +620,12 @@ void main() {
         redirectPath: '/',
       );
 
-      // Waypoint with redirect query param
+      // Waypoint query values are already decoded (Uri.queryParameters
+      // auto-decodes percent-encoded values)
       final waypoint = Waypoint(
         path: '/login',
         pattern: '/login',
-        query: {'redirect': '%2Fquest%2F42'},
+        query: {'redirect': '/quest/42'},
       );
 
       final result = sentinel.evaluate('/login', waypoint);
@@ -655,7 +656,7 @@ void main() {
       final waypoint = Waypoint(
         path: '/login',
         pattern: '/login',
-        query: {'redirect': '%2Fquest%2F42'},
+        query: {'redirect': '/quest/42'},
       );
 
       final result = sentinel.evaluate('/login', waypoint);
@@ -672,7 +673,7 @@ void main() {
       final waypoint = Waypoint(
         path: '/login',
         pattern: '/login',
-        query: {'redirect': '%2Fquest%2F42'},
+        query: {'redirect': '/quest/42'},
       );
 
       final result = sentinel.evaluate('/login', waypoint);
@@ -759,5 +760,49 @@ void main() {
 
       expect(find.text('Home'), findsOneWidget);
     });
+
+    testWidgets(
+      'refresh on login with query params does not cause spurious navigation',
+      (tester) async {
+        final auth = _AuthPillar();
+        Titan.put(auth);
+        auth.isLoggedIn.value = false;
+
+        final garrisonAuth = Garrison.refreshAuth(
+          isAuthenticated: () => auth.isLoggedIn.value,
+          cores: [auth.isLoggedIn, auth.role],
+          loginPath: '/login',
+          homePath: '/',
+          guestPaths: {'/login'},
+          preserveRedirect: true,
+        );
+
+        final atlas = Atlas(
+          passages: [
+            Passage('/', (_) => const Text('Home')),
+            Passage('/login', (wp) => Text('Login:${wp.query['redirect']}')),
+            Passage('/quest/:id', (wp) => Text('Quest:${wp.runes['id']}')),
+          ],
+          sentinels: garrisonAuth.sentinels,
+          refreshListenable: garrisonAuth.refresh,
+          // Start at login with redirect param
+          initialPath: '/login?redirect=%2Fquest%2F42',
+        );
+
+        await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+        await tester.pumpAndSettle();
+
+        // On login page with redirect param
+        expect(find.textContaining('Login'), findsOneWidget);
+
+        // Trigger a refresh from a non-auth core (role change) while still
+        // unauthenticated — should stay on login, NOT navigate away
+        auth.role.value = 'guest';
+        await tester.pumpAndSettle();
+
+        // Still on login page — path comparison uses path-only, not full URI
+        expect(find.textContaining('Login'), findsOneWidget);
+      },
+    );
   });
 }
