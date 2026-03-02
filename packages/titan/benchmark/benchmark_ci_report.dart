@@ -370,17 +370,17 @@ typedef _ChartGroup = ({
 });
 
 /// Chart color palette — Tableau-inspired, matching Mermaid plotColorPalette.
+///
+/// Colors render as colored dots in GitHub markdown when used as
+/// backtick-wrapped hex codes (e.g. `#4e79a7`).
 const List<String> _chartColors = [
-  '#4e79a7', // blue
+  '#4e79a7', // steel blue
   '#f28e2c', // orange
-  '#e15759', // red
+  '#e15759', // coral red
   '#76b7b2', // teal
   '#59a14f', // green
-  '#edc949', // yellow
+  '#edc949', // gold
 ];
-
-/// Color indicator emoji matching [_chartColors] order for markdown legends.
-const List<String> _colorEmoji = ['🔵', '🟠', '🔴', '🟢', '🟤', '🟡'];
 
 /// Predefined chart groups for trend visualization.
 ///
@@ -541,13 +541,13 @@ void _writeTrendCharts(StringBuffer md, _ParsedMarkdown parsed) {
     md.writeln('```');
     md.writeln();
 
-    // Colored legend mapping line order to metric names
+    // Colored legend with hex codes (GitHub renders these as color dots)
     md.writeln('<details>');
     md.writeln('<summary>Legend</summary>');
     md.writeln();
     for (var i = 0; i < group.metrics.length; i++) {
-      final color = _colorEmoji[i % _colorEmoji.length];
-      md.writeln('$color **${group.metrics[i]}**  ');
+      final color = _chartColors[i % _chartColors.length];
+      md.writeln('`$color` **${group.metrics[i]}**  ');
     }
     md.writeln();
     md.writeln('</details>');
