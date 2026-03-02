@@ -99,6 +99,9 @@ class _ShadeLensPillar extends Pillar {
   /// Whether auto-replay is enabled.
   late final autoReplayEnabled = core(false);
 
+  /// The session ID currently targeted for auto-replay.
+  late final autoReplaySessionId = core<String?>(null);
+
   /// Whether intelligent wait (waitForSettled) is enabled.
   late final waitForSettledEnabled = core(false);
 
@@ -221,10 +224,12 @@ class _ShadeLensPillar extends Pillar {
         sessionId: lastSession.value!.id,
         speed: replaySpeed.value,
       );
+      autoReplaySessionId.value = lastSession.value!.id;
       status.value = 'Auto-replay enabled for ${lastSession.value!.name}';
       await _loadSavedSessions();
     } else {
       await colossus.setAutoReplay(enabled: false);
+      autoReplaySessionId.value = null;
       status.value = 'Auto-replay disabled';
     }
   }
@@ -237,7 +242,25 @@ class _ShadeLensPillar extends Pillar {
       speed: replaySpeed.value,
     );
     autoReplayEnabled.value = true;
+    autoReplaySessionId.value = sessionId;
     status.value = 'Auto-replay set for session';
+  }
+
+  /// Toggle auto-replay for a specific session.
+  ///
+  /// If the session is already the auto-replay target, disables
+  /// auto-replay. Otherwise, sets it as the target.
+  Future<void> toggleAutoReplayForSession(String sessionId) async {
+    if (autoReplayEnabled.value && autoReplaySessionId.value == sessionId) {
+      // Already set — disable
+      await colossus.setAutoReplay(enabled: false);
+      autoReplayEnabled.value = false;
+      autoReplaySessionId.value = null;
+      status.value = 'Auto-replay disabled';
+    } else {
+      // Enable for this session
+      await setAutoReplaySession(sessionId);
+    }
   }
 
   /// Delete a saved session from the vault.
@@ -320,6 +343,7 @@ class _ShadeLensPillar extends Pillar {
     final config = await vault.getAutoReplayConfig();
     if (config != null) {
       autoReplayEnabled.value = config.enabled;
+      autoReplaySessionId.value = config.sessionId;
       replaySpeed.value = config.speed;
     }
   }
@@ -395,8 +419,6 @@ class _ShadeTabContent extends StatelessWidget {
             if (p.lastResult.value != null && !p.isReplaying.value)
               _buildReplayResult(p),
             if (p.colossus.vault != null) ...[
-              const SizedBox(height: 8),
-              _buildAutoReplayToggle(p),
               const SizedBox(height: 8),
               _buildLibrarySection(p),
             ],
@@ -650,6 +672,7 @@ Widget _buildSessionInfo(_ShadeLensPillar p) {
         const SizedBox(height: 4),
         _LensInfoRow(label: 'Name', value: session.name),
         _LensInfoRow(label: 'Events', value: '${session.eventCount}'),
+        _buildEventBreakdown(session),
         _LensInfoRow(
           label: 'Duration',
           value: '${session.duration.inMilliseconds}ms',
@@ -668,6 +691,25 @@ Widget _buildSessionInfo(_ShadeLensPillar p) {
       ],
     ),
   );
+}
+
+Widget _buildEventBreakdown(ShadeSession session) {
+  final textCount = session.imprints
+      .where((i) => i.type == ImprintType.textInput)
+      .length;
+  final pointerCount = session.imprints
+      .where(
+        (i) =>
+            i.type == ImprintType.pointerDown ||
+            i.type == ImprintType.pointerUp ||
+            i.type == ImprintType.pointerMove,
+      )
+      .length;
+  final parts = <String>[];
+  if (pointerCount > 0) parts.add('$pointerCount gesture');
+  if (textCount > 0) parts.add('$textCount text');
+  if (parts.isEmpty) return const SizedBox.shrink();
+  return _LensInfoRow(label: 'Breakdown', value: parts.join(' · '));
 }
 
 Widget _buildRouteMismatchWarning(String message) {
@@ -888,56 +930,6 @@ Widget _buildReportActions(_ShadeLensPillar p) {
 }
 
 // -----------------------------------------------------------------------
-// Auto-replay toggle
-// -----------------------------------------------------------------------
-
-Widget _buildAutoReplayToggle(_ShadeLensPillar p) {
-  return Container(
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: p.autoReplayEnabled.value
-          ? Colors.amber.withValues(alpha: 0.1)
-          : Colors.white.withValues(alpha: 0.05),
-      borderRadius: BorderRadius.circular(6),
-      border: Border.all(
-        color: p.autoReplayEnabled.value
-            ? Colors.amber.withValues(alpha: 0.3)
-            : Colors.white12,
-      ),
-    ),
-    child: Row(
-      children: [
-        Icon(
-          Icons.replay_circle_filled,
-          size: 14,
-          color: p.autoReplayEnabled.value ? Colors.amber : Colors.white38,
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            'Auto-replay on restart',
-            style: TextStyle(
-              color: p.autoReplayEnabled.value ? Colors.amber : Colors.white54,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        SizedBox(
-          height: 20,
-          child: Switch(
-            value: p.autoReplayEnabled.value,
-            onChanged: p.toggleAutoReplay,
-            activeThumbColor: Colors.amber,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// -----------------------------------------------------------------------
 // Session library
 // -----------------------------------------------------------------------
 
@@ -988,9 +980,12 @@ Widget _buildLibrarySection(_ShadeLensPillar p) {
         for (final summary in p.savedSessions.value)
           _SessionTile(
             summary: summary,
+            isAutoReplayTarget:
+                p.autoReplayEnabled.value &&
+                p.autoReplaySessionId.value == summary.id,
             onReplay: () => p.replaySavedSession(summary.id),
             onDelete: () => p.deleteSavedSession(summary.id),
-            onSetAutoReplay: () => p.setAutoReplaySession(summary.id),
+            onToggleAutoReplay: () => p.toggleAutoReplayForSession(summary.id),
           ),
       ],
     ],
@@ -1003,15 +998,17 @@ Widget _buildLibrarySection(_ShadeLensPillar p) {
 
 class _SessionTile extends StatelessWidget {
   final ShadeSessionSummary summary;
+  final bool isAutoReplayTarget;
   final VoidCallback onReplay;
   final VoidCallback onDelete;
-  final VoidCallback onSetAutoReplay;
+  final VoidCallback onToggleAutoReplay;
 
   const _SessionTile({
     required this.summary,
+    this.isAutoReplayTarget = false,
     required this.onReplay,
     required this.onDelete,
-    required this.onSetAutoReplay,
+    required this.onToggleAutoReplay,
   });
 
   @override
@@ -1020,9 +1017,15 @@ class _SessionTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: isAutoReplayTarget
+            ? Colors.amber.withValues(alpha: 0.08)
+            : Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(
+          color: isAutoReplayTarget
+              ? Colors.amber.withValues(alpha: 0.3)
+              : Colors.white10,
+        ),
       ),
       child: Row(
         children: [
@@ -1032,28 +1035,35 @@ class _SessionTile extends StatelessWidget {
               children: [
                 Text(
                   summary.name,
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: isAutoReplayTarget ? Colors.amber : Colors.white70,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${summary.eventCount} events · ${summary.durationMs}ms',
-                  style: const TextStyle(color: Colors.white30, fontSize: 9),
+                  isAutoReplayTarget
+                      ? '${summary.eventCount} events · auto-replay'
+                      : '${summary.eventCount} events · ${summary.durationMs}ms',
+                  style: TextStyle(
+                    color: isAutoReplayTarget
+                        ? Colors.amber.withValues(alpha: 0.6)
+                        : Colors.white30,
+                    fontSize: 9,
+                  ),
                 ),
               ],
             ),
           ),
           GestureDetector(
-            onTap: onSetAutoReplay,
-            child: const Padding(
-              padding: EdgeInsets.all(4),
+            onTap: onToggleAutoReplay,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
               child: Icon(
-                Icons.replay_circle_filled,
+                isAutoReplayTarget ? Icons.replay_circle_filled : Icons.replay,
                 size: 14,
-                color: Colors.amber,
+                color: isAutoReplayTarget ? Colors.amber : Colors.white38,
               ),
             ),
           ),
