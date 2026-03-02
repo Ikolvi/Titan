@@ -2031,6 +2031,41 @@ class HeroCard extends Spark {
 }
 ```
 
+### Stream Hooks
+
+`useStream` subscribes to a `Stream<T>` and returns an **Ether** (`AsyncValue<T>`) that auto-updates on each emission. Subscriptions are cancelled automatically on dispose or when keys change.
+
+```dart
+class LiveFeed extends Spark {
+  final Stream<List<Event>> events;
+  const LiveFeed({super.key, required this.events});
+
+  @override
+  Widget ignite(BuildContext context) {
+    final snapshot = useStream(events, initialData: const []);
+
+    return snapshot.when(
+      data: (data) => ListView.builder(
+        itemCount: data.length,
+        itemBuilder: (_, i) => Text(data[i].title),
+      ),
+      loading: () => const CircularProgressIndicator(),
+      error: (e, _) => Text('Error: $e'),
+    );
+  }
+}
+```
+
+Re-subscribe when a dependency changes:
+
+```dart
+final channel = useCore('general');
+final messages = useStream(
+  chatService.messagesFor(channel.value),
+  keys: [channel.value],
+);
+```
+
 ### Hook Rules
 
 1. Always call hooks in the **same order** — no hooks inside conditionals or loops

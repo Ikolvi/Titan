@@ -295,6 +295,57 @@ class HeroCard extends Spark {
 
 ---
 
+### The Stream Within
+
+"There's one more thing," Kael said, pulling up the quest activity feed. "Real-time data. WebSocket streams, SSE feeds — things that arrive *over time*."
+
+The junior groaned. "StreamBuilder? That thing is half my error handling code."
+
+"Not anymore." Kael typed a new Spark:
+
+```dart
+class QuestActivityFeed extends Spark {
+  final Stream<List<QuestEvent>> eventStream;
+  const QuestActivityFeed({super.key, required this.eventStream});
+
+  @override
+  Widget ignite(BuildContext context) {
+    final events = useStream(eventStream, initialData: const []);
+
+    return events.when(
+      data: (data) => ListView.builder(
+        itemCount: data.length,
+        itemBuilder: (_, i) => ListTile(
+          leading: Icon(data[i].icon),
+          title: Text(data[i].title),
+          subtitle: Text(data[i].timestamp.toString()),
+        ),
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Feed error: $e')),
+    );
+  }
+}
+```
+
+`useStream` subscribes to the stream, auto-cancels on dispose, and returns an **Ether** (`AsyncValue<T>`) — the same tri-state pattern used throughout Titan. It starts as `AsyncLoading`, transitions to `AsyncData` on each emission, and captures errors as `AsyncError`.
+
+"What if the stream source changes?" the junior asked.
+
+"Add keys," Kael said. "Like every other hook."
+
+```dart
+final selectedChannel = useCore('general');
+final messages = useStream(
+  chatService.messagesFor(selectedChannel.value),
+  keys: [selectedChannel.value],
+);
+```
+
+When `selectedChannel` changes, `useStream` cancels the old subscription and subscribes to the new stream automatically.
+
+---
+
 ### Spark vs StatefulWidget
 
 | Aspect | StatefulWidget | Spark |

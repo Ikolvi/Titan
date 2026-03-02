@@ -303,6 +303,9 @@ Need reactive Pillar access?
 Need standalone Core reactivity?
 ├── Yes → VestigeRaw
 │
+Need hooks-style reactivity (no Pillar)?
+├── Yes → Spark
+│
 Need one-time Pillar access (action)?
 ├── Yes → context.pillar<P>()
 │
@@ -315,6 +318,125 @@ Need StatefulWidget reactivity?
 Need legacy TitanStore access?
 ├── Yes → TitanConsumer<T> or TitanBuilder
 ```
+
+---
+
+## Spark — Hooks-Style Widgets
+
+**Spark** provides React-style hooks for Flutter, eliminating `StatefulWidget` boilerplate while maintaining full auto-tracking reactivity. Subclass `Spark` and override `ignite()` instead of `build()`.
+
+### Basic Example
+
+```dart
+class CounterSpark extends Spark {
+  @override
+  Widget ignite(BuildContext context) {
+    final count = useCore(0);
+    final doubled = useDerived(() => count.value * 2);
+
+    return Column(
+      children: [
+        Text('Count: ${count.value}'),
+        Text('Doubled: ${doubled.value}'),
+        ElevatedButton(
+          onPressed: () => count.value++,
+          child: const Text('Increment'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+No `Pillar` required — `useCore` creates reactive state inline with automatic disposal and rebuild tracking.
+
+### Hook Reference
+
+| Hook | Returns | Purpose |
+|------|---------|---------|
+| `useCore<T>(initial)` | `Core<T>` | Reactive mutable state, auto-rebuilds on change |
+| `useDerived<T>(() => ...)` | `Derived<T>` | Computed value, auto-tracks dependencies |
+| `useEffect(fn, [keys])` | `void` | Side effect with cleanup. `[]` = once, `null` = every build |
+| `useMemo<T>(fn, [keys])` | `T` | Memoized computation, recomputes on key change |
+| `useRef<T>(initial)` | `SparkRef<T>` | Mutable reference (no rebuild) |
+| `usePillar<P>(context)` | `P` | Access Pillar from Beacon or Titan DI |
+| `useStream<T>(stream)` | `AsyncValue<T>` | Subscribe to stream, returns Ether snapshot |
+| `useTextController()` | `TextEditingController` | Auto-disposed controller |
+| `useAnimationController()` | `AnimationController` | Auto-disposed with TickerProvider |
+| `useFocusNode()` | `FocusNode` | Auto-disposed focus node |
+| `useScrollController()` | `ScrollController` | Auto-disposed scroll controller |
+| `useTabController(length:)` | `TabController` | Auto-disposed with TickerProvider |
+| `usePageController()` | `PageController` | Auto-disposed page controller |
+
+### useEffect Lifecycle
+
+```dart
+// Run once on mount, cleanup on dispose
+useEffect(() {
+  final sub = stream.listen(onData);
+  return sub.cancel; // cleanup function
+}, []);
+
+// Run every build (no keys)
+useEffect(() { analytics.track('rebuild'); }, null);
+
+// Run when dependency changes
+useEffect(() {
+  fetchData(userId.value);
+}, [userId.value]);
+```
+
+### useStream — Reactive Stream Subscription
+
+```dart
+class LiveFeed extends Spark {
+  @override
+  Widget ignite(BuildContext context) {
+    final events = useStream(eventStream, initialData: []);
+
+    return events.when(
+      data: (data) => ListView.builder(
+        itemCount: data.length,
+        itemBuilder: (_, i) => Text(data[i].title),
+      ),
+      loading: () => const CircularProgressIndicator(),
+      error: (e, _) => Text('Error: $e'),
+    );
+  }
+}
+```
+
+### Pillar Integration
+
+```dart
+class QuestList extends Spark {
+  @override
+  Widget ignite(BuildContext context) {
+    final pillar = usePillar<QuestListPillar>(context);
+
+    return ListView.builder(
+      itemCount: pillar.quests.value.length,
+      itemBuilder: (_, i) => Text(pillar.quests.value[i].title),
+    );
+  }
+}
+```
+
+### Hook Rules
+
+1. **Same order every build** — never call hooks inside `if`/`for`/`switch`
+2. **Only inside `ignite()`** — hooks rely on `SparkState.current`
+3. **No async gaps** — don't call hooks after an `await`
+
+### Spark vs Vestige
+
+| | Spark | Vestige |
+|---|---|---|
+| State model | Local hooks (`useCore`) | Pillar-managed |
+| Boilerplate | Minimal (no `dispose()`) | Minimal (`builder:`) |
+| Best for | Self-contained UI, prototypes | Domain logic, shared state |
+| Auto-tracking | Yes (same engine) | Yes |
+| Disposal | Automatic (reverse order) | Automatic |
 
 ---
 

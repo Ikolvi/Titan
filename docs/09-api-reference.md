@@ -1448,6 +1448,7 @@ class MySpark extends Spark {
 | `useTabController(length:)` | `TabController` | Auto-disposed, built-in vsync |
 | `usePageController()` | `PageController` | Auto-disposed |
 | `usePillar<P>(context)` | `P` | Find Pillar from Beacon/Titan |
+| `useStream<T>(stream)` | `AsyncValue<T>` | Subscribe to stream, returns Ether snapshot |
 
 ---
 
