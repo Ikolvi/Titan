@@ -5,6 +5,17 @@ All notable changes to the Titan packages will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-03-02
+
+### 🎉 Stable Release
+
+Titan Atlas reaches 1.0.0 — the routing system (Atlas, Passage, Sanctum, Sentinel, Shift) is now
+considered stable. No breaking changes are planned for the 1.x series.
+
+### Changed
+- Updated `titan` dependency to `^1.0.0`
+- 174 tests passing
+
 ## [0.2.0] - 2026-03-02
 
 ### Changed

@@ -5,6 +5,30 @@ All notable changes to the Titan packages will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-03-02
+
+### 🎉 Stable Release
+
+All Titan packages reach 1.0.0 — the complete architecture is now considered stable.
+No breaking changes are planned for the 1.x series.
+
+**1,130+ tests** across all packages.
+
+#### Titan Core (`titan` 1.0.0)
+- **useStream** — Spark hook for reactive stream consumption
+- **Performance optimizations**: nullable conduits, lazy `isReady`, sentinel Future,
+  `notifyDependents` fast-path, observer fast-path, Saga pre-allocated results
+- **Benchmark infrastructure**: noise floor filtering, Mermaid trend charts in CI reports
+
+#### Bastion — Flutter Widgets (`titan_bastion` 1.0.0)
+- **Spark** — Hooks-style reactive widget with 13 hooks
+  - `useCore`, `useDerived`, `useEffect`, `useMemo`, `useRef`, `useStream`
+  - `useTextController`, `useAnimationController`, `useFocusNode`
+  - `useScrollController`, `useTabController`, `usePageController`, `usePillar`
+
+#### Atlas — Routing (`titan_atlas` 1.0.0)
+- Stable release, no feature changes since 0.2.0
+
 ## [0.3.0] - 2026-03-02
 
 ### Added

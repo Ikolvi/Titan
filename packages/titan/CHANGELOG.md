@@ -5,6 +5,30 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-03-02
+
+### 🎉 Stable Release
+
+Titan Core reaches 1.0.0 — the reactive engine, all Pillar features, and the full public API are now
+considered stable. No breaking changes are planned for the 1.x series.
+
+### Added
+- **useStream** — `Spark` hook for reactive stream consumption with `AsyncValue` integration
+
+### Changed
+- **Performance optimizations** across the reactive engine:
+  - Nullable `_conduits` — zero allocation when no Conduits are attached to a Core
+  - Lazy `isReady` — `Pillar.isReady` getter allocated only when `initAsync()` is overridden
+  - Sentinel `Future` — completed `_initAsync` Future pre-allocated to avoid async overhead
+  - `ReactiveNode.notifyDependents()` fast-path — skips iteration when no dependents or listeners
+  - `TitanObserver.notifyStateChanged()` fast-path — skips notification when no observers registered
+  - `Saga` pre-allocated step results — `List.filled()` replaces growable list allocation
+- **Benchmark infrastructure**:
+  - Noise floor support in benchmark tracker (default 0.100µs, configurable via `--noise-floor`)
+  - Mermaid `xychart-beta` trend charts auto-generated in CI benchmark reports (6 chart groups, 17 metrics)
+  - Forward-fill interpolation for missing historical data points
+- 811 tests passing
+
 ## [0.2.0] - 2026-03-02
 
 ### Added
