@@ -369,7 +369,23 @@ typedef _ChartGroup = ({
   bool divideByMillion,
 });
 
+/// Chart color palette — Tableau-inspired, matching Mermaid plotColorPalette.
+const List<String> _chartColors = [
+  '#4e79a7', // blue
+  '#f28e2c', // orange
+  '#e15759', // red
+  '#76b7b2', // teal
+  '#59a14f', // green
+  '#edc949', // yellow
+];
+
+/// Color indicator emoji matching [_chartColors] order for markdown legends.
+const List<String> _colorEmoji = ['🔵', '🟠', '🔴', '🟢', '🟤', '🟡'];
+
 /// Predefined chart groups for trend visualization.
+///
+/// All 17 CI-tracked metrics are covered across 6 charts, grouped by
+/// unit and magnitude for readable y-axis scaling.
 const List<_ChartGroup> _chartGroups = [
   (
     title: 'Core Latency',
@@ -381,6 +397,7 @@ const List<_ChartGroup> _chartGroups = [
     title: 'Sub-µs Latency',
     yLabel: 'µs',
     metrics: [
+      'Node Creation (100K)',
       'Diamond Pattern (1K)',
       'Loom Transition (30K)',
       'Conduit Pipeline (10K)',
@@ -389,15 +406,33 @@ const List<_ChartGroup> _chartGroups = [
     divideByMillion: false,
   ),
   (
+    title: 'Propagation Latency',
+    yLabel: 'µs',
+    metrics: ['Deep Chain (1000)', 'Fan-Out (10K)'],
+    divideByMillion: false,
+  ),
+  (
     title: 'Throughput',
     yLabel: 'M ops/sec',
     metrics: [
       'Notification Throughput',
       'Herald Throughput (10 listeners)',
-      'Vigil Capture',
+      'Tether Call (10K)',
       'Annals Record (100K, cap=1K)',
     ],
     divideByMillion: true,
+  ),
+  (
+    title: 'High-Volume Throughput',
+    yLabel: 'M ops/sec',
+    metrics: ['Sigil Lookup (1M)', 'Vigil Capture'],
+    divideByMillion: true,
+  ),
+  (
+    title: 'Overhead Ratios',
+    yLabel: 'x',
+    metrics: ['Batch Speedup', 'Epoch Overhead'],
+    divideByMillion: false,
   ),
 ];
 
@@ -483,6 +518,10 @@ void _writeTrendCharts(StringBuffer md, _ParsedMarkdown parsed) {
     md.writeln('    xyChart:');
     md.writeln('        width: 900');
     md.writeln('        height: 400');
+    md.writeln(
+      '        plotColorPalette: '
+      '"${_chartColors.join(', ')}"',
+    );
     md.writeln('---');
     md.writeln('xychart-beta');
     md.writeln('    title "${group.title} (${group.yLabel})"');
@@ -502,12 +541,13 @@ void _writeTrendCharts(StringBuffer md, _ParsedMarkdown parsed) {
     md.writeln('```');
     md.writeln();
 
-    // Text legend mapping line order to metric names
+    // Colored legend mapping line order to metric names
     md.writeln('<details>');
     md.writeln('<summary>Legend</summary>');
     md.writeln();
     for (var i = 0; i < group.metrics.length; i++) {
-      md.writeln('${i + 1}. **${group.metrics[i]}**');
+      final color = _colorEmoji[i % _colorEmoji.length];
+      md.writeln('$color **${group.metrics[i]}**  ');
     }
     md.writeln();
     md.writeln('</details>');
