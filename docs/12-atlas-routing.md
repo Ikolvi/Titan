@@ -14,6 +14,7 @@
 | Parameters | **Runes** | Ancient symbols carrying meaning |
 | Transition | **Shift** | Change of form/phase |
 | Route State | **Waypoint** | Current position in the journey |
+| Refresh Bridge | **CoreRefresh** | Reactive route re-evaluation |
 | Observer | **AtlasObserver** | Watches all navigation events |
 
 ## Quick Start
@@ -230,6 +231,78 @@ Atlas(
 ```
 
 Async Sentinels are fully resolved during navigation — Atlas automatically detects whether any Sentinels are async and uses the appropriate resolution path.
+
+## CoreRefresh — Reactive Route Re-evaluation
+
+Sentinels only evaluate during navigation (`Atlas.to()`, `.replace()`, etc.). When auth state changes outside of navigation — like a token expiring or the user signing in — Sentinels aren't automatically re-evaluated.
+
+**CoreRefresh** bridges this gap by converting Titan's reactive `Core` signals into a Flutter `Listenable` that Atlas observes:
+
+```dart
+class AuthPillar extends Pillar {
+  late final isLoggedIn = core(false);
+}
+
+final auth = Titan.get<AuthPillar>();
+
+final atlas = Atlas(
+  passages: [
+    Passage('/', (_) => HomeScreen()),
+    Passage('/login', (_) => LoginScreen()),
+    Passage('/profile', (_) => ProfileScreen()),
+  ],
+  sentinels: [
+    // Redirect unauthenticated users to /login
+    Garrison.authGuard(
+      isAuthenticated: () => auth.isLoggedIn.value,
+      loginPath: '/login',
+      publicPaths: {'/login'},
+    ),
+    // Redirect authenticated users away from /login
+    Garrison.guestOnly(
+      isAuthenticated: () => auth.isLoggedIn.value,
+      redirectPath: '/',
+      guestPaths: {'/login'},
+    ),
+  ],
+  // Re-evaluate Sentinels when auth state changes
+  refreshListenable: CoreRefresh([auth.isLoggedIn]),
+);
+```
+
+Now when `auth.isLoggedIn.value` changes:
+- **Sign-out** on `/profile` → Sentinel redirects to `/login`
+- **Sign-in** on `/login` → Sentinel redirects to `/`
+
+### Multiple Signals
+
+Monitor multiple reactive values — re-evaluation triggers when *any* changes:
+
+```dart
+CoreRefresh([auth.isLoggedIn, auth.role, subscription.tier])
+```
+
+### Any Listenable Works
+
+`refreshListenable` accepts any Flutter `Listenable`, not just `CoreRefresh`:
+
+```dart
+// Flutter ValueNotifier
+final authNotifier = ValueNotifier<bool>(false);
+Atlas(refreshListenable: authNotifier, ...);
+
+// Custom ChangeNotifier
+class AppState extends ChangeNotifier { ... }
+Atlas(refreshListenable: appState, ...);
+```
+
+### How It Works
+
+1. When the `Listenable` notifies, Atlas re-resolves the current path through **Drift → Sentinels → per-route redirect**
+2. If the resolved path differs from the current path → `Atlas.reset()` to the new destination
+3. If the path is unchanged → no-op (no unnecessary navigation)
+4. Re-entrant calls are guarded — rapid state changes don't cause stack overflow
+5. Both sync and async Sentinels are handled automatically
 
 ## Drift — Redirects
 

@@ -581,6 +581,41 @@ Atlas(
 | `replace` | Replace current route via `Atlas.replace()` |
 | `reset` | Reset stack via `Atlas.reset()` |
 
+### CoreRefresh
+
+Bridges Titan's reactive `Core` signals to Flutter's `Listenable`. Use with Atlas's `refreshListenable` parameter for reactive Sentinel/Drift re-evaluation.
+
+```dart
+class CoreRefresh extends ChangeNotifier
+```
+
+#### Constructor
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cores` | `List<ReactiveNode>` | Reactive nodes to observe (typically `Core<T>` or `Derived<T>`) |
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `dispose()` | Removes all listeners and cleans up |
+
+#### Atlas `refreshListenable` Parameter
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `refreshListenable` | `Listenable?` | `null` | When notified, re-evaluates current path through Drift → Sentinels → per-route redirect |
+
+```dart
+final auth = Titan.get<AuthPillar>();
+Atlas(
+  passages: [...],
+  sentinels: [Garrison.authGuard(...)],
+  refreshListenable: CoreRefresh([auth.isLoggedIn]),
+);
+```
+
 ---
 
 ## Performance Monitoring (package:titan_colossus)

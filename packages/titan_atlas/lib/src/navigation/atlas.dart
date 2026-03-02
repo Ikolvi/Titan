@@ -140,6 +140,15 @@ class Atlas {
   /// Default page transition.
   final Shift? _defaultShift;
 
+  /// Listenable that triggers re-evaluation of Sentinels and Drift.
+  final Listenable? _refreshListenable;
+
+  /// Cleanup callback for the refresh listener.
+  void Function()? _refreshSubscription;
+
+  /// Guard against re-entrant refresh calls.
+  bool _isRefreshing = false;
+
   /// The router delegate.
   late final AtlasDelegate _delegate;
 
@@ -167,12 +176,19 @@ class Atlas {
     Widget Function(String path)? onError,
     String initialPath = '/',
     Shift? defaultShift,
+    Listenable? refreshListenable,
   }) : _sentinels = sentinels,
        _observers = observers,
        _drift = drift,
        _onError = onError,
        _initialPath = initialPath,
-       _defaultShift = defaultShift {
+       _defaultShift = defaultShift,
+       _refreshListenable = refreshListenable {
+    // Clean up previous instance's refresh listener
+    if (_instance != null) {
+      _instance!._removeRefreshListener();
+    }
+
     // Register global Pillars via Titan DI
     for (final factory in pillars) {
       Titan.forge(factory());
@@ -187,6 +203,13 @@ class Atlas {
 
     // Set global instance
     _instance = this;
+
+    // Subscribe to refresh listenable for reactive Sentinel re-evaluation
+    if (_refreshListenable case final listenable?) {
+      void onRefresh() => _onRefresh();
+      listenable.addListener(onRefresh);
+      _refreshSubscription = () => listenable.removeListener(onRefresh);
+    }
   }
 
   /// Recursively register routes in the trie.
@@ -226,6 +249,54 @@ class Atlas {
           ]);
       }
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Refresh listenable — reactive Sentinel re-evaluation
+  // -------------------------------------------------------------------------
+
+  /// Handles refresh notifications by re-evaluating the current path
+  /// through Drift and Sentinels. If the resolved path differs from the
+  /// current path, Atlas navigates to the new destination.
+  void _onRefresh() {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+
+    try {
+      final currentPath = _delegate._currentWaypoint.path;
+
+      if (_hasAsyncSentinels) {
+        _resolveAsync(currentPath).then((result) {
+          _applyRefreshResult(currentPath, result);
+          _isRefreshing = false;
+        });
+      } else {
+        final result = _resolve(currentPath);
+        _applyRefreshResult(currentPath, result);
+        _isRefreshing = false;
+      }
+    } catch (_) {
+      _isRefreshing = false;
+    }
+  }
+
+  /// Applies the result of a refresh re-evaluation. If the resolved path
+  /// differs from the current path, resets the navigation stack.
+  void _applyRefreshResult(String originalPath, _NavigationResult result) {
+    final resolvedPath = result.waypoint.path;
+    if (resolvedPath != originalPath) {
+      // Sentinel or Drift redirected — navigate to the new destination
+      _delegate._reset(resolvedPath);
+    } else {
+      // Dispose pillars that were unnecessarily created during re-resolve
+      result.disposePillars();
+    }
+  }
+
+  /// Removes the refresh listener subscription.
+  void _removeRefreshListener() {
+    _refreshSubscription?.call();
+    _refreshSubscription = null;
   }
 
   /// Resolve a path to a widget, applying Drifts, Sentinels, and per-route redirects.

@@ -40,6 +40,7 @@
 | [XXIV](chapter-24-the-shade-follows.md) | **The Shade Follows** | `Shade`, `Imprint`, `ShadeSession`, `Phantom`, `PhantomResult`, `ShadeListener`, gesture recording & replay |
 | [XXV](chapter-25-the-vault-remembers.md) | **The Vault Remembers** | `ShadeTextController`, `ShadeVault`, `ShadeAutoReplayConfig`, text input capture, session persistence, auto-replay, controller registry, keyboard suppression, route safety |
 | [XXVI](chapter-26-the-colossus-turns-inward.md) | **The Colossus Turns Inward** | Pillar/Core/Beacon/Vestige in Colossus widgets, reactive `ShadeListener` with `Core.addListener`, `Lens.isVisible`, `waitForSettled`, Vestige scope rules, architecture dog-fooding |
+| [XXVII](chapter-27-the-sentinel-awakens.md) | **The Sentinel Awakens** | `CoreRefresh`, `refreshListenable`, reactive Sentinel/Drift re-evaluation, auth state changes, multiple signals, Listenable bridge |
 
 ---
 

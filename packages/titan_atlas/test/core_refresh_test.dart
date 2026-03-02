@@ -1,0 +1,408 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:titan_atlas/titan_atlas.dart';
+
+// ---------------------------------------------------------------------------
+// Test Pillar for auth simulation
+// ---------------------------------------------------------------------------
+
+class _AuthPillar extends Pillar {
+  late final isLoggedIn = core(false);
+  late final role = core<String?>(null);
+}
+
+void main() {
+  setUp(() {
+    Titan.reset();
+  });
+
+  // ---------------------------------------------------------
+  // CoreRefresh — reactive bridge
+  // ---------------------------------------------------------
+
+  group('CoreRefresh', () {
+    test('notifies listeners when a Core value changes', () {
+      final auth = _AuthPillar();
+      final refresh = CoreRefresh([auth.isLoggedIn]);
+
+      var notified = 0;
+      refresh.addListener(() => notified++);
+
+      auth.isLoggedIn.value = true;
+      expect(notified, 1);
+
+      auth.isLoggedIn.value = false;
+      expect(notified, 2);
+
+      refresh.dispose();
+    });
+
+    test('notifies on any of multiple Core changes', () {
+      final auth = _AuthPillar();
+      final refresh = CoreRefresh([auth.isLoggedIn, auth.role]);
+
+      var notified = 0;
+      refresh.addListener(() => notified++);
+
+      auth.isLoggedIn.value = true;
+      expect(notified, 1);
+
+      auth.role.value = 'admin';
+      expect(notified, 2);
+
+      refresh.dispose();
+    });
+
+    test('does not notify after dispose', () {
+      final auth = _AuthPillar();
+      final refresh = CoreRefresh([auth.isLoggedIn]);
+
+      var notified = 0;
+      refresh.addListener(() => notified++);
+
+      refresh.dispose();
+
+      auth.isLoggedIn.value = true;
+      expect(notified, 0);
+    });
+
+    test('handles empty cores list', () {
+      final refresh = CoreRefresh([]);
+      // Should not throw
+      refresh.dispose();
+    });
+  });
+
+  // ---------------------------------------------------------
+  // Atlas — refreshListenable integration
+  // ---------------------------------------------------------
+
+  group('Atlas — refreshListenable', () {
+    testWidgets('redirects unauthenticated user to login on refresh', (
+      tester,
+    ) async {
+      final auth = _AuthPillar();
+      auth.isLoggedIn.value = true;
+
+      final refresh = CoreRefresh([auth.isLoggedIn]);
+
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/login', (_) => const Text('Login')),
+        ],
+        sentinels: [
+          Sentinel.except(
+            paths: {'/login'},
+            guard: (path, _) => auth.isLoggedIn.peek() ? null : '/login',
+          ),
+        ],
+        refreshListenable: refresh,
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      // Initially on Home (authenticated)
+      expect(find.text('Home'), findsOneWidget);
+
+      // Sign out → triggers refresh → Sentinel redirects to /login
+      auth.isLoggedIn.value = false;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Login'), findsOneWidget);
+
+      refresh.dispose();
+    });
+
+    testWidgets('redirects authenticated user away from login on refresh', (
+      tester,
+    ) async {
+      final auth = _AuthPillar();
+      auth.isLoggedIn.value = false;
+
+      final refresh = CoreRefresh([auth.isLoggedIn]);
+
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/login', (_) => const Text('Login')),
+        ],
+        sentinels: [
+          // Redirect unauthenticated to /login
+          Sentinel.except(
+            paths: {'/login'},
+            guard: (path, _) => auth.isLoggedIn.peek() ? null : '/login',
+          ),
+          // Redirect authenticated away from /login
+          Sentinel.only(
+            paths: {'/login'},
+            guard: (path, _) => auth.isLoggedIn.peek() ? '/' : null,
+          ),
+        ],
+        refreshListenable: refresh,
+        initialPath: '/login',
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      // Initially on Login (not authenticated)
+      expect(find.text('Login'), findsOneWidget);
+
+      // Sign in → triggers refresh → Sentinel redirects to /
+      auth.isLoggedIn.value = true;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+
+      refresh.dispose();
+    });
+
+    testWidgets('does not navigate when Sentinel allows current path', (
+      tester,
+    ) async {
+      final auth = _AuthPillar();
+      auth.isLoggedIn.value = true;
+
+      final refresh = CoreRefresh([auth.isLoggedIn, auth.role]);
+
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/login', (_) => const Text('Login')),
+        ],
+        sentinels: [
+          Sentinel.except(
+            paths: {'/login'},
+            guard: (path, _) => auth.isLoggedIn.peek() ? null : '/login',
+          ),
+        ],
+        refreshListenable: refresh,
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+
+      // Changing role (not isLoggedIn) should NOT redirect
+      auth.role.value = 'admin';
+      await tester.pumpAndSettle();
+
+      // Still on Home
+      expect(find.text('Home'), findsOneWidget);
+
+      refresh.dispose();
+    });
+
+    testWidgets('works with Drift redirect', (tester) async {
+      final auth = _AuthPillar();
+      auth.isLoggedIn.value = true;
+
+      final refresh = CoreRefresh([auth.isLoggedIn]);
+
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/login', (_) => const Text('Login')),
+        ],
+        drift: (path, _) => auth.isLoggedIn.peek() ? null : '/login',
+        refreshListenable: refresh,
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+
+      // Sign out → drift redirects to /login
+      auth.isLoggedIn.value = false;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Login'), findsOneWidget);
+
+      refresh.dispose();
+    });
+
+    testWidgets('works with Garrison.authGuard', (tester) async {
+      final auth = _AuthPillar();
+      auth.isLoggedIn.value = true;
+
+      final refresh = CoreRefresh([auth.isLoggedIn]);
+
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/login', (_) => const Text('Login')),
+          Passage('/register', (_) => const Text('Register')),
+        ],
+        sentinels: [
+          Garrison.authGuard(
+            isAuthenticated: () => auth.isLoggedIn.peek(),
+            loginPath: '/login',
+            publicPaths: {'/login', '/register'},
+          ),
+        ],
+        refreshListenable: refresh,
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+
+      // Sign out → Garrison guard redirects to /login
+      auth.isLoggedIn.value = false;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Login'), findsOneWidget);
+
+      refresh.dispose();
+    });
+
+    testWidgets('works with ChangeNotifier (Flutter Listenable)', (
+      tester,
+    ) async {
+      final notifier = ValueNotifier<bool>(true);
+
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/login', (_) => const Text('Login')),
+        ],
+        sentinels: [
+          Sentinel.except(
+            paths: {'/login'},
+            guard: (path, _) => notifier.value ? null : '/login',
+          ),
+        ],
+        refreshListenable: notifier,
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+
+      notifier.value = false;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Login'), findsOneWidget);
+
+      notifier.dispose();
+    });
+
+    testWidgets('Atlas without refreshListenable still works', (tester) async {
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/about', (_) => const Text('About')),
+        ],
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+
+      Atlas.to('/about');
+      await tester.pumpAndSettle();
+      expect(find.text('About'), findsOneWidget);
+    });
+
+    testWidgets('cleans up old refresh listener when new Atlas is created', (
+      tester,
+    ) async {
+      final auth = _AuthPillar();
+      auth.isLoggedIn.value = true;
+
+      final refresh1 = CoreRefresh([auth.isLoggedIn]);
+
+      // First Atlas
+      Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home1')),
+          Passage('/login', (_) => const Text('Login1')),
+        ],
+        sentinels: [
+          Sentinel.except(
+            paths: {'/login'},
+            guard: (path, _) => auth.isLoggedIn.peek() ? null : '/login',
+          ),
+        ],
+        refreshListenable: refresh1,
+      );
+
+      final refresh2 = CoreRefresh([auth.isLoggedIn]);
+
+      // Second Atlas — should clean up first Atlas's listener
+      final atlas2 = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home2')),
+          Passage('/login', (_) => const Text('Login2')),
+        ],
+        sentinels: [
+          Sentinel.except(
+            paths: {'/login'},
+            guard: (path, _) => auth.isLoggedIn.peek() ? null : '/login',
+          ),
+        ],
+        refreshListenable: refresh2,
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas2.config));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home2'), findsOneWidget);
+
+      // Sign out → should use second Atlas's sentinel
+      auth.isLoggedIn.value = false;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Login2'), findsOneWidget);
+
+      refresh1.dispose();
+      refresh2.dispose();
+    });
+
+    testWidgets('handles rapid state changes without errors', (tester) async {
+      final auth = _AuthPillar();
+      auth.isLoggedIn.value = true;
+
+      final refresh = CoreRefresh([auth.isLoggedIn]);
+
+      final atlas = Atlas(
+        passages: [
+          Passage('/', (_) => const Text('Home')),
+          Passage('/login', (_) => const Text('Login')),
+        ],
+        sentinels: [
+          Sentinel.except(
+            paths: {'/login'},
+            guard: (path, _) => auth.isLoggedIn.peek() ? null : '/login',
+          ),
+          Sentinel.only(
+            paths: {'/login'},
+            guard: (path, _) => auth.isLoggedIn.peek() ? '/' : null,
+          ),
+        ],
+        refreshListenable: refresh,
+      );
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: atlas.config));
+      await tester.pumpAndSettle();
+
+      // Rapid toggles
+      auth.isLoggedIn.value = false;
+      auth.isLoggedIn.value = true;
+      auth.isLoggedIn.value = false;
+      await tester.pumpAndSettle();
+
+      // Should end up on Login (last state was false)
+      expect(find.text('Login'), findsOneWidget);
+
+      refresh.dispose();
+    });
+  });
+}

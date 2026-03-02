@@ -55,6 +55,7 @@ export 'src/core/shift.dart';
 export 'src/core/waypoint.dart';
 export 'src/core/route_trie.dart';
 export 'src/core/cartograph.dart';
+export 'src/core/core_refresh.dart';
 export 'src/core/garrison.dart';
 
 // Navigation

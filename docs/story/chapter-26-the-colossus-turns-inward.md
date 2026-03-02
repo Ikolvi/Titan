@@ -455,4 +455,4 @@ This was the mirror test. If the watchmen trust the walls they guard, the walls 
 | | |
 |---|---|
 | **Previous** | [Chapter XXV: The Vault Remembers](chapter-25-the-vault-remembers.md) |
-| **Next** | *The next chapter awaits...* |
+| **Next** | [Chapter XXVII: The Sentinel Awakens](chapter-27-the-sentinel-awakens.md) |
