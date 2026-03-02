@@ -157,6 +157,36 @@ class EnterpriseDemoPillar extends Pillar {
     'magic',
   ], name: 'tags');
 
+  // --------------- Conduit (Core-Level Middleware) ---------------
+
+  /// Quest reward with clamping — cannot go below 0 or above 10,000.
+  late final questReward = core(
+    100,
+    name: 'questReward',
+    conduits: [ClampConduit(min: 0, max: 10000)],
+  );
+
+  /// Hero name with trimming and lowercase transformation.
+  late final heroNameInput = core(
+    '',
+    name: 'heroNameInput',
+    conduits: [
+      TransformConduit<String>((_, v) => v.trim()),
+      TransformConduit<String>((_, v) => v.toLowerCase()),
+    ],
+  );
+
+  /// Validated difficulty level — must be 1-5.
+  late final difficulty = core(
+    1,
+    name: 'difficulty',
+    conduits: [
+      ValidateConduit<int>(
+        (_, v) => (v < 1 || v > 5) ? 'Difficulty must be 1-5' : null,
+      ),
+    ],
+  );
+
   // --------------- Sigil (Feature Flags) ---------------
 
   /// Whether the experimental publish feature is enabled.

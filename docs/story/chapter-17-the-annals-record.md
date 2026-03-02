@@ -366,3 +366,4 @@ Kael smiled. "At the First Pillar. It always starts with a Pillar."
 | [XV](chapter-15-the-loom-weaves.md) | The Loom Weaves |
 | [XVI](chapter-16-the-forge-and-crucible.md) | The Forge & Crucible |
 | **XVII** | **The Annals Record** ← You are here |
+| [XVIII](chapter-18-the-conduit-flows.md) | The Conduit Flows |

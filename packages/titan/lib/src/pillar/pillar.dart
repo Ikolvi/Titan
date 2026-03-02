@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 
 import '../core/batch.dart';
 import '../core/computed.dart';
+import '../core/conduit.dart';
 import '../core/effect.dart';
 import '../core/epoch.dart';
 import '../core/loom.dart';
@@ -142,15 +143,22 @@ abstract class Pillar {
   /// late final count = core(0);
   /// late final name = core('untitled', name: 'name');
   /// late final user = core<User?>(null);
+  /// late final health = core(100, conduits: [ClampConduit(min: 0, max: 100)]);
   /// ```
   @protected
   TitanState<T> core<T>(
     T initialValue, {
     String? name,
     bool Function(T previous, T next)? equals,
+    List<Conduit<T>>? conduits,
   }) {
     _assertNotDisposed();
-    final state = TitanState<T>(initialValue, name: name, equals: equals);
+    final state = TitanState<T>(
+      initialValue,
+      name: name,
+      equals: equals,
+      conduits: conduits,
+    );
     _managedNodes.add(state);
     return state;
   }

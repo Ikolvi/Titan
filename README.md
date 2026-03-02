@@ -49,6 +49,7 @@ A uniquely powerful reactive state management architecture for Flutter — struc
 | Data Query | **Quarry** | Cached data fetching with stale-while-revalidate |
 | Multi-Consumer | **Confluence** | Multi-Pillar consumer widget |
 | Debug Overlay | **Lens** | In-app debug panel for Pillars, Herald, Vigil, Chronicle |
+| Middleware | **Conduit** | Core-level pipeline — transform, validate, reject value changes |
 
 ---
 
@@ -124,6 +125,7 @@ Vestige<CounterPillar>(
 | Data fetching/caching | ❌ | ❌ | ❌ | ❌ | ✅ Quarry (SWR) |
 | Multi-store consumer | ❌ | ✅ MultiBlocBuilder | ✅ Multiple watches | ❌ | ✅ Confluence |
 | Debug overlay | ❌ | ❌ DevTools only | ❌ DevTools only | ❌ | ✅ Lens |
+| State middleware | ❌ | ❌ | ❌ | ❌ | ✅ Conduit |
 
 ### Vs Bloc
 

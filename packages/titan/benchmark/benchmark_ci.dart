@@ -30,6 +30,7 @@ void main() {
   _benchSigilLookup();
   _benchAnnalsRecord();
   _benchTetherCall();
+  _benchConduitPipeline();
 
   // Output JSON
   print(
@@ -420,6 +421,21 @@ void _benchTetherCall() {
   final throughput = calls / sw.elapsedMicroseconds * 1e6;
   _record('Tether Call (10K)', 'calls/sec', throughput);
   Tether.reset();
+}
+
+// ---------------------------------------------------------------------------
+// 15. Conduit Pipeline (10K sets with ClampConduit)
+// ---------------------------------------------------------------------------
+void _benchConduitPipeline() {
+  const n = 10000;
+  final state = TitanState<int>(50, conduits: [ClampConduit(min: 0, max: 100)]);
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    state.value = i % 200 - 50;
+  }
+  sw.stop();
+  final usPerSet = sw.elapsedMicroseconds / n;
+  _record('Conduit Pipeline (10K)', 'µs/set', usPerSet);
 }
 
 // =============================================================================

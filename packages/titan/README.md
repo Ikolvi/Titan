@@ -45,6 +45,7 @@ A signal-based reactive state management engine for Dart & Flutter — fine-grai
 | Form Group | **ScrollGroup** | Aggregate form state |
 | Pagination | **Codex** | Paginated data with reactive state |
 | Data Query | **Quarry** | Cached data fetching (SWR) |
+| Middleware | **Conduit** | Core-level pipeline — transform, validate, reject |
 
 ---
 
@@ -404,6 +405,7 @@ class ProfilePillar extends Pillar {
 | Form management | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Pagination | ❌ | ❌ | ❌ | ❌ | ✅ |
 | SWR data fetching | ❌ | ❌ | ❌ | ❌ | ✅ |
+| State middleware | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ---
 

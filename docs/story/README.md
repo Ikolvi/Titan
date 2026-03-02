@@ -31,6 +31,7 @@
 | [XV](chapter-15-the-loom-weaves.md) | **The Loom Weaves** | `Loom`, finite state machines, transitions, lifecycle hooks |
 | [XVI](chapter-16-the-forge-and-crucible.md) | **The Forge & Crucible** | `Crucible`, `Snapshot`, `Bulwark`, `PillarScope`, testing harness |
 | [XVII](chapter-17-the-annals-record.md) | **The Annals Record** | `Annals`, `Saga`, `Volley`, `Tether`, audit trail, workflows |
+| [XVIII](chapter-18-the-conduit-flows.md) | **The Conduit Flows** | `Conduit`, Core-level middleware, `ClampConduit`, `ValidateConduit`, `FreezeConduit` |
 
 ---
 

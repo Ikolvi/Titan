@@ -46,7 +46,7 @@ abstract class Pillar
 
 | Method | Return | Description |
 |--------|--------|-------------|
-| `core<T>(T value, {String? name, bool Function(T,T)? equals})` | `TitanState<T>` | Create a managed reactive Core |
+| `core<T>(T value, {String? name, bool Function(T,T)? equals, List<Conduit<T>>? conduits})` | `TitanState<T>` | Create a managed reactive Core |
 | `derived<T>(T Function() compute, {String? name})` | `TitanComputed<T>` | Create a managed Derived value |
 | `epoch<T>(T value, {int maxHistory, String? name})` | `Epoch<T>` | Create a managed Core with undo/redo |
 | `watch(dynamic Function() fn, {bool fireImmediately})` | `TitanEffect` | Create a managed reactive side effect |
@@ -266,7 +266,7 @@ Reactive mutable state container. `Core<T>` is a type alias for `TitanState<T>`.
 #### Constructor
 
 ```dart
-Core<T>(T initialValue, {String? name, bool Function(T, T)? equals})
+Core<T>(T initialValue, {String? name, bool Function(T, T)? equals, List<Conduit<T>>? conduits})
 ```
 
 | Parameter | Type | Description |
@@ -274,6 +274,7 @@ Core<T>(T initialValue, {String? name, bool Function(T, T)? equals})
 | `initialValue` | `T` | Initial value |
 | `name` | `String?` | Debug name for logging |
 | `equals` | `bool Function(T, T)?` | Custom equality function |
+| `conduits` | `List<Conduit<T>>?` | Middleware pipeline for value changes |
 
 #### Properties
 
@@ -281,6 +282,7 @@ Core<T>(T initialValue, {String? name, bool Function(T, T)? equals})
 |----------|------|-------------|
 | `value` | `T` | Get/set current value (tracks on read, notifies on write) |
 | `name` | `String?` | Debug name |
+| `conduits` | `List<Conduit<T>>` | Attached conduits (unmodifiable) |
 
 #### Methods
 
@@ -288,8 +290,11 @@ Core<T>(T initialValue, {String? name, bool Function(T, T)? equals})
 |--------|--------|-------------|
 | `peek()` | `T` | Read without dependency tracking |
 | `update(T Function(T) updater)` | `void` | Transform current value |
-| `silent(T value)` | `void` | Set without notifying dependents |
+| `silent(T value)` | `void` | Set without notifying dependents (bypasses conduits) |
 | `listen(void Function(T) callback)` | `void Function()` | Listen for changes, returns unsubscribe |
+| `addConduit(Conduit<T> conduit)` | `void` | Add a Conduit to the pipeline |
+| `removeConduit(Conduit<T> conduit)` | `bool` | Remove a Conduit (returns true if found) |
+| `clearConduits()` | `void` | Remove all Conduits |
 | `dispose()` | `void` | Dispose and remove all listeners |
 
 ---
@@ -870,6 +875,38 @@ LensLogSink({int maxEntries = 200})
 ---
 
 ## Enterprise Features
+
+### Conduit
+
+Core-level middleware that intercepts, transforms, or rejects individual value changes.
+
+#### Abstract Class
+
+```dart
+abstract class Conduit<T> {
+  T pipe(T oldValue, T newValue);
+  void onPiped(T oldValue, T newValue) {}
+}
+```
+
+#### Built-in Conduits
+
+| Class | Description |
+|-------|-------------|
+| `ClampConduit<T extends num>({required T min, required T max})` | Clamp numeric values to a range |
+| `TransformConduit<T>(T Function(T old, T new) transform)` | Apply a transformation function |
+| `ValidateConduit<T>(String? Function(T old, T new) validator)` | Reject values that fail validation |
+| `FreezeConduit<T>(bool Function(T old, T new) freezeWhen)` | Block changes once a condition is met |
+| `ThrottleConduit<T>(Duration minInterval)` | Reject changes faster than minimum interval |
+
+#### ConduitRejectedException
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `message` | `String?` | Why the change was rejected |
+| `rejectedValue` | `Object?` | The value that was rejected |
+
+---
 
 ### Loom
 

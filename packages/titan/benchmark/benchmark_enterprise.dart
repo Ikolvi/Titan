@@ -21,6 +21,7 @@ import 'package:titan/titan.dart';
 //  25. Core Extensions — toggle, increment, list ops, map ops, select
 //  26. Snapshot — State capture & restore, diff
 //  27. Crucible — Testing harness track + change recording
+//  28. Conduit — Core-level middleware pipeline throughput
 // =============================================================================
 
 void main() async {
@@ -41,6 +42,7 @@ void main() async {
   await _benchCoreExtensions();
   await _benchSnapshot();
   await _benchCrucible();
+  await _benchConduit();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -1107,6 +1109,97 @@ Future<void> _benchCrucible() async {
 
 // =============================================================================
 // Helpers
+// =============================================================================
+// 28. Conduit — Core-level middleware pipeline
+// =============================================================================
+
+Future<void> _benchConduit() async {
+  print('── 28. Conduit ──────────────────────────────────────');
+
+  // 28a. Core with single ClampConduit — 10K value sets
+  {
+    final sw = Stopwatch()..start();
+    const n = 10000;
+    final state = TitanState<int>(
+      50,
+      conduits: [ClampConduit(min: 0, max: 100)],
+    );
+    for (var i = 0; i < n; i++) {
+      state.value = i % 200 - 50; // Range -50..149
+    }
+    sw.stop();
+    print('  Clamp 10K sets:      ${_ms(sw)}  (${_pad(n)} iterations)');
+  }
+
+  // 28b. Core with 3-conduit chain — 10K sets
+  {
+    final sw = Stopwatch()..start();
+    const n = 10000;
+    final state = TitanState<String>(
+      '',
+      conduits: [
+        TransformConduit((_, v) => v.trim()),
+        TransformConduit((_, v) => v.toLowerCase()),
+        ValidateConduit((_, v) => v.length > 100 ? 'too long' : null),
+      ],
+    );
+    for (var i = 0; i < n; i++) {
+      state.value = '  Hello $i  ';
+    }
+    sw.stop();
+    print('  3-chain 10K sets:    ${_ms(sw)}  (${_pad(n)} iterations)');
+  }
+
+  // 28c. Rejected changes (FreezeConduit) — 10K rejections
+  {
+    final sw = Stopwatch()..start();
+    const n = 10000;
+    final state = TitanState<int>(
+      100,
+      conduits: [
+        FreezeConduit((_, _) => true), // Always frozen
+      ],
+    );
+    for (var i = 0; i < n; i++) {
+      try {
+        state.value = i;
+      } on ConduitRejectedException {
+        // Expected
+      }
+    }
+    sw.stop();
+    print('  Reject 10K sets:     ${_ms(sw)}  (${_pad(n)} iterations)');
+  }
+
+  // 28d. addConduit / removeConduit churn — 10K add+remove cycles
+  {
+    final sw = Stopwatch()..start();
+    const n = 10000;
+    final state = TitanState<int>(0);
+    final conduit = ClampConduit<int>(min: 0, max: 10);
+    for (var i = 0; i < n; i++) {
+      state.addConduit(conduit);
+      state.removeConduit(conduit);
+    }
+    sw.stop();
+    print('  Add/remove 10K:      ${_ms(sw)}  (${_pad(n)} iterations)');
+  }
+
+  // 28e. No-conduit baseline — 10K sets for comparison
+  {
+    final sw = Stopwatch()..start();
+    const n = 10000;
+    final state = TitanState<int>(0);
+    for (var i = 0; i < n; i++) {
+      state.value = i;
+    }
+    sw.stop();
+    print('  No-conduit 10K:      ${_ms(sw)}  (${_pad(n)} iterations)');
+  }
+
+  print('');
+}
+
 // =============================================================================
 
 class _BenchPillar extends Pillar {

@@ -73,6 +73,7 @@ export 'src/testing/snapshot.dart';
 export 'src/core/reactive.dart';
 export 'src/core/state.dart';
 export 'src/core/computed.dart';
+export 'src/core/conduit.dart';
 export 'src/core/effect.dart';
 export 'src/core/batch.dart';
 export 'src/core/epoch.dart';

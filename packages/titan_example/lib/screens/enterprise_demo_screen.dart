@@ -44,7 +44,7 @@ class _EnterpriseTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Column(
         children: [
           const TabBar(
@@ -54,6 +54,7 @@ class _EnterpriseTabs extends StatelessWidget {
               Tab(text: 'Bulwark'),
               Tab(text: 'Saga'),
               Tab(text: 'Volley'),
+              Tab(text: 'Conduit'),
               Tab(text: 'Toolkit'),
             ],
           ),
@@ -64,6 +65,7 @@ class _EnterpriseTabs extends StatelessWidget {
                 _BulwarkTab(),
                 _SagaTab(),
                 _VolleyTab(),
+                _ConduitTab(),
                 _ToolkitTab(),
               ],
             ),
@@ -425,6 +427,186 @@ class _VolleyTab extends StatelessWidget {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Conduit Tab — Core-Level Middleware
+// ---------------------------------------------------------------------------
+
+class _ConduitTab extends StatelessWidget {
+  const _ConduitTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, p) {
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ---- Clamp Conduit ----
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ClampConduit — Quest Reward',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Reward is clamped to 0–10,000. Try setting values '
+                      'outside the range.',
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Current reward: ${p.questReward.value}',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        FilledButton(
+                          onPressed: () => p.questReward.value = 500,
+                          child: const Text('Set 500'),
+                        ),
+                        FilledButton(
+                          onPressed: () => p.questReward.value = 15000,
+                          child: const Text('Set 15,000 (clamped)'),
+                        ),
+                        FilledButton(
+                          onPressed: () => p.questReward.value = -100,
+                          child: const Text('Set -100 (clamped)'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ---- Transform Conduit ----
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'TransformConduit — Hero Name',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Trims whitespace and converts to lowercase '
+                      'automatically.',
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Stored: "${p.heroNameInput.value}"',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        FilledButton(
+                          onPressed: () =>
+                              p.heroNameInput.value = '  SIR LANCELOT  ',
+                          child: const Text('Set "  SIR LANCELOT  "'),
+                        ),
+                        FilledButton(
+                          onPressed: () => p.heroNameInput.value = '   KAEL   ',
+                          child: const Text('Set "   KAEL   "'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ---- Validate Conduit ----
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ValidateConduit — Difficulty',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Only accepts values 1-5. Invalid values are '
+                      'rejected.',
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Difficulty: ${p.difficulty.value}',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        FilledButton(
+                          onPressed: () => p.difficulty.value = 3,
+                          child: const Text('Set 3 (valid)'),
+                        ),
+                        FilledButton(
+                          onPressed: () {
+                            try {
+                              p.difficulty.value = 10;
+                            } on ConduitRejectedException catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Rejected: ${e.message}'),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text('Set 10 (rejected)'),
+                        ),
+                        FilledButton(
+                          onPressed: () {
+                            try {
+                              p.difficulty.value = 0;
+                            } on ConduitRejectedException catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Rejected: ${e.message}'),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text('Set 0 (rejected)'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         );
       },
     );

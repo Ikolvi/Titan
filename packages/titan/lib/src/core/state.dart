@@ -1,4 +1,5 @@
 import 'computed.dart';
+import 'conduit.dart';
 import 'observer.dart';
 import 'reactive.dart';
 
@@ -33,15 +34,22 @@ class TitanState<T> extends ReactiveNode {
   T? _previousValue;
   final bool Function(T previous, T next)? _equals;
   final String? _name;
+  final List<Conduit<T>> _conduits;
 
   /// Creates a reactive state with the given initial [value].
   ///
   /// - [name] — Optional debug name for logging/devtools.
   /// - [equals] — Custom equality function. Defaults to `==`.
-  TitanState(T value, {String? name, bool Function(T previous, T next)? equals})
-    : _value = value,
-      _name = name,
-      _equals = equals;
+  /// - [conduits] — Optional list of [Conduit]s to intercept value changes.
+  TitanState(
+    T value, {
+    String? name,
+    bool Function(T previous, T next)? equals,
+    List<Conduit<T>>? conduits,
+  }) : _value = value,
+       _name = name,
+       _equals = equals,
+       _conduits = conduits != null ? List<Conduit<T>>.of(conduits) : [];
 
   /// The debug name of this state, if provided.
   String? get name => _name;
@@ -67,23 +75,41 @@ class TitanState<T> extends ReactiveNode {
   /// ```
   T? get previousValue => _previousValue;
 
-  /// Sets the value. If the new value differs from the current value
-  /// (per the equality function), dependents and listeners are notified.
+  /// Sets the value. If Conduits are attached, the value is piped through
+  /// each before being applied. If the final value differs from the current
+  /// value (per the equality function), dependents and listeners are notified.
+  ///
+  /// Throws [ConduitRejectedException] if any Conduit rejects the change.
   set value(T newValue) {
-    if (_isEqual(_value, newValue)) return;
+    // Pipe through conduits
+    var piped = newValue;
+    if (_conduits.isNotEmpty) {
+      for (final conduit in _conduits) {
+        piped = conduit.pipe(_value, piped);
+      }
+    }
+
+    if (_isEqual(_value, piped)) return;
 
     final oldValue = _value;
     _previousValue = oldValue;
-    _value = newValue;
+    _value = piped;
 
     // Notify all observers
     TitanObserver.notifyStateChanged(
       state: this,
       oldValue: oldValue,
-      newValue: newValue,
+      newValue: piped,
     );
 
     notifyDependents();
+
+    // Post-change callbacks
+    if (_conduits.isNotEmpty) {
+      for (final conduit in _conduits) {
+        conduit.onPiped(oldValue, piped);
+      }
+    }
   }
 
   /// Returns the current value without tracking it as a dependency.
@@ -100,6 +126,33 @@ class TitanState<T> extends ReactiveNode {
   void update(T Function(T current) updater) {
     value = updater(_value);
   }
+
+  /// Adds a [Conduit] to this Core's pipeline.
+  ///
+  /// Conduits are executed in the order they were added (FIFO).
+  /// The new conduit will intercept all future value changes.
+  ///
+  /// ```dart
+  /// counter.addConduit(ClampConduit(min: 0, max: 100));
+  /// ```
+  void addConduit(Conduit<T> conduit) {
+    _conduits.add(conduit);
+  }
+
+  /// Removes a previously added [Conduit].
+  ///
+  /// Returns `true` if the conduit was found and removed.
+  bool removeConduit(Conduit<T> conduit) {
+    return _conduits.remove(conduit);
+  }
+
+  /// Removes all Conduits from this Core.
+  void clearConduits() {
+    _conduits.clear();
+  }
+
+  /// The list of currently attached Conduits (read-only view).
+  List<Conduit<T>> get conduits => List.unmodifiable(_conduits);
 
   /// Silently sets the value without notifying dependents.
   ///

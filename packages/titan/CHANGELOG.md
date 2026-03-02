@@ -5,6 +5,17 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-02
+
+### Added
+- **Conduit** — Core-level middleware pipeline for intercepting value changes
+  - `Conduit<T>` abstract class with `pipe()` and `onPiped()` hooks
+  - Built-in: `ClampConduit`, `TransformConduit`, `ValidateConduit`, `FreezeConduit`, `ThrottleConduit`
+  - `ConduitRejectedException` for blocking invalid state changes
+  - `Core<T>` now accepts `conduits:` parameter in constructor and `Pillar.core()`
+  - Dynamic management: `addConduit()`, `removeConduit()`, `clearConduits()`
+  - 25 new tests, benchmark #28 added
+
 ## [0.1.1] - 2026-03-02
 
 ### Added

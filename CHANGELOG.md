@@ -5,6 +5,17 @@ All notable changes to the Titan packages will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-02
+
+### Added
+
+#### Titan Core (`titan`)
+- **Conduit** — Core-level middleware pipeline
+  - Intercept, transform, validate, or reject individual Core value changes
+  - 5 built-in Conduits: `ClampConduit`, `TransformConduit`, `ValidateConduit`, `FreezeConduit`, `ThrottleConduit`
+  - Pillar integration via `core(value, conduits: [...])`
+  - Story chapter XVIII: "The Conduit Flows"
+
 ## [0.0.3] - 2025-07-12
 
 ### Added

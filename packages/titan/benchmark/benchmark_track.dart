@@ -828,6 +828,26 @@ Future<void> _runEnterpriseBenchmarks() async {
     Titan.reset();
     Herald.reset();
   }
+
+  // 28. Conduit pipeline
+  {
+    const n = 10000;
+    final state = TitanState<int>(
+      50,
+      conduits: [ClampConduit(min: 0, max: 100)],
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < n; i++) {
+      state.value = i % 200 - 50;
+    }
+    sw.stop();
+    _record(
+      'Conduit Pipeline',
+      sw.elapsedMicroseconds / n,
+      'µs/set',
+      'enterprise',
+    );
+  }
 }
 
 // =============================================================================

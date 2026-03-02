@@ -1641,6 +1641,104 @@ PillarScope(
 
 ---
 
+## Conduit — Core-Level Middleware
+
+Conduits intercept individual Core value changes — transforming, validating, or rejecting values before they're applied.
+
+### Clamping Values
+
+```dart
+class HeroPillar extends Pillar {
+  late final health = core(100, conduits: [
+    ClampConduit(min: 0, max: 100),
+  ]);
+
+  void takeDamage(int amount) => strike(() {
+    health.value -= amount; // Clamped to 0 minimum
+  });
+}
+```
+
+### Chaining Conduits
+
+Multiple Conduits execute in FIFO order:
+
+```dart
+late final name = core('', conduits: [
+  TransformConduit((_, v) => v.trim()),
+  TransformConduit((_, v) => v.toLowerCase()),
+  ValidateConduit((_, v) => v.isEmpty ? 'Required' : null),
+]);
+```
+
+### Rejecting Changes
+
+Throw `ConduitRejectedException` to block a value change:
+
+```dart
+late final reward = core(100, conduits: [
+  ValidateConduit((_, v) => v < 0 ? 'Cannot be negative' : null),
+]);
+
+try {
+  reward.value = -10;
+} on ConduitRejectedException catch (e) {
+  print(e.message); // 'Cannot be negative'
+}
+```
+
+### Freezing State
+
+```dart
+late final score = core(0, conduits: [
+  FreezeConduit((oldValue, _) => oldValue >= 100),
+]);
+```
+
+### Dynamic Conduits
+
+```dart
+final clamp = ClampConduit<int>(min: 0, max: 100);
+health.addConduit(clamp);    // Add at runtime
+health.removeConduit(clamp); // Remove later
+health.clearConduits();      // Remove all
+```
+
+### Custom Conduits
+
+```dart
+class AuditConduit<T> extends Conduit<T> {
+  final String coreName;
+  AuditConduit(this.coreName);
+
+  @override
+  T pipe(T oldValue, T newValue) => newValue; // Pass through
+
+  @override
+  void onPiped(T oldValue, T newValue) {
+    Annals.record(AnnalEntry(
+      coreName: coreName,
+      pillarType: 'auto',
+      oldValue: oldValue,
+      newValue: newValue,
+      action: 'conduit_change',
+    ));
+  }
+}
+```
+
+### Built-in Conduits
+
+| Conduit | Purpose |
+|---------|---------|
+| `ClampConduit<num>` | Clamps numeric values to min-max range |
+| `TransformConduit<T>` | Applies a transformation function |
+| `ValidateConduit<T>` | Rejects values that fail validation |
+| `FreezeConduit<T>` | Blocks changes once a condition is met |
+| `ThrottleConduit<T>` | Rejects changes faster than a minimum interval |
+
+---
+
 ## Additional Widgets
 
 ### VestigeWhen
