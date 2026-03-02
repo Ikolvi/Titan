@@ -203,6 +203,26 @@ extension FluxStateExtensions<T> on TitanState<T> {
   /// count.stream.listen((v) => print(v));
   /// ```
   Stream<T> get stream => asStream();
+
+  /// Maps this Core's value through a transformation into a Derived.
+  ///
+  /// ```dart
+  /// final count = Core(3);
+  /// final label = count.map((v) => 'Count: $v');
+  /// print(label.value); // 'Count: 3'
+  /// ```
+  TitanComputed<R> map<R>(R Function(T value) transform) =>
+      TitanComputed<R>(() => transform(value));
+
+  /// Creates a `Derived<bool>` that is `true` when [predicate] passes.
+  ///
+  /// ```dart
+  /// final count = Core(10);
+  /// final isHigh = count.where((v) => v > 5);
+  /// print(isHigh.value); // true
+  /// ```
+  TitanComputed<bool> where(bool Function(T value) predicate) =>
+      TitanComputed<bool>(() => predicate(value));
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +261,24 @@ extension FluxComputedExtensions<T> on TitanComputed<T> {
   /// total.stream.listen((v) => print('Total: $v'));
   /// ```
   Stream<T> get stream => asStream();
+
+  /// Maps this Derived's value through a transformation into a new Derived.
+  ///
+  /// ```dart
+  /// final total = derived(() => a.value + b.value);
+  /// final label = total.map((v) => 'Total: $v');
+  /// ```
+  TitanComputed<R> map<R>(R Function(T value) transform) =>
+      TitanComputed<R>(() => transform(value));
+
+  /// Creates a `Derived<bool>` that is `true` when [predicate] passes.
+  ///
+  /// ```dart
+  /// final total = derived(() => a.value + b.value);
+  /// final isHigh = total.where((v) => v > 100);
+  /// ```
+  TitanComputed<bool> where(bool Function(T value) predicate) =>
+      TitanComputed<bool>(() => predicate(value));
 }
 
 // ---------------------------------------------------------------------------

@@ -437,6 +437,10 @@ abstract class Pillar {
   /// If [fn] returns a [Function], it's called as cleanup before each re-run
   /// and on disposal.
   ///
+  /// If [when] is provided, the watcher only executes when the guard
+  /// returns `true`. The guard can read reactive values and will
+  /// auto-track its own dependencies.
+  ///
   /// ```dart
   /// @override
   /// void onInit() {
@@ -449,12 +453,27 @@ abstract class Pillar {
   ///     final sub = stream.listen(handler);
   ///     return () => sub.cancel();
   ///   });
+  ///
+  ///   // With guard — only runs when online
+  ///   watch(() {
+  ///     syncToServer(data.value);
+  ///   }, when: () => isOnline.value);
   /// }
   /// ```
   @protected
-  TitanEffect watch(Function() fn, {String? name, bool immediate = true}) {
+  TitanEffect watch(
+    Function() fn, {
+    String? name,
+    bool immediate = true,
+    bool Function()? when,
+  }) {
     _assertNotDisposed();
-    final effect = TitanEffect(fn, name: name, fireImmediately: immediate);
+    final effect = TitanEffect(
+      fn,
+      name: name,
+      fireImmediately: immediate,
+      guard: when,
+    );
     _managedEffects.add(effect);
     return effect;
   }

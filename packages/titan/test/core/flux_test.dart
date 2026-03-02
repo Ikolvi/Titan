@@ -360,5 +360,79 @@ void main() {
         state.dispose();
       });
     });
+
+    // -----------------------------------------------------------------------
+    // TitanState.map / where
+    // -----------------------------------------------------------------------
+
+    group('TitanState.map', () {
+      test('creates a Derived from a mapped Core', () {
+        final count = TitanState(3);
+        final label = count.map((v) => 'Count: $v');
+
+        expect(label.value, 'Count: 3');
+
+        count.value = 10;
+        expect(label.value, 'Count: 10');
+
+        label.dispose();
+        count.dispose();
+      });
+    });
+
+    group('TitanState.where', () {
+      test('creates a Derived<bool> from a predicate', () {
+        final count = TitanState(3);
+        final isHigh = count.where((v) => v > 5);
+
+        expect(isHigh.value, false);
+
+        count.value = 10;
+        expect(isHigh.value, true);
+
+        isHigh.dispose();
+        count.dispose();
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // TitanComputed.map / where
+    // -----------------------------------------------------------------------
+
+    group('TitanComputed.map', () {
+      test('chains transformation on a Derived', () {
+        final a = TitanState(2);
+        final b = TitanState(3);
+        final sum = TitanComputed(() => a.value + b.value);
+        final label = sum.map((v) => 'Sum=$v');
+
+        expect(label.value, 'Sum=5');
+
+        a.value = 10;
+        expect(label.value, 'Sum=13');
+
+        label.dispose();
+        sum.dispose();
+        a.dispose();
+        b.dispose();
+      });
+    });
+
+    group('TitanComputed.where', () {
+      test('creates a predicate Derived from a Derived', () {
+        final count = TitanState(0);
+        final doubled = TitanComputed(() => count.value * 2);
+        final isHigh = doubled.where((v) => v > 10);
+
+        expect(isHigh.value, false);
+
+        count.value = 6;
+        expect(isHigh.value, true);
+
+        isHigh.dispose();
+        doubled.dispose();
+        count.dispose();
+      });
+    });
   });
 }

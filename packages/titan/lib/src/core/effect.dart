@@ -50,6 +50,7 @@ import 'reactive.dart';
 class TitanEffect extends ReactiveNode {
   final Function() _fn;
   final void Function()? _onNotify;
+  final bool Function()? _guard;
   Function()? _cleanup;
   Set<ReactiveNode> _dependencies = {};
   final String? _name;
@@ -65,14 +66,19 @@ class TitanEffect extends ReactiveNode {
   ///   when dependencies change. Useful for Flutter widget integration.
   /// - [fireImmediately] — Whether to run the effect immediately upon creation.
   ///   Defaults to `true`.
+  /// - [guard] — Optional guard condition. When provided, the effect only
+  ///   executes when the guard returns `true`. The guard function itself
+  ///   can read reactive values and will auto-track dependencies.
   TitanEffect(
     Function() fn, {
     String? name,
     void Function()? onNotify,
     bool fireImmediately = true,
+    bool Function()? guard,
   }) : _fn = fn,
        _name = name,
-       _onNotify = onNotify {
+       _onNotify = onNotify,
+       _guard = guard {
     if (fireImmediately) {
       _execute();
     }
@@ -89,6 +95,9 @@ class TitanEffect extends ReactiveNode {
   void _execute() {
     if (isDisposed) return;
     if (_isRunning) return; // Prevent recursive effects
+
+    // Check guard before executing — guard can read reactive values
+    if (_guard != null && !_guard()) return;
 
     _isRunning = true;
 

@@ -69,6 +69,7 @@ export 'src/core/effect.dart';
 export 'src/core/batch.dart';
 export 'src/core/epoch.dart';
 export 'src/core/flux.dart';
+export 'src/core/extensions.dart';
 export 'src/core/observer.dart';
 
 // Store pattern (advanced / legacy)

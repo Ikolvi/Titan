@@ -107,4 +107,97 @@ void main() {
       expect(await sentinel.evaluateAsync('/home', wp), isNull);
     });
   });
+
+  group('Waypoint query utilities', () {
+    test('queryOr returns value or default', () {
+      const wp = Waypoint(
+        path: '/search',
+        pattern: '/search',
+        query: {'q': 'dart'},
+      );
+      expect(wp.queryOr('q', ''), 'dart');
+      expect(wp.queryOr('missing', 'default'), 'default');
+    });
+
+    test('intQueryOr returns parsed int or default', () {
+      const wp = Waypoint(
+        path: '/list',
+        pattern: '/list',
+        query: {'page': '3', 'bad': 'abc'},
+      );
+      expect(wp.intQueryOr('page', 1), 3);
+      expect(wp.intQueryOr('missing', 1), 1);
+      expect(wp.intQueryOr('bad', 1), 1);
+    });
+
+    test('doubleQueryOr returns parsed double or default', () {
+      const wp = Waypoint(
+        path: '/map',
+        pattern: '/map',
+        query: {'lat': '37.7749'},
+      );
+      expect(wp.doubleQueryOr('lat', 0.0), 37.7749);
+      expect(wp.doubleQueryOr('lng', -122.0), -122.0);
+    });
+
+    test('boolQueryOr returns parsed bool or default', () {
+      const wp = Waypoint(
+        path: '/settings',
+        pattern: '/settings',
+        query: {'dark': 'true', 'compact': '1'},
+      );
+      expect(wp.boolQueryOr('dark', false), true);
+      expect(wp.boolQueryOr('compact', false), true);
+      expect(wp.boolQueryOr('missing', false), false);
+    });
+
+    test('listQuery splits comma-separated values', () {
+      const wp = Waypoint(
+        path: '/filter',
+        pattern: '/filter',
+        query: {'tags': 'dart,flutter,mobile'},
+      );
+      expect(wp.listQuery('tags'), ['dart', 'flutter', 'mobile']);
+      expect(wp.listQuery('missing'), isEmpty);
+    });
+
+    test('listQuery with custom separator', () {
+      const wp = Waypoint(
+        path: '/filter',
+        pattern: '/filter',
+        query: {'ids': '1|2|3'},
+      );
+      expect(wp.listQuery('ids', separator: '|'), ['1', '2', '3']);
+    });
+
+    test('hasQuery checks existence', () {
+      const wp = Waypoint(
+        path: '/search',
+        pattern: '/search',
+        query: {'q': 'test'},
+      );
+      expect(wp.hasQuery('q'), true);
+      expect(wp.hasQuery('page'), false);
+    });
+
+    test('hasRune checks existence', () {
+      const wp = Waypoint(
+        path: '/user/42',
+        pattern: '/user/:id',
+        runes: {'id': '42'},
+      );
+      expect(wp.hasRune('id'), true);
+      expect(wp.hasRune('name'), false);
+    });
+
+    test('runeOr returns value or default', () {
+      const wp = Waypoint(
+        path: '/user/42',
+        pattern: '/user/:id',
+        runes: {'id': '42'},
+      );
+      expect(wp.runeOr('id', 'none'), '42');
+      expect(wp.runeOr('tab', 'overview'), 'overview');
+    });
+  });
 }

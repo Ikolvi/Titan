@@ -122,6 +122,58 @@ class Waypoint {
     return v == 'true' || v == '1';
   }
 
+  /// Get a query parameter with a default value.
+  ///
+  /// ```dart
+  /// // '/search?q=dart' → waypoint.queryOr('q', '') == 'dart'
+  /// // '/search'        → waypoint.queryOr('q', '') == ''
+  /// ```
+  String queryOr(String key, String defaultValue) =>
+      query[key] ?? defaultValue;
+
+  /// Get a query parameter as `int` with a default value.
+  ///
+  /// ```dart
+  /// waypoint.intQueryOr('page', 1) // 1 if missing or unparseable
+  /// ```
+  int intQueryOr(String key, int defaultValue) =>
+      intQuery(key) ?? defaultValue;
+
+  /// Get a query parameter as `double` with a default value.
+  double doubleQueryOr(String key, double defaultValue) =>
+      doubleQuery(key) ?? defaultValue;
+
+  /// Get a query parameter as `bool` with a default value.
+  bool boolQueryOr(String key, bool defaultValue) =>
+      boolQuery(key) ?? defaultValue;
+
+  /// Parse a comma-separated (or custom separator) query parameter
+  /// into a list of strings.
+  ///
+  /// ```dart
+  /// // '/search?tags=dart,flutter,mobile'
+  /// waypoint.listQuery('tags'); // ['dart', 'flutter', 'mobile']
+  /// ```
+  List<String> listQuery(String key, {String separator = ','}) {
+    final v = query[key];
+    if (v == null || v.isEmpty) return const [];
+    return v.split(separator);
+  }
+
+  /// Whether a query parameter exists (regardless of value).
+  bool hasQuery(String key) => query.containsKey(key);
+
+  /// Whether a Rune (path parameter) exists.
+  bool hasRune(String key) => runes.containsKey(key);
+
+  /// Get a Rune with a default value.
+  ///
+  /// ```dart
+  /// waypoint.runeOr('tab', 'overview')
+  /// ```
+  String runeOr(String key, String defaultValue) =>
+      runes[key] ?? defaultValue;
+
   /// Create a copy with updated fields.
   Waypoint copyWith({
     String? path,
