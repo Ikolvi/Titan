@@ -55,9 +55,13 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     needs: analyze-and-test
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -114,4 +118,28 @@ jobs:
             packages/titan/benchmark/results/latest.json
           retention-days: 90
           overwrite: true
+
+      - name: Generate Benchmark Report
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        working-directory: packages/titan
+        run: |
+          dart run benchmark/benchmark_ci_report.dart \
+            --json benchmark_results.json \
+            --output ../../docs/BENCHMARKS.md \
+            --commit ${{ github.sha }} \
+            --max-runs 50
+
+      - name: Commit Benchmark Report
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/BENCHMARKS.md
+          if git diff --cached --quiet; then
+            echo "No benchmark changes to commit"
+          else
+            git pull --rebase origin main
+            git commit -m "docs: update benchmark history [skip ci]"
+            git push
+          fi
 
