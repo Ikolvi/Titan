@@ -117,6 +117,16 @@ class _ShadeLensPillar extends Pillar {
   void onInit() {
     _loadAutoReplayConfig();
     _loadSavedSessions();
+
+    // Auto-stop recording when Lens reopens — gives the user immediate
+    // access to Save/Replay without having to manually click Stop.
+    if (colossus.shade.isRecording) {
+      final session = colossus.shade.stopRecording();
+      lastSession.value = session;
+      status.value =
+          'Recording auto-stopped — ${session.eventCount} events in '
+          '${session.duration.inMilliseconds}ms';
+    }
   }
 
   // -- Actions --------------------------------------------------------------
@@ -148,11 +158,20 @@ class _ShadeLensPillar extends Pillar {
 
   /// Save the current session to the vault.
   Future<void> saveCurrentSession() async {
-    if (lastSession.value == null) return;
-    final path = await colossus.saveSession(lastSession.value!);
-    if (path != null) {
-      status.value = 'Session saved';
-      await _loadSavedSessions();
+    if (lastSession.value == null) {
+      status.value = 'No session to save';
+      return;
+    }
+    try {
+      final path = await colossus.saveSession(lastSession.value!);
+      if (path != null) {
+        status.value = 'Session saved';
+        await _loadSavedSessions();
+      } else {
+        status.value = 'Save failed — no storage path configured';
+      }
+    } on Exception catch (e) {
+      status.value = 'Save failed: $e';
     }
   }
 
@@ -374,7 +393,9 @@ class _ShadeTabContent extends StatelessWidget {
 
 Widget _buildRecordingSection(_ShadeLensPillar p) {
   final shade = p.colossus.shade;
-  final isRecording = shade.isRecording;
+  // Read via Core.value (not peek()) so the Vestige tracks this dependency
+  // and rebuilds when recording state changes.
+  final isRecording = shade.isRecordingCore.value;
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
