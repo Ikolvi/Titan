@@ -1197,6 +1197,161 @@ void main() {
       expect(find.text('prev: 5'), findsOneWidget);
     });
   });
+
+  // ===========================================================================
+  // useDebounced
+  // ===========================================================================
+
+  group('useDebounced', () {
+    testWidgets('returns null initially', (tester) async {
+      await tester.pumpWidget(
+        _app(_DebouncedSpark(value: 'hello', timeout: 300)),
+      );
+      expect(find.text('debounced: null'), findsOneWidget);
+    });
+
+    testWidgets('returns value after timeout elapses', (tester) async {
+      await tester.pumpWidget(
+        _app(_DebouncedSpark(value: 'hello', timeout: 300)),
+      );
+      expect(find.text('debounced: null'), findsOneWidget);
+
+      // Advance past the debounce timeout
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(find.text('debounced: hello'), findsOneWidget);
+    });
+
+    testWidgets('resets timer on value change', (tester) async {
+      await tester.pumpWidget(_app(_DebouncedSpark(value: 'a', timeout: 300)));
+
+      // Change value before timer fires
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpWidget(_app(_DebouncedSpark(value: 'b', timeout: 300)));
+
+      // Original timer (200ms elapsed) should have been canceled
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('debounced: null'), findsOneWidget);
+
+      // After full 300ms from last change
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(find.text('debounced: b'), findsOneWidget);
+    });
+  });
+
+  // ===========================================================================
+  // useListenable
+  // ===========================================================================
+
+  group('useListenable', () {
+    testWidgets('rebuilds when listenable notifies', (tester) async {
+      final notifier = ValueNotifier<int>(0);
+      await tester.pumpWidget(_app(_ListenableSpark(notifier: notifier)));
+      expect(find.text('0'), findsOneWidget);
+
+      notifier.value = 42;
+      await tester.pump();
+      expect(find.text('42'), findsOneWidget);
+
+      notifier.dispose();
+    });
+
+    testWidgets('cleans up listener on dispose', (tester) async {
+      final notifier = ValueNotifier<int>(0);
+      await tester.pumpWidget(_app(_ListenableSpark(notifier: notifier)));
+
+      await tester.pumpWidget(_app(const SizedBox()));
+      // Should not throw when notifier changes after disposal
+      notifier.value = 99;
+      await tester.pump();
+
+      notifier.dispose();
+    });
+  });
+
+  // ===========================================================================
+  // useAnimation
+  // ===========================================================================
+
+  group('useAnimation', () {
+    testWidgets('returns animation value and rebuilds on tick', (tester) async {
+      late AnimationController controller;
+      await tester.pumpWidget(
+        _app(_AnimationValueSpark(onController: (c) => controller = c)),
+      );
+      expect(find.text('0.0'), findsOneWidget);
+
+      controller.forward();
+      // Let the animation complete
+      await tester.pumpAndSettle();
+      expect(find.text('1.0'), findsOneWidget);
+    });
+  });
+
+  // ===========================================================================
+  // useIsMounted
+  // ===========================================================================
+
+  group('useIsMounted', () {
+    testWidgets('returns true while mounted', (tester) async {
+      late bool Function() isMounted;
+      await tester.pumpWidget(
+        _app(_IsMountedSpark(onIsMounted: (fn) => isMounted = fn)),
+      );
+      expect(isMounted(), isTrue);
+    });
+
+    testWidgets('returns false after disposal', (tester) async {
+      late bool Function() isMounted;
+      await tester.pumpWidget(
+        _app(_IsMountedSpark(onIsMounted: (fn) => isMounted = fn)),
+      );
+      expect(isMounted(), isTrue);
+
+      await tester.pumpWidget(_app(const SizedBox()));
+      expect(isMounted(), isFalse);
+    });
+  });
+
+  // ===========================================================================
+  // useAppLifecycleState
+  // ===========================================================================
+
+  group('useAppLifecycleState', () {
+    testWidgets('returns resumed initially', (tester) async {
+      await tester.pumpWidget(_app(const _AppLifecycleSpark()));
+      expect(find.text('resumed'), findsOneWidget);
+    });
+  });
+
+  // ===========================================================================
+  // useOnAppLifecycleStateChange
+  // ===========================================================================
+
+  group('useOnAppLifecycleStateChange', () {
+    testWidgets('receives lifecycle changes', (tester) async {
+      final changes = <(AppLifecycleState?, AppLifecycleState)>[];
+      await tester.pumpWidget(
+        _app(
+          _OnAppLifecycleChangeSpark(
+            onChanged: (prev, curr) => changes.add((prev, curr)),
+          ),
+        ),
+      );
+      // Initially no changes
+      expect(changes, isEmpty);
+    });
+  });
+
+  // ===========================================================================
+  // useAutomaticKeepAlive
+  // ===========================================================================
+
+  group('useAutomaticKeepAlive', () {
+    testWidgets('does not throw when used in a Spark', (tester) async {
+      await tester.pumpWidget(_app(const _KeepAliveSpark()));
+      expect(find.text('kept alive'), findsOneWidget);
+    });
+  });
 }
 
 /// Spark for tracking disposal of multiple hook types.
@@ -1433,5 +1588,121 @@ class _PreviousSpark extends Spark {
         Text('prev: $prev', textDirection: TextDirection.ltr),
       ],
     );
+  }
+}
+
+// =============================================================================
+// useDebounced helpers
+// =============================================================================
+
+/// Spark that uses useDebounced.
+class _DebouncedSpark extends Spark {
+  const _DebouncedSpark({required this.value, required this.timeout});
+  final String value;
+  final int timeout;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final debounced = useDebounced(value, Duration(milliseconds: timeout));
+    return Text('debounced: $debounced', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useListenable helpers
+// =============================================================================
+
+/// Spark that uses useListenable with a ValueNotifier.
+class _ListenableSpark extends Spark {
+  const _ListenableSpark({required this.notifier});
+  final ValueNotifier<int> notifier;
+
+  @override
+  Widget ignite(BuildContext context) {
+    useListenable(notifier);
+    return Text('${notifier.value}', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useAnimation helpers
+// =============================================================================
+
+/// Spark that uses useAnimation to read animation value.
+class _AnimationValueSpark extends Spark {
+  const _AnimationValueSpark({required this.onController});
+  final void Function(AnimationController) onController;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final controller = useAnimationController(
+      duration: const Duration(milliseconds: 500),
+    );
+    final value = useAnimation(controller);
+    onController(controller);
+    return Text(value.toStringAsFixed(1), textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useIsMounted helpers
+// =============================================================================
+
+/// Spark that uses useIsMounted.
+class _IsMountedSpark extends Spark {
+  const _IsMountedSpark({required this.onIsMounted});
+  final void Function(bool Function()) onIsMounted;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final isMounted = useIsMounted();
+    onIsMounted(isMounted);
+    return const Text('mounted', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useAppLifecycleState helpers
+// =============================================================================
+
+/// Spark that uses useAppLifecycleState.
+class _AppLifecycleSpark extends Spark {
+  const _AppLifecycleSpark();
+
+  @override
+  Widget ignite(BuildContext context) {
+    final state = useAppLifecycleState();
+    return Text(state.name, textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useOnAppLifecycleStateChange helpers
+// =============================================================================
+
+/// Spark that uses useOnAppLifecycleStateChange.
+class _OnAppLifecycleChangeSpark extends Spark {
+  const _OnAppLifecycleChangeSpark({required this.onChanged});
+  final void Function(AppLifecycleState?, AppLifecycleState) onChanged;
+
+  @override
+  Widget ignite(BuildContext context) {
+    useOnAppLifecycleStateChange(onChanged);
+    return const Text('watching', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useAutomaticKeepAlive helpers
+// =============================================================================
+
+/// Spark that uses useAutomaticKeepAlive.
+class _KeepAliveSpark extends Spark {
+  const _KeepAliveSpark();
+
+  @override
+  Widget ignite(BuildContext context) {
+    useAutomaticKeepAlive();
+    return const Text('kept alive', textDirection: TextDirection.ltr);
   }
 }

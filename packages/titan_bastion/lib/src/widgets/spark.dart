@@ -1379,3 +1379,363 @@ T? usePrevious<T>(T value) {
 class _PreviousHookState<T> extends _HookState<T> {
   T? _previous;
 }
+
+// =============================================================================
+// useDebounced — Debounced value
+// =============================================================================
+
+/// Returns a debounced version of [value].
+///
+/// The returned value only updates after [value] has stopped changing
+/// for [timeout]. Returns `null` on the first build until the first
+/// debounce completes.
+///
+/// ```dart
+/// class SearchWidget extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final query = useCore('');
+///     final debounced = useDebounced(query.value, Duration(milliseconds: 300));
+///
+///     useFuture(
+///       searchApi(debounced ?? ''),
+///       keys: [debounced],
+///     );
+///
+///     return TextField(onChanged: (v) => query.value = v);
+///   }
+/// }
+/// ```
+T? useDebounced<T>(T value, Duration timeout) {
+  final state = SparkState.current!;
+  final hook = state.use(() => _DebouncedHookState<T>(timeout));
+  hook.maybeUpdate(value, timeout);
+  return hook.debouncedValue;
+}
+
+class _DebouncedHookState<T> extends _HookState<T> {
+  _DebouncedHookState(this._timeout);
+
+  Duration _timeout;
+  T? debouncedValue;
+  T? _pendingValue;
+  Timer? _timer;
+
+  void maybeUpdate(T value, Duration timeout) {
+    _timeout = timeout;
+    if (_pendingValue == value) return;
+    _pendingValue = value;
+    _timer?.cancel();
+    _timer = Timer(_timeout, () {
+      debouncedValue = value;
+      _state.rebuild();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+  }
+}
+
+// =============================================================================
+// useListenable — General Listenable subscriber
+// =============================================================================
+
+/// Subscribes to a [Listenable] and rebuilds the Spark whenever it
+/// notifies. Returns the listenable itself for property access.
+///
+/// Use this for interop with any Flutter [Listenable] — `ChangeNotifier`,
+/// `AnimationController`, `ScrollController.position`, third-party
+/// notifiers, etc. For `ValueListenable<T>` specifically, prefer
+/// [useValueListenable] which returns the value directly.
+///
+/// ```dart
+/// class AnimatedBox extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final controller = useAnimationController(
+///       duration: Duration(seconds: 1),
+///     );
+///     // Rebuilds on every animation frame
+///     useListenable(controller);
+///
+///     return Opacity(
+///       opacity: controller.value,
+///       child: Container(width: 100, height: 100, color: Colors.blue),
+///     );
+///   }
+/// }
+/// ```
+T useListenable<T extends Listenable>(T listenable) {
+  final state = SparkState.current!;
+  state.use(() => _ListenableHookState<T>(listenable));
+  return listenable;
+}
+
+class _ListenableHookState<T extends Listenable> extends _HookState<T> {
+  _ListenableHookState(this._listenable);
+
+  final T _listenable;
+  late final void Function() _listener;
+
+  @override
+  void init() {
+    _listener = () => _state.rebuild();
+    _listenable.addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    _listenable.removeListener(_listener);
+  }
+}
+
+// =============================================================================
+// useAnimation — Animation value subscriber
+// =============================================================================
+
+/// Subscribes to an [Animation] and returns its current value.
+///
+/// Rebuilds on every animation tick, making this ideal for driving
+/// per-frame UI updates without wrapping in `AnimatedBuilder`.
+///
+/// ```dart
+/// class FadeBox extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final controller = useAnimationController(
+///       duration: Duration(milliseconds: 500),
+///     );
+///     final opacity = useAnimation(controller);
+///
+///     useEffect(() { controller.forward(); return null; }, []);
+///
+///     return Opacity(opacity: opacity, child: const Placeholder());
+///   }
+/// }
+/// ```
+T useAnimation<T>(Animation<T> animation) {
+  final state = SparkState.current!;
+  final hook = state.use(() => _AnimationHookState<T>(animation));
+  return hook.value;
+}
+
+class _AnimationHookState<T> extends _HookState<T> {
+  _AnimationHookState(this._animation);
+
+  final Animation<T> _animation;
+  late T value;
+  late final void Function() _listener;
+
+  @override
+  void init() {
+    value = _animation.value;
+    _listener = () {
+      value = _animation.value;
+      _state.rebuild();
+    };
+    _animation.addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    _animation.removeListener(_listener);
+  }
+}
+
+// =============================================================================
+// useIsMounted — Async mount safety
+// =============================================================================
+
+/// Returns a function that returns `true` if the Spark is still mounted.
+///
+/// Use this to guard async continuations against calling operations
+/// on a disposed widget — the perennial `setState after dispose` error.
+///
+/// ```dart
+/// class AsyncWidget extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final isMounted = useIsMounted();
+///     final data = useCore<String?>(null);
+///
+///     return ElevatedButton(
+///       onPressed: () async {
+///         final result = await fetchData();
+///         if (isMounted()) {
+///           data.value = result;
+///         }
+///       },
+///       child: Text(data.value ?? 'Load'),
+///     );
+///   }
+/// }
+/// ```
+bool Function() useIsMounted() {
+  final state = SparkState.current!;
+  return state.use(_IsMountedHookState.new).isMounted;
+}
+
+class _IsMountedHookState extends _HookState<void> {
+  late final bool Function() isMounted;
+
+  @override
+  void init() {
+    isMounted = () => _state.mounted;
+  }
+}
+
+// =============================================================================
+// useAppLifecycleState — App lifecycle observer (rebuilding)
+// =============================================================================
+
+/// Returns the current [AppLifecycleState] and rebuilds when it changes.
+///
+/// ```dart
+/// class VideoPlayer extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final lifecycle = useAppLifecycleState();
+///
+///     useEffect(() {
+///       if (lifecycle == AppLifecycleState.paused) pauseVideo();
+///       if (lifecycle == AppLifecycleState.resumed) resumeVideo();
+///       return null;
+///     }, [lifecycle]);
+///
+///     return VideoWidget();
+///   }
+/// }
+/// ```
+AppLifecycleState useAppLifecycleState() {
+  final state = SparkState.current!;
+  return state.use(_AppLifecycleHookState.new).lifecycleState;
+}
+
+class _AppLifecycleHookState extends _HookState<void>
+    with WidgetsBindingObserver {
+  AppLifecycleState lifecycleState = AppLifecycleState.resumed;
+
+  @override
+  void init() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    lifecycleState = state;
+    _state.rebuild();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+  }
+}
+
+// =============================================================================
+// useOnAppLifecycleStateChange — App lifecycle callback (non-rebuilding)
+// =============================================================================
+
+/// Listens to [AppLifecycleState] changes and calls [callback] without
+/// triggering a rebuild. Use this for side-effects like saving drafts
+/// or pausing audio.
+///
+/// ```dart
+/// class BackgroundSaver extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     useOnAppLifecycleStateChange((previous, current) {
+///       if (current == AppLifecycleState.paused) saveDraft();
+///     });
+///
+///     return EditorWidget();
+///   }
+/// }
+/// ```
+void useOnAppLifecycleStateChange(
+  void Function(AppLifecycleState? previous, AppLifecycleState current)
+  callback,
+) {
+  final state = SparkState.current!;
+  final hook = state.use(_OnAppLifecycleHookState.new);
+  hook._callback = callback;
+}
+
+class _OnAppLifecycleHookState extends _HookState<void>
+    with WidgetsBindingObserver {
+  void Function(AppLifecycleState?, AppLifecycleState)? _callback;
+  AppLifecycleState? _previous;
+
+  @override
+  void init() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _callback?.call(_previous, state);
+    _previous = state;
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+  }
+}
+
+// =============================================================================
+// useAutomaticKeepAlive — Keep widget alive in scrollable lists
+// =============================================================================
+
+/// Marks this Spark widget as wanting to stay alive when scrolled
+/// off-screen in a [ListView], [TabBarView], or [PageView].
+///
+/// Equivalent to [AutomaticKeepAliveClientMixin] without the boilerplate.
+///
+/// ```dart
+/// class ExpensiveListItem extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     useAutomaticKeepAlive();
+///     return ExpensiveContent();
+///   }
+/// }
+/// ```
+///
+/// Pass `false` to conditionally disable keep-alive:
+///
+/// ```dart
+/// useAutomaticKeepAlive(wantKeepAlive: someCondition);
+/// ```
+void useAutomaticKeepAlive({bool wantKeepAlive = true}) {
+  final state = SparkState.current!;
+  final hook = state.use(_KeepAliveHookState.new);
+  hook.updateKeepAlive(wantKeepAlive);
+}
+
+class _KeepAliveHookState extends _HookState<void> {
+  KeepAliveHandle? _handle;
+
+  void updateKeepAlive(bool wantKeepAlive) {
+    if (wantKeepAlive) {
+      if (_handle == null) {
+        _handle = KeepAliveHandle();
+        KeepAliveNotification(_handle!).dispatch(_state.context);
+      }
+    } else {
+      _releaseHandle();
+    }
+  }
+
+  void _releaseHandle() {
+    _handle?.dispose();
+    _handle = null;
+  }
+
+  @override
+  void dispose() {
+    _releaseHandle();
+  }
+}

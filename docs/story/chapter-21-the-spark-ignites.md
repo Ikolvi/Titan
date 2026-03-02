@@ -409,6 +409,82 @@ final prev = usePrevious(count.value); // null on first build, then prior value
 
 ---
 
+### useDebounced — Patience Rewarded
+
+Search fields, auto-save, filter inputs — all need debouncing. Without a hook, it's eight lines of timer management. With `useDebounced`, it's one:
+
+```dart
+final query = useCore('');
+final debounced = useDebounced(query.value, Duration(milliseconds: 300));
+```
+
+The returned value only updates after `query` has stopped changing for 300ms. The timer resets on every keystroke. The old timer is canceled automatically.
+
+---
+
+### useListenable — The Universal Adapter
+
+Flutter's ecosystem is full of `Listenable` objects — `ChangeNotifier`, `ScrollController.position`, third-party notifiers. `useListenable` subscribes to any of them:
+
+```dart
+useListenable(scrollController);
+// Now the Spark rebuilds whenever scrollController notifies
+```
+
+---
+
+### useAnimation — Frame-Perfect Motion
+
+After creating an `AnimationController`, you need its value. `useAnimation` subscribes to every tick:
+
+```dart
+final controller = useAnimationController(duration: Duration(seconds: 1));
+final opacity = useAnimation(controller);
+// opacity updates on every frame — no AnimatedBuilder needed
+```
+
+---
+
+### useIsMounted — Async Safety Guard
+
+The perennial Flutter bug: calling `setState` after an async gap when the widget has already been disposed. `useIsMounted` returns a closure that remains valid:
+
+```dart
+final isMounted = useIsMounted();
+// In a callback:
+final result = await fetchData();
+if (isMounted()) data.value = result;
+```
+
+---
+
+### useAppLifecycleState — Sensing the World
+
+Mobile apps need to react when the user backgrounds or foregrounds the app. `useAppLifecycleState` turns the lifecycle into reactive state:
+
+```dart
+final lifecycle = useAppLifecycleState();
+useEffect(() {
+  if (lifecycle == AppLifecycleState.paused) pauseVideo();
+  if (lifecycle == AppLifecycleState.resumed) resumeVideo();
+  return null;
+}, [lifecycle]);
+```
+
+For side-effects without rebuilding, there's also `useOnAppLifecycleStateChange`.
+
+---
+
+### useAutomaticKeepAlive — Persistence in Lists
+
+When scrolling in a `ListView`, Flutter destroys off-screen widgets. One hook call prevents it:
+
+```dart
+useAutomaticKeepAlive(); // Widget state survives scrolling
+```
+
+---
+
 ### Spark vs StatefulWidget
 
 | Aspect | StatefulWidget | Spark |
