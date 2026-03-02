@@ -13,6 +13,8 @@ import '../core/state.dart';
 import '../data/codex.dart';
 import '../data/quarry.dart';
 import '../data/bulwark.dart';
+import '../data/saga.dart';
+import '../testing/snapshot.dart';
 import '../errors/vigil.dart';
 import '../events/herald.dart';
 import '../form/scroll.dart';
@@ -93,6 +95,24 @@ abstract class Pillar {
   bool _isDisposed = false;
   bool _autoDispose = false;
   int _refCount = 0;
+
+  /// Reactive readiness indicator for async initialization.
+  ///
+  /// Starts as `false`, becomes `true` after [onInitAsync] completes.
+  /// If [onInitAsync] is not overridden, remains `false` (use
+  /// [isInitialized] instead for sync init checks).
+  ///
+  /// ```dart
+  /// Vestige<MyPillar>(
+  ///   builder: (_, p) => p.isReady.value
+  ///     ? Text('Ready!')
+  ///     : CircularProgressIndicator(),
+  /// )
+  /// ```
+  late final TitanState<bool> isReady = TitanState<bool>(
+    false,
+    name: '${runtimeType}_isReady',
+  );
 
   /// Whether this Pillar has been initialized.
   bool get isInitialized => _isInitialized;
@@ -400,6 +420,46 @@ abstract class Pillar {
     );
     _managedNodes.addAll(b.managedNodes);
     return b;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Saga — multi-step workflow orchestration
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Saga] (multi-step workflow) managed by this Pillar.
+  ///
+  /// A Saga coordinates a sequence of async steps with automatic
+  /// compensation (rollback) on failure. All progress is reactive.
+  ///
+  /// ```dart
+  /// late final checkout = saga<Order>(
+  ///   steps: [
+  ///     SagaStep(name: 'validate', execute: (_) async => validate()),
+  ///     SagaStep(
+  ///       name: 'charge',
+  ///       execute: (_) async => chargeCard(),
+  ///       compensate: (_) async => refundCard(),
+  ///     ),
+  ///   ],
+  /// );
+  /// ```
+  @protected
+  Saga<T> saga<T>({
+    required List<SagaStep<T>> steps,
+    void Function(T? result)? onComplete,
+    void Function(Object error, String failedStep)? onError,
+    void Function(String stepName, int index, int total)? onStepComplete,
+    String? name,
+  }) {
+    final s = Saga<T>(
+      steps: steps,
+      onComplete: onComplete,
+      onError: onError,
+      onStepComplete: onStepComplete,
+      name: name,
+    );
+    _managedNodes.addAll(s.managedNodes);
+    return s;
   }
 
   // ---------------------------------------------------------------------------
@@ -803,6 +863,24 @@ abstract class Pillar {
   @protected
   void onInit() {}
 
+  /// Called after [onInit] for async initialization.
+  ///
+  /// Override to perform async setup: loading data from APIs,
+  /// reading from databases, authenticating, etc. When this method
+  /// completes, [isReady] is automatically set to `true`.
+  ///
+  /// Errors are caught and forwarded to [onError].
+  ///
+  /// ```dart
+  /// @override
+  /// Future<void> onInitAsync() async {
+  ///   final data = await api.fetchInitialData();
+  ///   items.value = data;
+  /// }
+  /// ```
+  @protected
+  Future<void> onInitAsync() async {}
+
   /// Called when the Pillar is being disposed.
   ///
   /// Override to perform cleanup: close connections, cancel timers, etc.
@@ -868,12 +946,55 @@ abstract class Pillar {
   /// the global registry. Can be overridden for custom disposal logic.
   void Function()? onAutoDispose;
 
+  // ---------------------------------------------------------------------------
+  // Snapshot — state capture & restore
+  // ---------------------------------------------------------------------------
+
+  /// Capture a snapshot of all named Core values.
+  ///
+  /// Only [Core] values with a non-null `name` parameter are included.
+  /// Computed/Derived values are excluded since they derive from state.
+  ///
+  /// ```dart
+  /// final snap = pillar.snapshot(label: 'before-mutation');
+  /// ```
+  PillarSnapshot snapshot({String? label}) {
+    return Snapshot.captureFromNodes(_managedNodes, label: label);
+  }
+
+  /// Restore Core values from a previously captured snapshot.
+  ///
+  /// By default, values are restored silently (without notifications).
+  /// Set [notify] to `true` to trigger reactive updates.
+  ///
+  /// ```dart
+  /// pillar.restore(snap);
+  /// ```
+  void restore(PillarSnapshot snapshot, {bool notify = false}) {
+    Snapshot.restoreToNodes(_managedNodes, snapshot, notify: notify);
+  }
+
   /// Initializes the Pillar. Called automatically by [Beacon] or [Titan].
   void initialize() {
     if (_isInitialized) return;
     _isInitialized = true;
     onInit();
     TitanObserver.notifyPillarInit(this);
+
+    // Run async initialization if overridden
+    _runInitAsync();
+  }
+
+  /// Internal async init runner.
+  Future<void> _runInitAsync() async {
+    try {
+      await onInitAsync();
+      if (!_isDisposed) {
+        isReady.value = true;
+      }
+    } catch (e, s) {
+      onError(e, s);
+    }
   }
 
   /// Disposes the Pillar and all its managed reactive nodes.
@@ -909,6 +1030,9 @@ abstract class Pillar {
       node.dispose();
     }
     _managedNodes.clear();
+
+    // Dispose isReady Core
+    isReady.dispose();
   }
 
   void _assertNotDisposed() {

@@ -61,6 +61,10 @@ export 'src/form/scroll.dart';
 export 'src/data/codex.dart';
 export 'src/data/quarry.dart';
 export 'src/data/bulwark.dart';
+export 'src/data/saga.dart';
+export 'src/data/sigil.dart';
+export 'src/data/aegis.dart';
+export 'src/testing/snapshot.dart';
 
 // Core reactive primitives
 export 'src/core/reactive.dart';
