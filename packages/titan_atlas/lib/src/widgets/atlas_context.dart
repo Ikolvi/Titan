@@ -29,6 +29,7 @@ extension AtlasContext on BuildContext {
 
 /// Proxy object providing Atlas navigation via BuildContext.
 class AtlasContextProxy {
+  /// Creates an [AtlasContextProxy].
   const AtlasContextProxy();
 
   /// Navigate to a path (push).

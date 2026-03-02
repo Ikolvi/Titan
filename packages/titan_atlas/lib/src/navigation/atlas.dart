@@ -81,6 +81,8 @@ class AtlasConfiguration {
   /// The navigation stack (for stack-based navigation).
   final List<Waypoint> stack;
 
+  /// Creates an [AtlasConfiguration] with the current [waypoint] and
+  /// optional navigation [stack].
   const AtlasConfiguration({required this.waypoint, this.stack = const []});
 }
 
@@ -705,6 +707,8 @@ class AtlasDelegate extends RouterDelegate<AtlasConfiguration>
   @override
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+  /// Creates an [AtlasDelegate] for the given [Atlas] instance and resolves
+  /// the initial route.
   AtlasDelegate(this._atlas) {
     // Resolve initial path (pillars are created inside _resolve)
     final result = _atlas._resolve(_atlas._initialPath);
@@ -922,6 +926,8 @@ class AtlasDelegate extends RouterDelegate<AtlasConfiguration>
 class AtlasParser extends RouteInformationParser<AtlasConfiguration> {
   final String _initialPath;
 
+  /// Creates an [AtlasParser] that falls back to [_initialPath] when the
+  /// incoming URL is empty.
   const AtlasParser(this._initialPath);
 
   @override

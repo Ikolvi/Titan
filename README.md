@@ -53,6 +53,19 @@ A uniquely powerful reactive state management architecture for Flutter — struc
 | State Selector | **Prism** | Fine-grained, memoized state projections with structural equality |
 | Reactive Collection | **Nexus** | In-place reactive List, Map, Set with granular change records |
 | Hooks Widget | **Spark** | Hooks-style widget — `useCore`, `useEffect`, `useMemo`, auto-disposal |
+| Performance Monitor | **Colossus** | Enterprise performance monitoring orchestrator |
+| Frame Monitor | **Pulse** | Frame timing and jank detection |
+| Page Load Monitor | **Stride** | Navigation / page load timing |
+| Memory Monitor | **Vessel** | Heap usage tracking and leak detection |
+| Rebuild Counter | **Echo** | Widget rebuild frequency monitoring |
+| Perf Alert | **Tremor** | Threshold-based performance alerts |
+| Perf Report | **Decree** | Aggregated performance report |
+| Report Export | **Inscribe** | Export as Markdown, JSON, or HTML; save to disk |
+| Perf Metric | **Mark** | Individual metric data point |
+| Gesture Recorder | **Shade** | Record user interactions as replayable sessions |
+| Recorded Event | **Imprint** | Serialized pointer event with timestamp |
+| Replay Engine | **Phantom** | Replay recorded sessions via synthetic events |
+| Capture Widget | **ShadeListener** | Transparent listener capturing all pointer events |
 
 ---
 
@@ -131,6 +144,7 @@ Vestige<CounterPillar>(
 | State middleware | ❌ | ❌ | ❌ | ❌ | ✅ Conduit |
 | Reactive collections | ❌ | ❌ | ❌ | ❌ | ✅ Nexus |
 | Hooks-style widgets | ❌ | ❌ | ❌ | ❌ | ✅ Spark |
+| Performance monitoring | ❌ | ❌ | ❌ | ❌ | ✅ Colossus |
 
 ### Vs Bloc
 
@@ -407,6 +421,7 @@ Titan's reactive engine is built for speed. Benchmarks run automatically in CI o
 | [`titan`](packages/titan/) | Core reactive engine (pure Dart) |
 | [`titan_bastion`](packages/titan_bastion/) | Flutter widgets & extensions |
 | [`titan_atlas`](packages/titan_atlas/) | Routing & navigation (Atlas) |
+| [`titan_colossus`](packages/titan_colossus/) | Enterprise performance monitoring |
 | [`titan_example`](packages/titan_example/) | Example application |
 
 ## Documentation

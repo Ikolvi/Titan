@@ -1,6 +1,6 @@
 # API Reference
 
-Complete reference for all public APIs in the `titan` and `titan_bastion` packages.
+Complete reference for all public APIs in the `titan`, `titan_bastion`, `titan_atlas`, and `titan_colossus` packages.
 
 ---
 
@@ -580,6 +580,337 @@ Atlas(
 | `pop` | Backward navigation via `Atlas.back()` |
 | `replace` | Replace current route via `Atlas.replace()` |
 | `reset` | Reset stack via `Atlas.reset()` |
+
+---
+
+## Performance Monitoring (package:titan_colossus)
+
+### Colossus
+
+Enterprise performance monitoring Pillar. Extends `Pillar`. Singleton.
+
+```dart
+class Colossus extends Pillar
+```
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `Colossus.init({tremors, vesselConfig, ...})` | `Colossus` | Initialize monitoring singleton |
+| `Colossus.shutdown()` | `void` | Stop monitoring and clean up all resources |
+| `Colossus.instance` | `Colossus` | Access the singleton instance |
+| `Colossus.isActive` | `bool` | Whether Colossus has been initialized |
+| `decree()` | `Decree` | Generate a comprehensive performance report |
+| `recordRebuild(label)` | `void` | Record a widget rebuild (called by Echo) |
+| `reset()` | `void` | Reset all metrics and start fresh |
+| `pulse` | `Pulse` | Frame metrics monitor |
+| `vessel` | `Vessel` | Memory and leak detection monitor |
+| `stride` | `Stride` | Page load timing monitor |
+| `rebuildsPerWidget` | `Map<String, int>` | Widget rebuild counts by label |
+
+### Pulse
+
+Frame timing monitor — tracks FPS, jank, build/raster times via `addTimingsCallback`.
+
+```dart
+class Pulse
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `fps` | `double` | Current estimated FPS |
+| `totalFrames` | `int` | Total frames measured |
+| `jankFrames` | `int` | Janky frames (> 16ms) |
+| `jankRate` | `double` | Jank percentage (0–100) |
+| `avgBuildTime` | `Duration` | Rolling average build duration |
+| `avgRasterTime` | `Duration` | Rolling average raster duration |
+| `history` | `List<FrameMark>` | Recent frame history |
+| `processTimings(timings)` | `void` | Process `List<FrameTiming>` from Flutter |
+| `recordFrame({build, raster, total})` | `void` | Manually record a frame |
+| `reset()` | `void` | Clear all frame metrics |
+
+### Stride
+
+Page load timing monitor — measures navigation-to-first-paint duration.
+
+```dart
+class Stride
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `history` | `List<PageLoadMark>` | Recorded page loads |
+| `lastPageLoad` | `PageLoadMark?` | Most recent page load |
+| `avgPageLoad` | `Duration` | Average page load duration |
+| `startTiming(path, {pattern})` | `void` | Start timing a page load (auto-completes on next frame) |
+| `record(path, duration, {pattern})` | `void` | Manually record a page load |
+| `reset()` | `void` | Clear all page load data |
+
+### Vessel
+
+Memory monitor — tracks Pillar instances and detects leaks via periodic timer.
+
+```dart
+class Vessel
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `pillarCount` | `int` | Live Pillar instances |
+| `totalInstances` | `int` | Total Titan DI instances |
+| `leakSuspects` | `List<LeakSuspect>` | Suspected memory leaks |
+| `exemptTypes` | `Set<String>` | Types exempt from leak detection |
+| `snapshot()` | `MemoryMark` | Take a memory snapshot |
+| `exempt(typeName)` | `void` | Mark a type as long-lived |
+| `start()` / `stop()` | `void` | Start/stop periodic checks |
+| `reset()` | `void` | Clear all tracking data |
+
+### Echo
+
+Rebuild tracking widget — wraps a child and counts rebuilds.
+
+```dart
+class Echo extends StatelessWidget
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `label` | `String` | Widget identifier for tracking |
+| `child` | `Widget` | The widget to wrap |
+
+### Tremor
+
+Configurable performance alert threshold.
+
+```dart
+class Tremor
+```
+
+| Factory | Description |
+|---------|-------------|
+| `Tremor.fps({threshold, severity, once})` | Alert when FPS drops below threshold |
+| `Tremor.jankRate({threshold, severity, once})` | Alert when jank rate exceeds threshold |
+| `Tremor.pageLoad({threshold, severity, once})` | Alert when page load exceeds duration |
+| `Tremor.memory({maxPillars, severity, once})` | Alert when Pillar count exceeds limit |
+| `Tremor.rebuilds({threshold, widget, severity, once})` | Alert on excessive widget rebuilds |
+| `Tremor.leaks({severity, once})` | Alert when leak suspects are detected |
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `evaluate(context)` | `bool` | Check if threshold is breached |
+| `reset()` | `void` | Reset fired state |
+
+### Decree
+
+Aggregated performance report with health verdict.
+
+```dart
+class Decree
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `totalFrames` / `jankFrames` | `int` | Frame counts |
+| `avgFps` | `double` | Average FPS |
+| `jankRate` | `double` | Jank percentage |
+| `avgBuildTime` / `avgRasterTime` | `Duration` | Average frame durations |
+| `pageLoads` | `List<PageLoadMark>` | All recorded page loads |
+| `pillarCount` / `totalInstances` | `int` | Memory counts |
+| `leakSuspects` | `List<LeakSuspect>` | Leak suspects |
+| `rebuildsPerWidget` | `Map<String, int>` | Rebuild counts |
+| `health` | `PerformanceHealth` | `good` / `fair` / `poor` |
+| `summary` | `String` | Human-readable report |
+| `topRebuilders(n)` | `List<MapEntry>` | Top N rebuilding widgets |
+| `slowestPageLoad` | `PageLoadMark?` | Slowest recorded page load |
+
+### Mark
+
+Base performance measurement data class.
+
+```dart
+class Mark
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `String` | Human-readable label |
+| `category` | `MarkCategory` | `frame` / `pageLoad` / `memory` / `rebuild` / `custom` |
+| `duration` | `Duration` | Measured duration |
+| `timestamp` | `DateTime` | When recorded |
+| `metadata` | `Map<String, dynamic>?` | Optional key-value metadata |
+
+**Subclasses**: `FrameMark`, `PageLoadMark`, `RebuildMark`, `MemoryMark`
+
+### ColossusLensTab
+
+Lens plugin — adds a "Perf" tab to the Lens debug overlay with Pulse/Stride/Vessel/Echo sub-tabs.
+
+```dart
+class ColossusLensTab extends LensPlugin
+```
+
+### ColossusAtlasObserver
+
+Atlas observer — automatically starts Stride timing on every navigation event.
+
+```dart
+class ColossusAtlasObserver extends AtlasObserver
+```
+
+### Inscribe
+
+Report exporter — converts a Decree into Markdown, JSON, or a self-contained HTML dashboard.
+
+```dart
+class Inscribe
+```
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `Inscribe.markdown(decree)` | `String` | Markdown report with tables and health badge |
+| `Inscribe.json(decree)` | `String` | Pretty-printed JSON using `Decree.toMap()` |
+| `Inscribe.html(decree)` | `String` | Self-contained HTML dashboard with embedded CSS |
+
+### InscribeIO
+
+File-based report export — saves Decree to disk. Uses `dart:io` (mobile/desktop/server only).
+
+```dart
+class InscribeIO
+```
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `InscribeIO.saveMarkdown(decree, {directory, filename})` | `Future<String>` | Save Markdown report, returns file path |
+| `InscribeIO.saveJson(decree, {directory, filename})` | `Future<String>` | Save JSON report, returns file path |
+| `InscribeIO.saveHtml(decree, {directory, filename})` | `Future<String>` | Save HTML dashboard, returns file path |
+| `InscribeIO.saveAll(decree, {directory})` | `Future<SaveResult>` | Save all three formats, returns `SaveResult` |
+
+### Shade
+
+Gesture recording controller. Records pointer events as Imprints during user sessions.
+
+#### Methods
+
+| Method / Property | Type | Description |
+|-------------------|------|-------------|
+| `shade.isRecording` | `bool` | Whether currently recording |
+| `shade.currentEventCount` | `int` | Events recorded in current session |
+| `shade.elapsed` | `Duration` | Time since recording started |
+| `shade.startRecording({name, description, screenSize, devicePixelRatio})` | `void` | Start recording pointer events |
+| `shade.stopRecording()` | `ShadeSession` | Stop recording and return the session |
+| `shade.cancelRecording()` | `void` | Cancel recording without producing a session |
+| `shade.recordPointerEvent(event)` | `void` | Record a single pointer event |
+| `shade.onRecordingStarted` | `void Function()?` | Callback when recording starts |
+| `shade.onRecordingStopped` | `void Function(ShadeSession)?` | Callback when recording stops |
+| `shade.onImprintCaptured` | `void Function(Imprint)?` | Callback per captured event |
+
+### Imprint
+
+A single recorded pointer event with position, timing, and metadata.
+
+#### Constructor
+
+```dart
+Imprint({
+  required ImprintType type,
+  required double positionX,
+  required double positionY,
+  required Duration timestamp,
+  int pointer = 0,
+  int deviceKind = 0,
+  int buttons = 0,
+  double deltaX = 0,
+  double deltaY = 0,
+  double scrollDeltaX = 0,
+  double scrollDeltaY = 0,
+  double pressure = 1.0,
+})
+```
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `toMap()` | `Map<String, dynamic>` | Serialize to JSON-compatible map |
+| `Imprint.fromMap(map)` | `Imprint` | Deserialize from map |
+
+### ShadeSession
+
+A complete recorded interaction session with metadata and ordered Imprints.
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | `String` | Unique session identifier |
+| `name` | `String` | Human-readable session name |
+| `recordedAt` | `DateTime` | When the session was recorded |
+| `duration` | `Duration` | Total recording duration |
+| `screenWidth` | `double` | Screen width at recording time |
+| `screenHeight` | `double` | Screen height at recording time |
+| `devicePixelRatio` | `double` | Device pixel ratio at recording time |
+| `imprints` | `List<Imprint>` | Ordered list of recorded events |
+| `eventCount` | `int` | Number of recorded events |
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `toJson()` | `String` | Serialize to JSON string |
+| `ShadeSession.fromJson(json)` | `ShadeSession` | Deserialize from JSON string |
+| `toMap()` | `Map<String, dynamic>` | Serialize to map |
+| `ShadeSession.fromMap(map)` | `ShadeSession` | Deserialize from map |
+
+### Phantom
+
+Replays recorded ShadeSession as synthetic pointer events via GestureBinding.
+
+#### Constructor
+
+```dart
+Phantom({
+  bool normalizePositions = true,
+  double speedMultiplier = 1.0,
+  void Function(int current, int total)? onProgress,
+  void Function(PhantomResult result)? onComplete,
+  void Function()? onCancelled,
+})
+```
+
+#### Methods
+
+| Method / Property | Type | Description |
+|-------------------|------|-------------|
+| `phantom.isReplaying` | `bool` | Whether currently replaying |
+| `phantom.replay(session)` | `Future<PhantomResult>` | Replay a recorded session |
+| `phantom.cancel()` | `void` | Cancel in-progress replay |
+
+### PhantomResult
+
+The outcome of a Phantom replay session.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `sessionName` | `String` | Name of the replayed session |
+| `eventsDispatched` | `int` | Events successfully dispatched |
+| `eventsSkipped` | `int` | Events skipped (unsupported types) |
+| `expectedDuration` | `Duration` | Original recording duration |
+| `actualDuration` | `Duration` | How long the replay actually took |
+| `wasNormalized` | `bool` | Whether positions were normalized |
+| `wasCancelled` | `bool` | Whether replay was cancelled |
+| `totalEvents` | `int` | Dispatched + skipped |
+| `speedRatio` | `double` | Actual / expected duration ratio |
+
+### ShadeListener
+
+Transparent widget that captures all pointer events for Shade recording.
+
+```dart
+ShadeListener(
+  shade: shade,
+  child: MaterialApp(...),
+)
+```
 
 ---
 

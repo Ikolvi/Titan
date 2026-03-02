@@ -21,6 +21,8 @@ class RouteMatch<T> {
   /// Remaining unmatched path (for wildcard routes).
   final String? remaining;
 
+  /// Creates a [RouteMatch] with the resolved [value], extracted [runes],
+  /// matched [pattern], and optional wildcard [remaining] segment.
   const RouteMatch({
     required this.value,
     required this.runes,

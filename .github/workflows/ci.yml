@@ -37,6 +37,10 @@ jobs:
         working-directory: packages/titan_atlas
         run: dart analyze --fatal-infos
 
+      - name: Analyze titan_colossus
+        working-directory: packages/titan_colossus
+        run: dart analyze --fatal-infos
+
       - name: Test titan
         working-directory: packages/titan
         run: flutter test
@@ -49,8 +53,12 @@ jobs:
         working-directory: packages/titan_atlas
         run: flutter test
 
+      - name: Test titan_colossus
+        working-directory: packages/titan_colossus
+        run: flutter test
+
       - name: Check formatting
-        run: dart format --set-exit-if-changed packages/titan/lib packages/titan_bastion/lib packages/titan_atlas/lib
+        run: dart format --set-exit-if-changed packages/titan/lib packages/titan_bastion/lib packages/titan_atlas/lib packages/titan_colossus/lib
 
   benchmark:
     runs-on: ubuntu-latest
@@ -142,4 +150,69 @@ jobs:
             git pull --rebase origin main
             git push
           fi
+
+  benchmark-colossus:
+    runs-on: ubuntu-latest
+    needs: analyze-and-test
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.2'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Restore Previous Colossus Baseline
+        uses: actions/cache/restore@v4
+        with:
+          path: packages/titan_colossus/benchmark/results
+          key: colossus-benchmark-baseline-${{ github.ref_name }}
+          restore-keys: |
+            colossus-benchmark-baseline-main
+            colossus-benchmark-baseline-
+
+      - name: Run Colossus Benchmark Tracker
+        working-directory: packages/titan_colossus
+        run: flutter test benchmark/benchmark_track.dart | tee benchmark_output.txt
+
+      - name: Run Colossus Benchmark Suite
+        working-directory: packages/titan_colossus
+        run: flutter test benchmark/benchmark_colossus.dart | tee benchmark_suite.txt
+
+      - name: Save Colossus Baseline
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: packages/titan_colossus/benchmark/results
+          key: colossus-benchmark-baseline-main-${{ github.sha }}
+
+      - name: Generate Colossus Benchmark Summary
+        working-directory: packages/titan_colossus
+        run: |
+          echo "## ⚡ Colossus Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat benchmark_output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Colossus Benchmark Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: colossus-benchmark-results
+          path: |
+            packages/titan_colossus/benchmark_output.txt
+            packages/titan_colossus/benchmark_suite.txt
+            packages/titan_colossus/benchmark/results/latest.json
+          retention-days: 90
+          overwrite: true
 

@@ -65,6 +65,12 @@ class Waypoint {
   Uri get uri =>
       Uri.parse(path).replace(queryParameters: query.isEmpty ? null : query);
 
+  /// Creates a [Waypoint] representing a resolved navigation state.
+  ///
+  /// [path] is the full matched URL path and [pattern] is the route pattern.
+  /// [runes] contains extracted path parameters, [query] contains query
+  /// parameters, and [extra] holds any additional data passed during
+  /// navigation.
   const Waypoint({
     required this.path,
     required this.pattern,

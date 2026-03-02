@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:titan_atlas/titan_atlas.dart';
 import 'package:titan_bastion/titan_bastion.dart';
+import 'package:titan_colossus/titan_colossus.dart';
 
 import 'pillars/quest_detail_pillar.dart';
 import 'pillars/quest_list_pillar.dart';
@@ -11,6 +14,7 @@ import 'screens/hero_profile_screen.dart';
 import 'screens/hero_registration_screen.dart';
 import 'screens/quest_detail_screen.dart';
 import 'screens/quest_list_screen.dart';
+import 'screens/shade_demo_screen.dart';
 import 'screens/spark_demo_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +46,9 @@ import 'screens/spark_demo_screen.dart';
 //   Tether                     -- Request-response channels
 //   Core extensions            -- toggle, increment, add, removeWhere
 //   onInitAsync                -- Async Pillar initialization
+//   Colossus                   -- Performance monitoring (Pulse, Vessel, Stride)
+//   Shade                      -- Gesture recording & macro replay
+//   Phantom                    -- Automated gesture replay engine
 //
 // ---------------------------------------------------------------------------
 
@@ -53,6 +60,30 @@ void main() {
 
   // Set up Vigil error tracking with console output
   Vigil.addHandler(ConsoleErrorHandler());
+
+  // Initialize Colossus performance monitoring with session persistence
+  final shadeDir = '${Directory.systemTemp.path}/questboard_shade';
+  Colossus.init(
+    tremors: [Tremor.fps(), Tremor.jankRate(), Tremor.leaks()],
+    enableLensTab: true,
+    enableChronicle: true,
+    shadeStoragePath: shadeDir,
+  );
+
+  // Wire up route-aware recording — Shade captures the current route
+  // so Phantom can verify the correct page before replay
+  Colossus.instance.shade.getCurrentRoute = () {
+    try {
+      return Atlas.current.path;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  // Check for auto-replay on startup (replays saved session if configured)
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    Colossus.instance.checkAutoReplay();
+  });
 
   // Create Atlas router
   final atlas = Atlas(
@@ -69,6 +100,7 @@ void main() {
             name: 'enterprise',
           ),
           Passage('/spark', (_) => const SparkDemoScreen(), name: 'spark'),
+          Passage('/shade', (_) => const ShadeDemoScreen(), name: 'shade'),
         ],
       ),
 
@@ -92,33 +124,37 @@ void main() {
         name: 'about',
       ),
     ],
-    observers: [HeraldAtlasObserver()],
+    observers: [HeraldAtlasObserver(), ColossusAtlasObserver()],
   );
 
   runApp(
-    // Lens -- debug overlay (disable in production)
-    Lens(
-      enabled: true,
-      child: Beacon(
-        pillars: [
-          QuestboardPillar.new,
-          QuestListPillar.new,
-          QuestDetailPillar.new,
-        ],
-        child: MaterialApp.router(
-          title: 'Questboard',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorSchemeSeed: Colors.deepPurple,
-            useMaterial3: true,
-            brightness: Brightness.light,
+    // ShadeListener -- captures all gestures for recording
+    ShadeListener(
+      shade: Colossus.instance.shade,
+      // Lens -- debug overlay (disable in production)
+      child: Lens(
+        enabled: true,
+        child: Beacon(
+          pillars: [
+            QuestboardPillar.new,
+            QuestListPillar.new,
+            QuestDetailPillar.new,
+          ],
+          child: MaterialApp.router(
+            title: 'Questboard',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              colorSchemeSeed: Colors.deepPurple,
+              useMaterial3: true,
+              brightness: Brightness.light,
+            ),
+            darkTheme: ThemeData(
+              colorSchemeSeed: Colors.deepPurple,
+              useMaterial3: true,
+              brightness: Brightness.dark,
+            ),
+            routerConfig: atlas.config,
           ),
-          darkTheme: ThemeData(
-            colorSchemeSeed: Colors.deepPurple,
-            useMaterial3: true,
-            brightness: Brightness.dark,
-          ),
-          routerConfig: atlas.config,
         ),
       ),
     ),
@@ -142,6 +178,8 @@ class _QuestboardShell extends StatelessWidget {
         ? 2
         : path == '/spark'
         ? 3
+        : path == '/shade'
+        ? 4
         : 0;
 
     return Scaffold(
@@ -172,7 +210,9 @@ class _QuestboardShell extends StatelessWidget {
                 ? '/hero'
                 : i == 2
                 ? '/enterprise'
-                : '/spark',
+                : i == 3
+                ? '/spark'
+                : '/shade',
           );
         },
         destinations: const [
@@ -195,6 +235,11 @@ class _QuestboardShell extends StatelessWidget {
             icon: Icon(Icons.bolt_outlined),
             selectedIcon: Icon(Icons.bolt),
             label: 'Spark',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.fiber_smart_record_outlined),
+            selectedIcon: Icon(Icons.fiber_smart_record),
+            label: 'Shade',
           ),
         ],
       ),

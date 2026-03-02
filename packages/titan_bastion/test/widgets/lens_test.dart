@@ -94,6 +94,42 @@ void main() {
       expect(find.textContaining('test error'), findsOneWidget);
     });
 
+    testWidgets('isVisible returns false when panel is closed', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Lens(child: Text('app'))),
+      );
+
+      expect(Lens.isVisible, false);
+    });
+
+    testWidgets('isVisible tracks panel visibility', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Lens(child: Text('app'))),
+      );
+
+      expect(Lens.isVisible, false);
+
+      Lens.show();
+      await tester.pump();
+      expect(Lens.isVisible, true);
+
+      Lens.hide();
+      await tester.pump();
+      expect(Lens.isVisible, false);
+
+      Lens.toggle();
+      await tester.pump();
+      expect(Lens.isVisible, true);
+    });
+
+    testWidgets('isVisible returns false when no Lens is mounted', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const MaterialApp(home: Text('no lens')));
+
+      expect(Lens.isVisible, false);
+    });
+
     testWidgets('static show/hide/toggle work', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(home: Lens(child: Text('app'))),

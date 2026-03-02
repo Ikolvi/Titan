@@ -81,6 +81,14 @@ test('counter works', () {
 
 ```
 ┌──────────────────────────────────────────────┐
+│              titan_colossus                   │
+│  Colossus · Pulse · Stride · Vessel · Echo   │
+│  Tremor · Decree · Mark · ColossusLensTab    │
+├──────────────────────────────────────────────┤
+│              titan_atlas                      │
+│  Atlas · Passage · Sanctum · Sentinel        │
+│  Waypoint · Shift · Drift · context.atlas    │
+├──────────────────────────────────────────────┤
 │              titan_bastion                    │
 │  Vestige · Beacon · BeaconScope              │
 │  VestigeRaw · context.pillar<P>()            │
@@ -147,6 +155,8 @@ class CounterPage extends StatelessWidget {
 - [Core Concepts](03-core-concepts.md) — Core, Derived, Strike, Watch
 - [Pillars](04-stores.md) — Organize state at scale
 - [Flutter Integration](05-flutter-integration.md) — Vestige, Beacon, extensions
+- [Atlas Routing](12-atlas-routing.md) — Declarative navigation with Passages, Sentinels, Sanctums
+- [The Colossus Watches](story/chapter-22-the-colossus-watches.md) — Enterprise performance monitoring
 
 ---
 

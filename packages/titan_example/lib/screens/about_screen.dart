@@ -118,6 +118,18 @@ class AboutScreen extends StatelessWidget {
                 icon: Icons.build,
                 text: 'Core Extensions — toggle, increment, add',
               ),
+              const _FeatureRow(
+                icon: Icons.speed,
+                text: 'Colossus — Performance monitoring',
+              ),
+              const _FeatureRow(
+                icon: Icons.fiber_smart_record,
+                text: 'Shade — Gesture recording & macros',
+              ),
+              const _FeatureRow(
+                icon: Icons.replay_circle_filled,
+                text: 'Phantom — Automated gesture replay',
+              ),
               const SizedBox(height: 32),
               Text(
                 'Built by Ikolvi',

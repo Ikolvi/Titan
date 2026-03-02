@@ -7,6 +7,55 @@ import 'package:titan/titan.dart';
 // Lens — Titan's Debug Overlay
 // ---------------------------------------------------------------------------
 
+/// A plugin that adds a custom tab to the [Lens] debug overlay.
+///
+/// External packages (like `titan_colossus`) implement this to inject
+/// custom tabs without modifying Lens itself.
+///
+/// ## Usage
+///
+/// ```dart
+/// class MyLensPlugin extends LensPlugin {
+///   @override
+///   String get title => 'MyTab';
+///
+///   @override
+///   IconData get icon => Icons.speed;
+///
+///   @override
+///   Widget build(BuildContext context) {
+///     return const Center(child: Text('Hello from plugin'));
+///   }
+/// }
+///
+/// // Register the plugin
+/// Lens.registerPlugin(MyLensPlugin());
+/// ```
+abstract class LensPlugin {
+  /// Creates a [LensPlugin].
+  const LensPlugin();
+
+  /// Tab title displayed in the Lens header bar.
+  String get title;
+
+  /// Icon displayed next to the tab title.
+  IconData get icon;
+
+  /// Build the tab content widget.
+  Widget build(BuildContext context);
+
+  /// Called when the plugin is registered with Lens.
+  void onAttach() {}
+
+  /// Called when the plugin is unregistered from Lens.
+  void onDetach() {}
+
+  /// Called on each Lens refresh cycle (e.g. new Herald event, timer tick).
+  ///
+  /// Plugins can use this to update their internal state before rebuild.
+  void onRefresh() {}
+}
+
 /// A [LogSink] that captures [LogEntry] records into a bounded buffer.
 ///
 /// Used internally by [Lens] to display Chronicle log output.
@@ -90,6 +139,9 @@ class Lens extends StatefulWidget {
 
   static _LensState? _activeInstance;
 
+  /// Whether the debug overlay is currently visible.
+  static bool get isVisible => _activeInstance?._visible ?? false;
+
   /// Show the debug overlay.
   static void show() => _activeInstance?._setVisible(true);
 
@@ -98,6 +150,35 @@ class Lens extends StatefulWidget {
 
   /// Toggle the debug overlay.
   static void toggle() => _activeInstance?._toggle();
+
+  // -------------------------------------------------------------------------
+  // Plugin API — allows external packages to add custom tabs
+  // -------------------------------------------------------------------------
+
+  static final List<LensPlugin> _plugins = [];
+
+  /// All registered plugins.
+  static List<LensPlugin> get plugins => List.unmodifiable(_plugins);
+
+  /// Register a custom [LensPlugin] tab.
+  ///
+  /// The plugin's tab appears after the built-in tabs (Pillars, Herald,
+  /// Vigil, Chronicle). Call [unregisterPlugin] to remove it.
+  static void registerPlugin(LensPlugin plugin) {
+    if (!_plugins.contains(plugin)) {
+      _plugins.add(plugin);
+      plugin.onAttach();
+      _activeInstance?._refresh();
+    }
+  }
+
+  /// Remove a previously registered [LensPlugin].
+  static void unregisterPlugin(LensPlugin plugin) {
+    if (_plugins.remove(plugin)) {
+      plugin.onDetach();
+      _activeInstance?._refresh();
+    }
+  }
 
   @override
   State<Lens> createState() => _LensState();
@@ -138,6 +219,10 @@ class _LensState extends State<Lens> {
   }
 
   void _refresh() {
+    // Notify all plugins of a refresh cycle
+    for (final plugin in Lens._plugins) {
+      plugin.onRefresh();
+    }
     if (mounted && _visible) {
       setState(() {});
     }
@@ -192,6 +277,7 @@ class _LensState extends State<Lens> {
                 heraldEvents: _heraldEvents,
                 vigilErrors: Vigil.history,
                 logEntries: _logSink.entries,
+                plugins: Lens._plugins,
                 onClearHerald: () {
                   setState(() => _heraldEvents.clear());
                 },
@@ -254,6 +340,7 @@ class _LensPanel extends StatelessWidget {
   final List<HeraldEvent> heraldEvents;
   final List<TitanError> vigilErrors;
   final List<LogEntry> logEntries;
+  final List<LensPlugin> plugins;
   final VoidCallback onClearHerald;
   final VoidCallback onClearLogs;
   final VoidCallback onClearErrors;
@@ -265,6 +352,7 @@ class _LensPanel extends StatelessWidget {
     required this.heraldEvents,
     required this.vigilErrors,
     required this.logEntries,
+    required this.plugins,
     required this.onClearHerald,
     required this.onClearLogs,
     required this.onClearErrors,
@@ -283,7 +371,7 @@ class _LensPanel extends StatelessWidget {
           child: Column(
             children: [
               _buildTabBar(),
-              Expanded(child: _buildContent()),
+              Expanded(child: _buildContent(context)),
             ],
           ),
         ),
@@ -292,54 +380,86 @@ class _LensPanel extends StatelessWidget {
   }
 
   Widget _buildTabBar() {
-    const tabs = ['Pillars', 'Herald', 'Vigil', 'Chronicle'];
+    final builtInTabs = ['Pillars', 'Herald', 'Vigil', 'Chronicle'];
+    final allTabs = [...builtInTabs, ...plugins.map((p) => p.title)];
     return Container(
       height: 40,
       color: const Color(0xFF2D2D3F),
-      child: Row(
-        children: [
-          for (var i = 0; i < tabs.length; i++)
-            Expanded(
-              child: GestureDetector(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (var i = 0; i < allTabs.length; i++)
+              GestureDetector(
                 onTap: () => onTabChanged(i),
                 child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   alignment: Alignment.center,
+                  height: 40,
                   decoration: BoxDecoration(
                     border: Border(
                       bottom: BorderSide(
                         color: selectedTab == i
-                            ? Colors.deepPurpleAccent
+                            ? (i >= builtInTabs.length
+                                  ? Colors.tealAccent
+                                  : Colors.deepPurpleAccent)
                             : Colors.transparent,
                         width: 2,
                       ),
                     ),
                   ),
-                  child: Text(
-                    tabs[i],
-                    style: TextStyle(
-                      color: selectedTab == i
-                          ? Colors.deepPurpleAccent
-                          : Colors.white54,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (i >= builtInTabs.length) ...[
+                        Icon(
+                          plugins[i - builtInTabs.length].icon,
+                          color: selectedTab == i
+                              ? Colors.tealAccent
+                              : Colors.white54,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(
+                        allTabs[i],
+                        style: TextStyle(
+                          color: selectedTab == i
+                              ? (i >= builtInTabs.length
+                                    ? Colors.tealAccent
+                                    : Colors.deepPurpleAccent)
+                              : Colors.white54,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildContent() {
-    return switch (selectedTab) {
-      0 => _PillarsView(instances: instances),
-      1 => _HeraldView(events: heraldEvents, onClear: onClearHerald),
-      2 => _VigilView(errors: vigilErrors, onClear: onClearErrors),
-      3 => _ChronicleView(entries: logEntries, onClear: onClearLogs),
-      _ => const SizedBox.shrink(),
-    };
+  Widget _buildContent(BuildContext context) {
+    const builtInCount = 4;
+    if (selectedTab < builtInCount) {
+      return switch (selectedTab) {
+        0 => _PillarsView(instances: instances),
+        1 => _HeraldView(events: heraldEvents, onClear: onClearHerald),
+        2 => _VigilView(errors: vigilErrors, onClear: onClearErrors),
+        3 => _ChronicleView(entries: logEntries, onClear: onClearLogs),
+        _ => const SizedBox.shrink(),
+      };
+    }
+    // Plugin tab
+    final pluginIndex = selectedTab - builtInCount;
+    if (pluginIndex < plugins.length) {
+      return plugins[pluginIndex].build(context);
+    }
+    return const SizedBox.shrink();
   }
 }
 

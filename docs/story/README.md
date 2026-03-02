@@ -35,6 +35,11 @@
 | [XIX](chapter-19-the-prism-reveals.md) | **The Prism Reveals** | `Prism`, fine-grained projections, `PrismEquals`, multi-source combining |
 | [XX](chapter-20-the-nexus-connects.md) | **The Nexus Connects** | `NexusList`, `NexusMap`, `NexusSet`, `NexusChange`, in-place reactive collections |
 | [XXI](chapter-21-the-spark-ignites.md) | **The Spark Ignites** | `Spark`, `useCore`, `useDerived`, `useEffect`, `useMemo`, `useRef`, hooks-style widgets |
+| [XXII](chapter-22-the-colossus-watches.md) | **The Colossus Watches** | `Colossus`, `Pulse`, `Stride`, `Vessel`, `Echo`, `Tremor`, `Decree`, performance monitoring |
+| [XXIII](chapter-23-the-inscribe-endures.md) | **The Inscribe Endures** | `Inscribe`, `InscribeIO`, `SaveResult`, Markdown/JSON/HTML export, file save, Lens export tab |
+| [XXIV](chapter-24-the-shade-follows.md) | **The Shade Follows** | `Shade`, `Imprint`, `ShadeSession`, `Phantom`, `PhantomResult`, `ShadeListener`, gesture recording & replay |
+| [XXV](chapter-25-the-vault-remembers.md) | **The Vault Remembers** | `ShadeTextController`, `ShadeVault`, `ShadeAutoReplayConfig`, text input capture, session persistence, auto-replay, controller registry, keyboard suppression, route safety |
+| [XXVI](chapter-26-the-colossus-turns-inward.md) | **The Colossus Turns Inward** | Pillar/Core/Beacon/Vestige in Colossus widgets, reactive `ShadeListener` with `Core.addListener`, `Lens.isVisible`, `waitForSettled`, Vestige scope rules, architecture dog-fooding |
 
 ---
 

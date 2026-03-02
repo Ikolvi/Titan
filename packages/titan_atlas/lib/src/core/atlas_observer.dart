@@ -33,6 +33,7 @@ import '../core/waypoint.dart';
 /// }
 /// ```
 abstract class AtlasObserver {
+  /// Creates an [AtlasObserver].
   const AtlasObserver();
 
   /// Called when navigating to a new route (`Atlas.to`, `Atlas.toNamed`).
@@ -69,6 +70,7 @@ class AtlasLoggingObserver extends AtlasObserver {
   /// Optional prefix for log messages.
   final String prefix;
 
+  /// Creates an [AtlasLoggingObserver] with an optional [prefix].
   const AtlasLoggingObserver({this.prefix = 'Atlas'});
 
   @override

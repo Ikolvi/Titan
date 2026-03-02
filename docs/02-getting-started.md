@@ -16,6 +16,24 @@ dependencies:
 
 `titan_bastion` re-exports `titan` — you don't need both.
 
+### Flutter Apps with Routing
+
+```yaml
+dependencies:
+  titan_atlas: ^0.0.1
+```
+
+`titan_atlas` re-exports `titan` — add `titan_bastion` separately if you need Vestige/Beacon widgets outside of Atlas routes.
+
+### Performance Monitoring
+
+```yaml
+dependencies:
+  titan_colossus: ^1.0.0
+```
+
+`titan_colossus` provides enterprise performance monitoring — frame tracking (Pulse), page load timing (Stride), memory monitoring (Vessel), rebuild counting (Echo), threshold alerts (Tremor), and reporting (Decree). Integrates with Lens via `ColossusLensTab` and with Atlas via `ColossusAtlasObserver`.
+
 ### Pure Dart Projects
 
 ```yaml

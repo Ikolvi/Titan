@@ -68,6 +68,51 @@ Titan ensures **glitch-free** updates through:
 
 ```
 ┌──────────────────────────────────────────────┐
+│              titan_colossus                   │
+│                                              │
+│  ┌──────────────────────────────────────┐   │
+│  │       Monitoring Layer               │   │
+│  │  Colossus (orchestrator Pillar)      │   │
+│  │  Pulse (frame timing)               │   │
+│  │  Stride (page load timing)          │   │
+│  │  Vessel (memory monitoring)         │   │
+│  │  Echo (rebuild counting)            │   │
+│  └──────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────┐   │
+│  │       Alerting & Reporting           │   │
+│  │  Tremor (threshold alerts)          │   │
+│  │  Decree (performance reports)       │   │
+│  │  Mark (metric data points)          │   │
+│  └──────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────┐   │
+│  │       Integration                    │   │
+│  │  ColossusLensTab (Lens perf tab)    │   │
+│  │  ColossusAtlasObserver (nav timing) │   │
+│  └──────────────────────────────────────┘   │
+├──────────────────────────────────────────────┤
+│              titan_atlas                      │
+│                                              │
+│  ┌──────────────────────────────────────┐   │
+│  │         Routing Layer                │   │
+│  │  Atlas (router, static API)         │   │
+│  │  Passage (route definitions)        │   │
+│  │  Sanctum (shell / persistent layout)│   │
+│  │  RouteTrie (O(k) trie matching)     │   │
+│  └──────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────┐   │
+│  │         Guard & Navigation           │   │
+│  │  Sentinel (route guards)            │   │
+│  │  Drift (global redirects)           │   │
+│  │  Waypoint (resolved route state)    │   │
+│  │  Shift (page transitions)           │   │
+│  └──────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────┐   │
+│  │         Integration                  │   │
+│  │  AtlasObserver · HeraldAtlasObserver│   │
+│  │  context.atlas (BuildContext ext)   │   │
+│  │  Route-scoped Pillars (auto DI)     │   │
+│  └──────────────────────────────────────┘   │
+├──────────────────────────────────────────────┤
 │              titan_bastion                    │
 │                                              │
 │  ┌──────────────┐  ┌──────────────────────┐ │
@@ -151,6 +196,15 @@ Titan ensures **glitch-free** updates through:
 | **Primary Widgets** | `titan_bastion` | Vestige, Beacon, BeaconScope |
 | **Legacy Widgets** | `titan_bastion` | TitanScope, TitanBuilder, TitanConsumer, etc. |
 | **Extensions** | `titan_bastion` | BuildContext methods (pillar, hasPillar) |
+| **Routing** | `titan_atlas` | Atlas, Passage, Sanctum, RouteTrie |
+| **Guards** | `titan_atlas` | Sentinel, Drift, per-route redirects |
+| **Navigation** | `titan_atlas` | Waypoint, Shift, AtlasDelegate, AtlasParser |
+| **Route Observers** | `titan_atlas` | AtlasObserver, HeraldAtlasObserver |
+| **Route Integration** | `titan_atlas` | context.atlas, route-scoped Pillars |
+| **Monitoring** | `titan_colossus` | Colossus, Pulse, Stride, Vessel, Echo |
+| **Alerting** | `titan_colossus` | Tremor (threshold alerts) |
+| **Reporting** | `titan_colossus` | Decree (reports), Mark (metrics) |
+| **Perf Integration** | `titan_colossus` | ColossusLensTab, ColossusAtlasObserver |
 
 ---
 
