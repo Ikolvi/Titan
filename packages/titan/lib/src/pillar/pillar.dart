@@ -14,6 +14,7 @@ import '../data/codex.dart';
 import '../data/quarry.dart';
 import '../data/bulwark.dart';
 import '../data/saga.dart';
+import '../data/volley.dart';
 import '../testing/snapshot.dart';
 import '../errors/vigil.dart';
 import '../events/herald.dart';
@@ -460,6 +461,28 @@ abstract class Pillar {
     );
     _managedNodes.addAll(s.managedNodes);
     return s;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Volley — batch async operations
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Volley] (batch async executor) managed by this Pillar.
+  ///
+  /// A Volley runs multiple async tasks in parallel with a configurable
+  /// concurrency limit and reactive progress tracking.
+  ///
+  /// ```dart
+  /// late final upload = volley<String>(concurrency: 3);
+  /// ```
+  @protected
+  Volley<T> volley<T>({
+    int concurrency = 5,
+    String? name,
+  }) {
+    final v = Volley<T>(concurrency: concurrency, name: name);
+    _managedNodes.addAll(v.managedNodes);
+    return v;
   }
 
   // ---------------------------------------------------------------------------

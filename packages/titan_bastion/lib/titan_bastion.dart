@@ -62,6 +62,7 @@ export 'src/widgets/lens.dart';
 export 'src/widgets/animated_vestige.dart';
 export 'src/widgets/pillar_scope.dart';
 export 'src/widgets/vestige_when.dart';
+export 'src/widgets/rampart.dart';
 
 // Advanced Widgets (legacy / specialized)
 export 'src/widgets/obs.dart';
