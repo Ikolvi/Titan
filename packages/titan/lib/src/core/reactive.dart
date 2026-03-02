@@ -117,6 +117,9 @@ abstract class ReactiveNode {
       return;
     }
 
+    // Fast path: nothing to notify.
+    if (_dependents.isEmpty && _listeners.isEmpty) return;
+
     _isNotifying = true;
 
     // Notify dependent reactive nodes.

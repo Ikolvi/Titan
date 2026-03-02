@@ -83,6 +83,9 @@ abstract class TitanObserver {
     required dynamic oldValue,
     required dynamic newValue,
   }) {
+    // Fast path: skip when no observers are registered.
+    if (instance == null && _observers.isEmpty) return;
+
     instance?.onStateChanged(
       state: state,
       oldValue: oldValue,

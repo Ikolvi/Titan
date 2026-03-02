@@ -128,7 +128,8 @@ class Saga<T> {
   final TitanState<T?> _result;
 
   /// Completed step results (for compensation).
-  final List<T?> _stepResults = [];
+  late final List<T?> _stepResults = List<T?>.filled(steps.length, null);
+  int _stepResultCount = 0;
 
   /// Optional callback on completion.
   final void Function(T? result)? onComplete;
@@ -228,7 +229,7 @@ class Saga<T> {
     _status.value = SagaStatus.running;
     _error.value = null;
     _result.value = null;
-    _stepResults.clear();
+    _stepResultCount = 0;
 
     T? previousResult;
 
@@ -238,7 +239,8 @@ class Saga<T> {
 
       try {
         final stepResult = await step.execute(previousResult);
-        _stepResults.add(stepResult);
+        _stepResults[i] = stepResult;
+        _stepResultCount = i + 1;
         previousResult = stepResult;
         onStepComplete?.call(step.name, i, steps.length);
       } catch (e) {
@@ -263,7 +265,7 @@ class Saga<T> {
 
     for (var i = fromIndex; i >= 0; i--) {
       final step = steps[i];
-      final result = i < _stepResults.length ? _stepResults[i] : null;
+      final result = i < _stepResultCount ? _stepResults[i] : null;
       _currentStep.value = i;
 
       try {
@@ -283,7 +285,8 @@ class Saga<T> {
     _currentStep.value = -1;
     _error.value = null;
     _result.value = null;
-    _stepResults.clear();
+    _stepResults.fillRange(0, _stepResultCount, null);
+    _stepResultCount = 0;
   }
 
   /// All managed reactive nodes (for Pillar disposal).
