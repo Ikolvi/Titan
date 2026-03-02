@@ -6,6 +6,7 @@ import 'pillars/quest_detail_pillar.dart';
 import 'pillars/quest_list_pillar.dart';
 import 'pillars/questboard_pillar.dart';
 import 'screens/about_screen.dart';
+import 'screens/enterprise_demo_screen.dart';
 import 'screens/hero_profile_screen.dart';
 import 'screens/hero_registration_screen.dart';
 import 'screens/quest_detail_screen.dart';
@@ -30,6 +31,16 @@ import 'screens/quest_list_screen.dart';
 //   Quarry                     -- Data fetching with SWR (quest detail)
 //   Confluence                 -- Multi-Pillar consumers
 //   Lens                       -- Debug overlay
+//   Loom                       -- Finite state machine
+//   Bulwark                    -- Circuit breaker
+//   Saga                       -- Multi-step workflows
+//   Volley                     -- Batch async operations
+//   Sigil                      -- Feature flags
+//   Aegis                      -- Retry with backoff
+//   Annals                     -- Audit trail
+//   Tether                     -- Request-response channels
+//   Core extensions            -- toggle, increment, add, removeWhere
+//   onInitAsync                -- Async Pillar initialization
 //
 // ---------------------------------------------------------------------------
 
@@ -51,6 +62,11 @@ void main() {
         passages: [
           Passage('/', (_) => const QuestListScreen(), name: 'quests'),
           Passage('/hero', (_) => const HeroProfileScreen(), name: 'hero'),
+          Passage(
+            '/enterprise',
+            (_) => const EnterpriseDemoScreen(),
+            name: 'enterprise',
+          ),
         ],
       ),
 
@@ -120,7 +136,11 @@ class _QuestboardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = Atlas.current.path;
-    final index = path == '/hero' ? 1 : 0;
+    final index = path == '/hero'
+        ? 1
+        : path == '/enterprise'
+            ? 2
+            : 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -143,7 +163,13 @@ class _QuestboardShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (i) {
-          context.atlas.go(i == 0 ? '/' : '/hero');
+          context.atlas.go(
+            i == 0
+                ? '/'
+                : i == 1
+                    ? '/hero'
+                    : '/enterprise',
+          );
         },
         destinations: const [
           NavigationDestination(
@@ -155,6 +181,11 @@ class _QuestboardShell extends StatelessWidget {
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Hero',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.business_center_outlined),
+            selectedIcon: Icon(Icons.business_center),
+            label: 'Enterprise',
           ),
         ],
       ),

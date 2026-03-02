@@ -406,3 +406,7 @@ And it all started with a single Pillar.
 | [XI](chapter-11-the-quarry-yields.md) | The Quarry Yields |
 | [XII](chapter-12-the-confluence-converges.md) | The Confluence Converges |
 | [XIII](chapter-13-the-lens-reveals.md) | The Lens Reveals |
+| [XIV](chapter-14-the-enterprise-arsenal.md) | The Enterprise Arsenal |
+| [XV](chapter-15-the-loom-weaves.md) | The Loom Weaves |
+| [XVI](chapter-16-the-forge-and-crucible.md) | The Forge & Crucible |
+| [XVII](chapter-17-the-annals-record.md) | The Annals Record |

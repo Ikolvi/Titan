@@ -869,4 +869,368 @@ LensLogSink({int maxEntries = 200})
 
 ---
 
+## Enterprise Features
+
+### Loom
+
+Finite state machine with reactive state, lifecycle hooks, and transition history.
+
+#### Constructor (Pillar factory)
+
+```dart
+loom<S, E>({
+  required S initial,
+  required Map<(S, E), S> transitions,
+  Map<S, void Function()>? onEnter,
+  Map<S, void Function()>? onExit,
+  void Function(S from, E event, S to)? onTransition,
+  int maxHistory = 100,
+  String? name,
+})
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `current` | `S` | Current state (reactive) |
+| `state` | `Core<S>` | Underlying reactive Core |
+| `isIn(S state)` | `bool` | Check if in a specific state (reactive) |
+| `canSend(E event)` | `bool` | Check if an event is valid from current state |
+| `allowedEvents` | `Set<E>` | Set of valid events from current state |
+| `send(E event)` | `bool` | Attempt transition; returns true on success |
+| `sendOrThrow(E event)` | `void` | Attempt transition; throws on invalid |
+| `history` | `List<LoomTransition<S, E>>` | Transition history |
+| `reset(S state)` | `void` | Reset to a specific state, clear history |
+
+#### LoomTransition
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `from` | `S` | Source state |
+| `event` | `E` | Event that triggered the transition |
+| `to` | `S` | Destination state |
+
+---
+
+### Bulwark
+
+Reactive circuit breaker for resilient async operations.
+
+#### Constructor (Pillar factory)
+
+```dart
+bulwark<T>({
+  int failureThreshold = 3,
+  Duration resetTimeout = const Duration(seconds: 30),
+  void Function(Object error)? onOpen,
+  void Function()? onClose,
+  void Function()? onHalfOpen,
+  String? name,
+})
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `state` | `BulwarkState` | Current state: `closed`, `open`, or `halfOpen` (reactive) |
+| `stateCore` | `Core<BulwarkState>` | Underlying reactive Core |
+| `failureCount` | `int` | Consecutive failure count (reactive) |
+| `lastError` | `Object?` | Most recent error (reactive) |
+| `isClosed` | `bool` | Whether the circuit is closed |
+| `isOpen` | `bool` | Whether the circuit is open |
+| `isHalfOpen` | `bool` | Whether the circuit is in recovery |
+| `call(Future<T> Function() action)` | `Future<T>` | Execute through the breaker |
+| `reset()` | `void` | Manually close the circuit |
+| `trip([Object? error])` | `void` | Manually open the circuit |
+| `dispose()` | `void` | Dispose all internal state |
+
+#### BulwarkOpenException
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `failureCount` | `int` | Failures that triggered the circuit |
+| `lastError` | `Object?` | Last error |
+
+---
+
+### Saga
+
+Multi-step async workflow with compensation (rollback) on failure.
+
+#### Constructor (Pillar factory)
+
+```dart
+saga<T>({
+  required List<SagaStep<T>> steps,
+  void Function(T? result)? onComplete,
+  void Function(Object error, String failedStep)? onError,
+  void Function(String stepName, int index, int total)? onStepComplete,
+  String? name,
+})
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `status` | `SagaStatus` | `idle`, `running`, `completed`, `compensating`, `failed` (reactive) |
+| `currentStep` | `int` | Current step index, -1 when not started (reactive) |
+| `currentStepName` | `String?` | Name of current step |
+| `progress` | `double` | Progress 0.0–1.0 (reactive) |
+| `error` | `Object?` | Error if failed (reactive) |
+| `result` | `T?` | Final result if completed (reactive) |
+| `isRunning` | `bool` | Whether currently executing |
+| `totalSteps` | `int` | Total number of steps |
+| `run()` | `Future<T?>` | Execute all steps; compensates on failure |
+| `reset()` | `void` | Reset to idle |
+| `dispose()` | `void` | Dispose internal state |
+
+#### SagaStep
+
+```dart
+SagaStep<T>({
+  required String name,
+  required Future<T?> Function(T? previousResult) execute,
+  Future<void> Function(T? result)? compensate,
+})
+```
+
+---
+
+### Volley
+
+Batch async operations with concurrency control and partial-failure handling.
+
+#### Constructor (Pillar factory)
+
+```dart
+volley<T>({int concurrency = 5, String? name})
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `status` | `VolleyStatus` | `idle`, `running`, `done`, `cancelled` (reactive) |
+| `progress` | `double` | Progress 0.0–1.0 (reactive) |
+| `completedCount` | `int` | Number of completed tasks (reactive) |
+| `totalCount` | `int` | Total tasks (reactive) |
+| `isRunning` | `bool` | Whether currently executing |
+| `successCount` | `int` | Number of successes |
+| `execute(List<VolleyTask<T>> tasks)` | `Future<List<VolleyResult<T>>>` | Run batch with concurrency limit |
+| `cancel()` | `void` | Cancel execution |
+| `reset()` | `void` | Reset to idle |
+| `dispose()` | `void` | Dispose internal state |
+
+#### VolleyTask / VolleyResult
+
+```dart
+VolleyTask<T>({required String name, required Future<T> Function() execute})
+```
+
+`VolleyResult<T>` is a sealed class: `VolleySuccess<T>` (with `value`) or `VolleyFailure<T>` (with `error`, `stackTrace`). Common getters: `taskName`, `isSuccess`, `isFailure`, `valueOrNull`, `errorOrNull`.
+
+---
+
+### Annals
+
+Static audit trail for Core mutations. Immutable, append-only, FIFO-evicted.
+
+| Method | Type | Description |
+|--------|------|-------------|
+| `Annals.enable({int maxEntries})` | `void` | Enable auditing |
+| `Annals.disable()` | `void` | Disable auditing |
+| `Annals.record(AnnalEntry entry)` | `void` | Record an entry |
+| `Annals.entries` | `List<AnnalEntry>` | All entries (unmodifiable) |
+| `Annals.length` | `int` | Entry count |
+| `Annals.stream` | `Stream<AnnalEntry>` | Broadcast stream of entries |
+| `Annals.query({...})` | `List<AnnalEntry>` | Filter by coreName, pillarType, action, userId, after, before, limit |
+| `Annals.export({...})` | `List<Map<String, dynamic>>` | Export as serializable maps |
+| `Annals.clear()` | `void` | Clear all entries |
+| `Annals.reset()` | `void` | Clear, disable, reset max |
+
+#### AnnalEntry
+
+```dart
+AnnalEntry({
+  required String coreName,
+  String? pillarType,
+  required dynamic oldValue,
+  required dynamic newValue,
+  DateTime? timestamp,
+  String? action,
+  String? userId,
+  Map<String, dynamic>? metadata,
+})
+```
+
+---
+
+### Tether
+
+Static request-response channels between Pillars.
+
+| Method | Type | Description |
+|--------|------|-------------|
+| `Tether.register<Req, Res>(name, handler, {timeout})` | `void` | Register a typed handler |
+| `Tether.unregister(name)` | `bool` | Remove a handler |
+| `Tether.has(name)` | `bool` | Check if registered |
+| `Tether.call<Req, Res>(name, request, {timeout})` | `Future<Res>` | Invoke and await response |
+| `Tether.tryCall<Req, Res>(name, request, {timeout})` | `Future<Res?>` | Returns null if not registered |
+| `Tether.names` | `Set<String>` | All registered names |
+| `Tether.reset()` | `void` | Clear all registrations |
+
+---
+
+### Aegis
+
+Static retry utility with configurable backoff strategies.
+
+| Method | Type | Description |
+|--------|------|-------------|
+| `Aegis.run<T>(operation, {maxAttempts, baseDelay, maxDelay, strategy, jitter, retryIf, onRetry})` | `Future<T>` | Execute with retry |
+| `Aegis.runWithConfig<T>(operation, {config, onRetry})` | `Future<AegisResult<T>>` | Execute with config object |
+
+Strategies: `BackoffStrategy.exponential`, `.constant`, `.linear`.
+
+`onRetry` signature: `void Function(int attempt, Object error, Duration nextDelay)?`
+
+---
+
+### Sigil
+
+Static feature flag management with reactive reads.
+
+| Method | Type | Description |
+|--------|------|-------------|
+| `Sigil.register(name, initialValue)` | `void` | Register a boolean flag |
+| `Sigil.loadAll(Map<String, bool>)` | `void` | Bulk-register flags |
+| `Sigil.unregister(name)` | `bool` | Remove a flag |
+| `Sigil.isEnabled(name)` | `bool` | Reactive read |
+| `Sigil.isDisabled(name)` | `bool` | Inverse reactive read |
+| `Sigil.has(name)` | `bool` | Check if registered |
+| `Sigil.names` | `Set<String>` | All registered names |
+| `Sigil.peek(name)` | `bool` | Non-reactive read |
+| `Sigil.coreOf(name)` | `Core<bool>?` | Underlying reactive Core |
+| `Sigil.enable(name)` | `void` | Set flag true |
+| `Sigil.disable(name)` | `void` | Set flag false |
+| `Sigil.toggle(name)` | `bool` | Toggle, returns new value |
+| `Sigil.set(name, value)` | `void` | Set explicit value |
+| `Sigil.override(name, value)` | `void` | Override for testing |
+| `Sigil.clearOverride(name)` | `void` | Clear one override |
+| `Sigil.clearOverrides()` | `void` | Clear all overrides |
+| `Sigil.reset()` | `void` | Dispose all flags |
+
+---
+
+### Crucible
+
+Testing harness for Pillars.
+
+#### Constructor
+
+```dart
+Crucible<P extends Pillar>(P Function() factory)
+Crucible.from(P pillar)
+```
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `pillar` | `P` | The Pillar under test |
+| `isDisposed` | `bool` | Whether disposed |
+| `changes` | `List<CoreChange>` | All recorded changes |
+| `expectCore<T>(core, expected)` | `void` | Assert a Core's value |
+| `expectStrikeSync(action, {before, after})` | `void` | Assert sync Strike |
+| `expectStrike(action, {before, after})` | `Future<void>` | Assert async Strike |
+| `track<T>(core)` | `void` | Start recording changes on a Core |
+| `changesFor<T>(core)` | `List<CoreChange<T>>` | Get changes for a Core |
+| `valuesFor<T>(core)` | `List<T>` | Get values for a Core |
+| `clearChanges()` | `void` | Clear all recordings |
+| `dispose()` | `void` | Dispose Crucible and Pillar |
+
+---
+
+### Snapshot / PillarSnapshot
+
+State capture and restore.
+
+| Method | Type | Description |
+|--------|------|-------------|
+| `pillar.snapshot({String? label})` | `PillarSnapshot` | Capture all named Cores |
+| `pillar.restore(snapshot, {bool notify})` | `void` | Restore from snapshot |
+| `Snapshot.diff(a, b)` | `Map<String, (dynamic, dynamic)>` | Compare two snapshots |
+| `snapshot.has(name)` | `bool` | Check if Core is captured |
+| `snapshot.get<T>(name)` | `T?` | Get captured value |
+| `snapshot.length` | `int` | Number of captured Cores |
+
+---
+
+### Additional Pillar Members
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `isReady` | `Core<bool>` | True after `onInitAsync()` completes |
+| `autoDispose` | `bool` | Whether auto-dispose is enabled |
+| `refCount` | `int` | Active consumer count |
+| `enableAutoDispose()` | `void` | Enable auto-dispose |
+| `ref()` | `void` | Increment reference count |
+| `unref()` | `void` | Decrement reference count |
+| `onInitAsync()` | `Future<void>` | Async initialization lifecycle hook |
+| `onError(error, stackTrace)` | `void` | Error handler for strikeAsync/captureError |
+
+---
+
+### Additional Widgets (titan_bastion)
+
+#### VestigeWhen
+
+```dart
+VestigeWhen<P extends Pillar>({
+  required bool Function(P pillar) condition,
+  required Widget Function(BuildContext, P) builder,
+})
+```
+
+#### AnimatedVestige
+
+```dart
+AnimatedVestige<P extends Pillar>({
+  required Duration duration,
+  required Widget Function(BuildContext, P, Animation<double>) builder,
+  Curve? curve,
+})
+```
+
+#### VestigeSelector
+
+```dart
+VestigeSelector<P extends Pillar, T>({
+  required T Function(P pillar) selector,
+  required Widget Function(BuildContext, P, T) builder,
+})
+```
+
+#### VestigeListener
+
+```dart
+VestigeListener<P extends Pillar>({
+  required void Function(BuildContext, P) listener,
+  required Widget child,
+})
+```
+
+#### VestigeConsumer
+
+```dart
+VestigeConsumer<P extends Pillar>({
+  required void Function(BuildContext, P) listener,
+  required Widget Function(BuildContext, P) builder,
+})
+```
+
+#### PillarScope
+
+```dart
+PillarScope({
+  required List<Pillar> overrides,
+  required Widget child,
+})
+```
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

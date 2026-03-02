@@ -27,6 +27,10 @@
 | [XI](chapter-11-the-quarry-yields.md) | **The Quarry Yields** | `Quarry`, data fetching, stale-while-revalidate, retry, caching |
 | [XII](chapter-12-the-confluence-converges.md) | **The Confluence Converges** | `Confluence2/3/4`, multi-Pillar consumers |
 | [XIII](chapter-13-the-lens-reveals.md) | **The Lens Reveals** | `Lens`, debug overlay, runtime introspection |
+| [XIV](chapter-14-the-enterprise-arsenal.md) | **The Enterprise Arsenal** | Core extensions, debounced/throttled Strikes, guarded Watch, `Aegis`, `Sigil`, auto-dispose, `onInitAsync` |
+| [XV](chapter-15-the-loom-weaves.md) | **The Loom Weaves** | `Loom`, finite state machines, transitions, lifecycle hooks |
+| [XVI](chapter-16-the-forge-and-crucible.md) | **The Forge & Crucible** | `Crucible`, `Snapshot`, `Bulwark`, `PillarScope`, testing harness |
+| [XVII](chapter-17-the-annals-record.md) | **The Annals Record** | `Annals`, `Saga`, `Volley`, `Tether`, audit trail, workflows |
 
 ---
 

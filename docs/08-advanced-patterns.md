@@ -1229,4 +1229,484 @@ sink.clear();
 
 ---
 
+## Enterprise Features
+
+### Core Extensions
+
+Type-safe convenience methods on `Core<T>` for common mutations:
+
+```dart
+final isActive = core(false);
+isActive.toggle(); // flips to true
+
+final count = core(0);
+count.increment(); // 1
+count.decrement(); // 0
+count.increment(5); // 5
+
+final items = core(<String>['a', 'b']);
+items.add('c'); // ['a', 'b', 'c']
+items.removeWhere((s) => s == 'a'); // ['b', 'c']
+items.updateWhere((s) => s == 'b', (s) => s.toUpperCase()); // ['B', 'c']
+
+final map = core(<String, int>{'x': 1});
+map.putEntry('y', 2); // {'x': 1, 'y': 2}
+map.removeKey('x'); // {'y': 2}
+
+final text = core('hello');
+text.transform((s) => s.toUpperCase()); // 'HELLO'
+```
+
+### Core.select — Granular Subscriptions
+
+Subscribe to a projection of a Core's value — only fires when the selected part changes:
+
+```dart
+final user = core(User(name: 'Kael', level: 5));
+
+// Only rebuild when name changes, ignore level changes
+user.select((u) => u.name).listen((name) {
+  print('Name changed: $name');
+});
+```
+
+### Debounced & Throttled Strikes
+
+```dart
+class SearchPillar extends Pillar {
+  late final query = core('');
+
+  // Only executes after 300ms of no input
+  late final debouncedSearch = strikeDebounced(
+    const Duration(milliseconds: 300),
+    (String q) {
+      query.value = q;
+      _performSearch();
+    },
+  );
+
+  // At most once per 500ms
+  late final throttledRefresh = strikeThrottled(
+    const Duration(milliseconds: 500),
+    () => _refresh(),
+  );
+}
+```
+
+### Guarded Watch
+
+Watch with an error handler — prevents one failing watcher from crashing the app:
+
+```dart
+@override
+void onInit() {
+  guardedWatch(
+    () => expensiveComputation(data.value),
+    onError: (error, stack) => log.error('Watch failed: $error'),
+  );
+}
+```
+
+### Pillar Auto-Dispose
+
+Automatically dispose a Pillar when all consuming widgets unmount:
+
+```dart
+Titan.put(ChatPillar()..enableAutoDispose());
+
+// ChatPillar will dispose when the last Vestige<ChatPillar> unmounts
+```
+
+### onInitAsync — Async Initialization
+
+```dart
+class DataPillar extends Pillar {
+  late final items = core(<Item>[]);
+
+  @override
+  Future<void> onInitAsync() async {
+    items.value = await api.fetchAll();
+  }
+}
+
+// In UI — wait for readiness
+Vestige<DataPillar>(
+  builder: (context, pillar) {
+    if (!pillar.isReady.value) return const CircularProgressIndicator();
+    return ItemList(items: pillar.items.value);
+  },
+)
+```
+
+### Aegis — Retry with Backoff
+
+```dart
+final result = await Aegis.run(
+  () => api.fetchData(),
+  maxAttempts: 3,
+  baseDelay: const Duration(seconds: 1),
+  strategy: BackoffStrategy.exponential,
+  retryIf: (error) => error is SocketException,
+  onRetry: (attempt, error, nextDelay) {
+    log.warning('Retry $attempt: $error (next in $nextDelay)');
+  },
+);
+```
+
+### Sigil — Feature Flags
+
+```dart
+// Register flags
+Sigil.register('dark_mode', true);
+Sigil.register('new_checkout', false);
+Sigil.loadAll({'beta_feature': true, 'legacy_ui': false});
+
+// Check
+if (Sigil.isEnabled('dark_mode')) { /* ... */ }
+if (Sigil.isDisabled('new_checkout')) { /* ... */ }
+
+// Mutate
+Sigil.enable('new_checkout');
+Sigil.toggle('dark_mode');
+
+// Test overrides
+Sigil.override('dark_mode', false);
+Sigil.clearOverrides();
+```
+
+---
+
+## Loom — Finite State Machines
+
+The Loom enforces controlled state transitions with a transition table:
+
+```dart
+enum QuestState { idle, claiming, active, completed }
+enum QuestEvent { claim, start, complete, reset }
+
+class QuestPillar extends Pillar {
+  late final questFlow = loom<QuestState, QuestEvent>(
+    initial: QuestState.idle,
+    transitions: {
+      (QuestState.idle, QuestEvent.claim): QuestState.claiming,
+      (QuestState.claiming, QuestEvent.start): QuestState.active,
+      (QuestState.active, QuestEvent.complete): QuestState.completed,
+      (QuestState.completed, QuestEvent.reset): QuestState.idle,
+    },
+    onEnter: {
+      QuestState.active: () => log.info('Quest started'),
+    },
+    onTransition: (from, event, to) {
+      log.debug('$from --[$event]--> $to');
+    },
+  );
+}
+
+// Usage
+questFlow.send(QuestEvent.claim); // returns true
+questFlow.canSend(QuestEvent.complete); // false — not in active state
+questFlow.current; // QuestState.claiming
+questFlow.allowedEvents; // {QuestEvent.start}
+questFlow.history; // [LoomTransition(idle, claim, claiming)]
+```
+
+---
+
+## Bulwark — Circuit Breaker
+
+Prevents cascading failures by tracking consecutive errors and short-circuiting when a threshold is reached:
+
+```dart
+class ApiPillar extends Pillar {
+  late final breaker = bulwark<List<Item>>(
+    failureThreshold: 3,
+    resetTimeout: const Duration(seconds: 30),
+    onOpen: (error) => log.error('Circuit opened: $error'),
+    onClose: () => log.info('Circuit recovered'),
+  );
+
+  Future<void> fetch() async {
+    try {
+      final items = await breaker.call(() => api.getItems());
+      data.value = items;
+    } on BulwarkOpenException catch (e) {
+      log.warning('API unavailable (${e.failureCount} failures)');
+    }
+  }
+}
+
+// Manual controls
+breaker.trip(); // Force open
+breaker.reset(); // Force closed
+breaker.state; // BulwarkState.closed/open/halfOpen
+```
+
+---
+
+## Saga — Multi-Step Workflows
+
+Sequential async operations with automatic compensation (rollback) on failure:
+
+```dart
+class OrderPillar extends Pillar {
+  late final checkout = saga<String>(
+    steps: [
+      SagaStep(
+        name: 'reserve-inventory',
+        execute: (prev) async {
+          await api.reserveItems(cartItems);
+          return orderId;
+        },
+        compensate: (id) async => await api.releaseItems(id!),
+      ),
+      SagaStep(
+        name: 'charge-payment',
+        execute: (prev) async {
+          await api.chargePayment(prev!, total);
+          return prev;
+        },
+        compensate: (id) async => await api.refundPayment(id!),
+      ),
+      SagaStep(
+        name: 'send-confirmation',
+        execute: (prev) async {
+          await api.sendEmail(prev!);
+          return prev;
+        },
+      ),
+    ],
+    onComplete: (result) => log.info('Order $result confirmed'),
+    onError: (error, step) => log.error('Order failed at $step'),
+    onStepComplete: (name, i, total) => log.info('$name ($i/$total)'),
+  );
+}
+
+// Execute
+final orderId = await pillar.checkout.run();
+
+// Monitor reactively
+pillar.checkout.status; // SagaStatus.running
+pillar.checkout.progress; // 0.33, 0.66, 1.0
+pillar.checkout.currentStepName; // 'charge-payment'
+```
+
+---
+
+## Volley — Batch Async Operations
+
+Parallel async tasks with concurrency limits and partial-failure handling:
+
+```dart
+class UploadPillar extends Pillar {
+  late final uploader = volley<String>(concurrency: 3);
+
+  Future<void> uploadAll(List<File> files) async {
+    final tasks = files.map((f) => VolleyTask(
+      name: f.name,
+      execute: () => api.upload(f),
+    )).toList();
+
+    final results = await uploader.execute(tasks);
+
+    final successes = results.where((r) => r.isSuccess).length;
+    final failures = results.where((r) => r.isFailure).length;
+    log.info('Uploaded $successes, failed $failures');
+  }
+}
+
+// Progress & cancellation
+uploader.progress; // 0.0 to 1.0
+uploader.completedCount; // reactive
+uploader.cancel(); // stop starting new tasks
+```
+
+---
+
+## Annals — Audit Trail
+
+Immutable, append-only record of state mutations for compliance:
+
+```dart
+// Enable globally
+Annals.enable(maxEntries: 10000);
+
+// Record mutations
+Annals.record(AnnalEntry(
+  coreName: 'status',
+  pillarType: 'OrderPillar',
+  oldValue: 'pending',
+  newValue: 'shipped',
+  action: 'shipOrder',
+  userId: 'admin-42',
+));
+
+// Query
+final changes = Annals.query(
+  pillarType: 'OrderPillar',
+  action: 'shipOrder',
+  after: DateTime.now().subtract(const Duration(hours: 24)),
+);
+
+// Export for compliance
+final report = Annals.export(after: DateTime(2025, 1, 1));
+
+// Stream real-time
+Annals.stream.listen((entry) => sendToSIEM(entry));
+```
+
+---
+
+## Tether — Request-Response Channels
+
+Typed, bidirectional async communication between Pillars:
+
+```dart
+// Register a handler
+Tether.register<String, User?>(
+  'getUserById',
+  (id) async => await userApi.fetch(id),
+  timeout: const Duration(seconds: 5),
+);
+
+// Call from another Pillar
+final user = await Tether.call<String, User?>('getUserById', 'user-42');
+
+// Safe call (returns null if not registered)
+final maybeUser = await Tether.tryCall<String, User?>('getUserById', 'user-42');
+
+// Check availability
+Tether.has('getUserById'); // true
+Tether.names; // {'getUserById', ...}
+
+// Cleanup
+Tether.unregister('getUserById');
+```
+
+---
+
+## Crucible — Testing Harness
+
+Structured testing helpers for Pillars:
+
+```dart
+late Crucible<MyPillar> crucible;
+
+setUp(() => crucible = Crucible(() => MyPillar()));
+tearDown(() => crucible.dispose());
+
+test('tracks changes', () async {
+  crucible.track(crucible.pillar.count);
+
+  await crucible.expectStrike(
+    () => crucible.pillar.increment(),
+    before: () => crucible.expectCore(crucible.pillar.count, 0),
+    after: () => crucible.expectCore(crucible.pillar.count, 1),
+  );
+
+  expect(crucible.valuesFor(crucible.pillar.count), [1]);
+});
+```
+
+---
+
+## Snapshot — State Capture & Restore
+
+Capture and compare Pillar state:
+
+```dart
+final before = pillar.snapshot(label: 'before');
+pillar.updateTitle('New Title');
+final after = pillar.snapshot(label: 'after');
+
+// Compare
+final diff = Snapshot.diff(before, after);
+// {'title': ('Old Title', 'New Title')}
+
+// Restore
+pillar.restore(before, notify: true);
+```
+
+---
+
+## PillarScope — Scoped Overrides
+
+Override Pillar instances for a widget subtree (testing, previews):
+
+```dart
+PillarScope(
+  overrides: [mockPillar, testPillar],
+  child: const MyScreen(),
+)
+```
+
+---
+
+## Additional Widgets
+
+### VestigeWhen
+
+Rebuild only when a condition is met:
+
+```dart
+VestigeWhen<MyPillar>(
+  condition: (pillar) => pillar.isVisible.value,
+  builder: (context, pillar) => Text(pillar.message.value),
+)
+```
+
+### AnimatedVestige
+
+Animate between state changes:
+
+```dart
+AnimatedVestige<MyPillar>(
+  duration: const Duration(milliseconds: 300),
+  builder: (context, pillar, animation) {
+    return FadeTransition(
+      opacity: animation,
+      child: Text(pillar.status.value),
+    );
+  },
+)
+```
+
+### VestigeSelector
+
+Rebuild only when a selected value changes:
+
+```dart
+VestigeSelector<MyPillar, String>(
+  selector: (pillar) => pillar.name.value,
+  builder: (context, pillar, name) => Text(name),
+)
+```
+
+### VestigeListener
+
+Listen for side effects without rebuilding:
+
+```dart
+VestigeListener<MyPillar>(
+  listener: (context, pillar) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(pillar.message.value)),
+    );
+  },
+  child: const MyWidget(),
+)
+```
+
+### VestigeConsumer
+
+Combines builder + listener:
+
+```dart
+VestigeConsumer<MyPillar>(
+  listener: (context, pillar) => showDialog(/* ... */),
+  builder: (context, pillar) => Text(pillar.data.value),
+)
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)

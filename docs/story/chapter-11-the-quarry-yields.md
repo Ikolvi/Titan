@@ -265,3 +265,7 @@ He turned to the **Confluence**.
 | **XI** | **The Quarry Yields** ← You are here |
 | [XII](chapter-12-the-confluence-converges.md) | The Confluence Converges |
 | [XIII](chapter-13-the-lens-reveals.md) | The Lens Reveals |
+| [XIV](chapter-14-the-enterprise-arsenal.md) | The Enterprise Arsenal |
+| [XV](chapter-15-the-loom-weaves.md) | The Loom Weaves |
+| [XVI](chapter-16-the-forge-and-crucible.md) | The Forge & Crucible |
+| [XVII](chapter-17-the-annals-record.md) | The Annals Record |
