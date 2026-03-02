@@ -132,6 +132,10 @@ class _ShadeLensPillar extends Pillar {
           status.value =
               'Recording auto-stopped — ${session.eventCount} events in '
               '${session.duration.inMilliseconds}ms';
+          // Auto-save to vault if available
+          if (colossus.vault != null) {
+            _autoSave(session);
+          }
         }
       });
     }
@@ -279,6 +283,20 @@ class _ShadeLensPillar extends Pillar {
   }
 
   // -- Private helpers -------------------------------------------------------
+
+  Future<void> _autoSave(ShadeSession session) async {
+    try {
+      final path = await colossus.saveSession(session);
+      if (path != null) {
+        status.value =
+            'Auto-saved — ${session.eventCount} events in '
+            '${session.duration.inMilliseconds}ms';
+        await _loadSavedSessions();
+      }
+    } on Exception catch (e) {
+      status.value = 'Auto-save failed: $e';
+    }
+  }
 
   Future<void> _loadAutoReplayConfig() async {
     final vault = colossus.vault;
