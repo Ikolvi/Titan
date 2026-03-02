@@ -1043,6 +1043,160 @@ void main() {
       controller.close();
     });
   });
+
+  // ===========================================================================
+  // useFuture
+  // ===========================================================================
+
+  group('useFuture', () {
+    testWidgets('shows loading then data', (tester) async {
+      final completer = Completer<String>();
+      await tester.pumpWidget(_app(_FutureSpark(future: completer.future)));
+      expect(find.text('loading'), findsOneWidget);
+
+      completer.complete('hello');
+      await tester.pump();
+      expect(find.text('data: hello'), findsOneWidget);
+    });
+
+    testWidgets('shows error when future fails', (tester) async {
+      final completer = Completer<String>();
+      await tester.pumpWidget(_app(_FutureSpark(future: completer.future)));
+      expect(find.text('loading'), findsOneWidget);
+
+      completer.completeError('oops');
+      await tester.pump();
+      expect(find.text('error: oops'), findsOneWidget);
+    });
+
+    testWidgets('uses initialData', (tester) async {
+      final completer = Completer<String>();
+      await tester.pumpWidget(
+        _app(_FutureSpark(future: completer.future, initialData: 'cached')),
+      );
+      expect(find.text('data: cached'), findsOneWidget);
+
+      completer.complete('fresh');
+      await tester.pump();
+      expect(find.text('data: fresh'), findsOneWidget);
+    });
+
+    testWidgets('resubscribes when keys change', (tester) async {
+      final completer1 = Completer<String>();
+      completer1.complete('first');
+
+      await tester.pumpWidget(
+        _app(_KeyedFutureSpark(future: completer1.future, futureKey: 'a')),
+      );
+      await tester.pump(); // Allow microtask to resolve
+      expect(find.text('data: first'), findsOneWidget);
+
+      final completer2 = Completer<String>();
+      completer2.complete('second');
+      await tester.pumpWidget(
+        _app(_KeyedFutureSpark(future: completer2.future, futureKey: 'b')),
+      );
+      await tester.pump(); // Allow microtask to resolve
+      expect(find.text('data: second'), findsOneWidget);
+    });
+  });
+
+  // ===========================================================================
+  // useCallback
+  // ===========================================================================
+
+  group('useCallback', () {
+    testWidgets('returns same instance with same keys', (tester) async {
+      final callbacks = <VoidCallback>[];
+      await tester.pumpWidget(
+        _app(_CallbackSpark(dependency: 'a', onCallback: callbacks.add)),
+      );
+      // Trigger rebuild
+      await tester.pumpWidget(
+        _app(_CallbackSpark(dependency: 'a', onCallback: callbacks.add)),
+      );
+      expect(callbacks.length, 2);
+      expect(callbacks[0], same(callbacks[1]));
+    });
+
+    testWidgets('returns new instance when keys change', (tester) async {
+      final callbacks = <VoidCallback>[];
+      await tester.pumpWidget(
+        _app(_CallbackSpark(dependency: 'a', onCallback: callbacks.add)),
+      );
+      await tester.pumpWidget(
+        _app(_CallbackSpark(dependency: 'b', onCallback: callbacks.add)),
+      );
+      expect(callbacks.length, 2);
+      expect(callbacks[0], isNot(same(callbacks[1])));
+    });
+  });
+
+  // ===========================================================================
+  // useValueListenable
+  // ===========================================================================
+
+  group('useValueListenable', () {
+    testWidgets('reads initial value', (tester) async {
+      final notifier = ValueNotifier<int>(42);
+      await tester.pumpWidget(_app(_ValueListenableSpark(notifier: notifier)));
+      expect(find.text('42'), findsOneWidget);
+      notifier.dispose();
+    });
+
+    testWidgets('rebuilds when value changes', (tester) async {
+      final notifier = ValueNotifier<int>(0);
+      await tester.pumpWidget(_app(_ValueListenableSpark(notifier: notifier)));
+      expect(find.text('0'), findsOneWidget);
+
+      notifier.value = 10;
+      await tester.pump();
+      expect(find.text('10'), findsOneWidget);
+
+      notifier.dispose();
+    });
+
+    testWidgets('cleans up listener on dispose', (tester) async {
+      final notifier = ValueNotifier<int>(0);
+      await tester.pumpWidget(_app(_ValueListenableSpark(notifier: notifier)));
+
+      // Remove widget — should remove listener
+      await tester.pumpWidget(_app(const SizedBox()));
+      // Verify no error when notifier changes after disposal
+      notifier.value = 99;
+      await tester.pump();
+
+      notifier.dispose();
+    });
+  });
+
+  // ===========================================================================
+  // usePrevious
+  // ===========================================================================
+
+  group('usePrevious', () {
+    testWidgets('returns null on first build', (tester) async {
+      await tester.pumpWidget(_app(_PreviousSpark(onCore: (_) {})));
+      expect(find.text('prev: null'), findsOneWidget);
+      expect(find.text('cur: 0'), findsOneWidget);
+    });
+
+    testWidgets('returns previous value after rebuild', (tester) async {
+      Core<int>? coreRef;
+      await tester.pumpWidget(_app(_PreviousSpark(onCore: (c) => coreRef = c)));
+      expect(find.text('prev: null'), findsOneWidget);
+
+      coreRef!.value = 5;
+      await tester.pump();
+      expect(find.text('cur: 5'), findsOneWidget);
+      expect(find.text('prev: 0'), findsOneWidget);
+
+      coreRef!.value = 10;
+      await tester.pump();
+      expect(find.text('cur: 10'), findsOneWidget);
+      expect(find.text('prev: 5'), findsOneWidget);
+    });
+  });
 }
 
 /// Spark for tracking disposal of multiple hook types.
@@ -1182,5 +1336,102 @@ class _StreamBuildCountSpark extends Spark {
       AsyncError(:final error) => 'error: $error',
       _ => 'loading',
     }, textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useFuture helpers
+// =============================================================================
+
+/// Spark that uses useFuture.
+class _FutureSpark extends Spark {
+  const _FutureSpark({required this.future, this.initialData});
+  final Future<String> future;
+  final String? initialData;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final snapshot = useFuture(future, initialData: initialData);
+    return Text(switch (snapshot) {
+      AsyncData(:final data) => 'data: $data',
+      AsyncError(:final error) => 'error: $error',
+      _ => 'loading',
+    }, textDirection: TextDirection.ltr);
+  }
+}
+
+/// Spark that uses useFuture with keys for re-subscription testing.
+class _KeyedFutureSpark extends Spark {
+  const _KeyedFutureSpark({required this.future, required this.futureKey});
+  final Future<String> future;
+  final String futureKey;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final snapshot = useFuture(future, keys: [futureKey]);
+    return Text(switch (snapshot) {
+      AsyncData(:final data) => 'data: $data',
+      AsyncError(:final error) => 'error: $error',
+      _ => 'loading',
+    }, textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// useCallback helpers
+// =============================================================================
+
+/// Spark that uses useCallback with a dependency.
+class _CallbackSpark extends Spark {
+  const _CallbackSpark({required this.dependency, required this.onCallback});
+  final String dependency;
+  final void Function(VoidCallback) onCallback;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final cb = useCallback(() {
+      /* tap handler for $dependency */
+    }, [dependency]);
+    onCallback(cb);
+    return const SizedBox();
+  }
+}
+
+// =============================================================================
+// useValueListenable helpers
+// =============================================================================
+
+/// Spark that uses useValueListenable.
+class _ValueListenableSpark extends Spark {
+  const _ValueListenableSpark({required this.notifier});
+  final ValueNotifier<int> notifier;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final value = useValueListenable(notifier);
+    return Text('$value', textDirection: TextDirection.ltr);
+  }
+}
+
+// =============================================================================
+// usePrevious helpers
+// =============================================================================
+
+/// Spark that uses usePrevious to track the prior value.
+class _PreviousSpark extends Spark {
+  const _PreviousSpark({required this.onCore});
+  final void Function(Core<int>) onCore;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final count = useCore(0);
+    final prev = usePrevious(count.value);
+    onCore(count);
+    return Column(
+      children: [
+        Text('cur: ${count.value}', textDirection: TextDirection.ltr),
+        Text('prev: $prev', textDirection: TextDirection.ltr),
+      ],
+    );
   }
 }

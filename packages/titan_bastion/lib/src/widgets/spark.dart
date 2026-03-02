@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:titan/titan.dart';
@@ -144,9 +145,12 @@ abstract class Spark extends StatefulWidget {
 class SparkState extends State<Spark> with TickerProviderStateMixin {
   /// The currently active SparkState during [ignite].
   ///
-  /// Used by hook functions to find the state they belong to.
-  /// Only valid during [ignite] execution.
+  /// Uses a stack to support nested Spark builds (e.g., via
+  /// OverlayEntry or LayoutBuilder).
   static SparkState? current;
+
+  /// Stack of parent SparkStates for nested build safety.
+  static final List<SparkState?> _currentStack = [];
 
   final List<_HookState<dynamic>> _hooks = [];
   int _hookIndex = 0;
@@ -200,11 +204,13 @@ class SparkState extends State<Spark> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // Push/pop for nested Spark builds (stack-safe)
+    _currentStack.add(current);
     current = this;
     _hookIndex = 0;
     _effect.run();
     _isFirstBuild = false;
-    current = null;
+    current = _currentStack.removeLast();
 
     // TitanEffect catches errors internally — rethrow so Flutter sees them.
     if (_buildError case final err?) {
@@ -263,6 +269,15 @@ abstract class _HookState<T> {
   void dispose() {}
 }
 
+/// Shared keys-comparison helper used by [useEffect], [useMemo], and
+/// [useStream] hooks.
+bool _sparkKeysChanged(List<Object?> old, List<Object?> current) {
+  for (var i = 0; i < old.length; i++) {
+    if (old[i] != current[i]) return true;
+  }
+  return false;
+}
+
 // =============================================================================
 // useCore — Reactive mutable state
 // =============================================================================
@@ -293,20 +308,18 @@ class _CoreHookState<T> extends _HookState<T> {
   final T _initial;
   final String? name;
   late final Core<T> core;
-  void Function()? _listener;
 
   @override
   void init() {
+    // No explicit listener needed — the TitanEffect auto-tracking in
+    // SparkState.build() already tracks Core reads during ignite() and
+    // triggers rebuild() when they change. Adding a separate listener
+    // would cause redundant setState calls on every mutation.
     core = TitanState<T>(_initial, name: name);
-    _listener = () => _state.rebuild();
-    core.addListener(_listener!);
   }
 
   @override
   void dispose() {
-    if (_listener != null) {
-      core.removeListener(_listener!);
-    }
     core.dispose();
   }
 }
@@ -344,20 +357,17 @@ class _DerivedHookState<T> extends _HookState<T> {
   final T Function() _compute;
   final String? name;
   late final Derived<T> derived;
-  void Function()? _listener;
 
   @override
   void init() {
+    // No explicit listener needed — the TitanEffect auto-tracking in
+    // SparkState.build() already tracks Derived reads during ignite()
+    // and triggers rebuild() when computed values change.
     derived = TitanComputed<T>(_compute, name: name);
-    _listener = () => _state.rebuild();
-    derived.addListener(_listener!);
   }
 
   @override
   void dispose() {
-    if (_listener != null) {
-      derived.removeListener(_listener!);
-    }
     derived.dispose();
   }
 }
@@ -424,7 +434,8 @@ class _EffectHookState extends _HookState<void> {
     }
 
     if (_keys == null) return;
-    if (_keys!.length != newKeys.length || _keysChanged(_keys!, newKeys)) {
+    if (identical(_keys, newKeys)) return; // fast-path for const lists
+    if (_keys!.length != newKeys.length || _sparkKeysChanged(_keys!, newKeys)) {
       _disposeCleanup();
       _keys = newKeys;
       _run();
@@ -443,13 +454,6 @@ class _EffectHookState extends _HookState<void> {
   void _disposeCleanup() {
     _cleanup?.call();
     _cleanup = null;
-  }
-
-  static bool _keysChanged(List<Object?> old, List<Object?> current) {
-    for (var i = 0; i < old.length; i++) {
-      if (old[i] != current[i]) return true;
-    }
-    return false;
   }
 
   @override
@@ -503,9 +507,10 @@ class _MemoHookState<T> extends _HookState<T> {
       return _value;
     }
 
+    if (identical(_keys, newKeys)) return _value; // fast-path for const lists
     if (_keys != null &&
         _keys!.length == newKeys.length &&
-        !_EffectHookState._keysChanged(_keys!, newKeys)) {
+        !_sparkKeysChanged(_keys!, newKeys)) {
       return _value; // Keys unchanged
     }
 
@@ -1081,7 +1086,8 @@ class _StreamHookState<T> extends _HookState<T> {
   void maybeResubscribe(Stream<T> stream, List<Object?>? newKeys) {
     if (newKeys == null) return; // null keys = subscribe once, never change
     if (_keys == null) return;
-    if (_keys!.length != newKeys.length || _keysChanged(_keys!, newKeys)) {
+    if (identical(_keys, newKeys)) return; // fast-path for const lists
+    if (_keys!.length != newKeys.length || _sparkKeysChanged(_keys!, newKeys)) {
       _keys = newKeys;
       _stream = stream;
       _cancelSubscription();
@@ -1108,15 +1114,268 @@ class _StreamHookState<T> extends _HookState<T> {
     _subscription = null;
   }
 
-  static bool _keysChanged(List<Object?> old, List<Object?> current) {
-    for (var i = 0; i < old.length; i++) {
-      if (old[i] != current[i]) return true;
-    }
-    return false;
-  }
-
   @override
   void dispose() {
     _cancelSubscription();
   }
+}
+
+// =============================================================================
+// useFuture — Subscribe to a Future with auto-cleanup
+// =============================================================================
+
+/// Subscribes to a [Future] and returns the latest [AsyncValue] snapshot.
+///
+/// The future is resolved on the first build and the Spark rebuilds when
+/// the result arrives. If [keys] change, the previous result is discarded
+/// and the new future is awaited.
+///
+/// Returns an [AsyncValue] with the current state:
+/// - [AsyncValue.loading] — future not yet resolved
+/// - [AsyncValue.data] — future completed with a value
+/// - [AsyncValue.error] — future completed with an error
+///
+/// ```dart
+/// class UserProfile extends Spark {
+///   const UserProfile({required this.userId});
+///   final String userId;
+///
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final snapshot = useFuture(
+///       fetchUser(userId),
+///       keys: [userId],
+///     );
+///
+///     return switch (snapshot) {
+///       AsyncData(:final data) => Text('Hello, ${data.name}'),
+///       AsyncError(:final error) => Text('Error: $error'),
+///       _ => const CircularProgressIndicator(),
+///     };
+///   }
+/// }
+/// ```
+///
+/// Provide [initialData] to avoid a loading state on first build:
+///
+/// ```dart
+/// final snapshot = useFuture(future, initialData: cachedUser);
+/// ```
+AsyncValue<T> useFuture<T>(
+  Future<T> future, {
+  T? initialData,
+  List<Object?>? keys,
+}) {
+  final state = SparkState.current!;
+  final hook = state.use(
+    () => _FutureHookState<T>(future, initialData: initialData, keys: keys),
+  );
+  hook.maybeResubscribe(future, keys);
+  return hook.snapshot;
+}
+
+class _FutureHookState<T> extends _HookState<T> {
+  _FutureHookState(this._future, {T? initialData, List<Object?>? keys})
+    : _keys = keys,
+      snapshot = initialData != null
+          ? AsyncValue<T>.data(initialData)
+          : AsyncValue<T>.loading();
+
+  Future<T> _future;
+  List<Object?>? _keys;
+  AsyncValue<T> snapshot;
+
+  /// Monotonically increasing token to discard stale completions.
+  int _token = 0;
+
+  @override
+  void init() {
+    _subscribe();
+  }
+
+  void maybeResubscribe(Future<T> future, List<Object?>? newKeys) {
+    if (newKeys == null) return;
+    if (_keys == null) return;
+    if (identical(_keys, newKeys)) return;
+    if (_keys!.length != newKeys.length || _sparkKeysChanged(_keys!, newKeys)) {
+      _keys = newKeys;
+      _future = future;
+      snapshot = AsyncValue<T>.loading();
+      _subscribe();
+    }
+  }
+
+  void _subscribe() {
+    final myToken = ++_token;
+    _future.then(
+      (data) {
+        if (myToken != _token) return; // Stale — new future replaced us
+        snapshot = AsyncValue<T>.data(data);
+        _state.rebuild();
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (myToken != _token) return;
+        snapshot = AsyncValue<T>.error(error, stackTrace);
+        _state.rebuild();
+      },
+    );
+  }
+}
+
+// =============================================================================
+// useCallback — Memoized callback to prevent child rebuilds
+// =============================================================================
+
+/// Memoizes a callback function, returning the same instance until
+/// [keys] change.
+///
+/// Use this to create stable callback references that prevent unnecessary
+/// child widget rebuilds. Without `useCallback`, closures are recreated
+/// on every build, causing children that receive them as props to rebuild.
+///
+/// ```dart
+/// class ParentWidget extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final count = useCore(0);
+///
+///     // Same instance across rebuilds (stable for child widgets)
+///     final increment = useCallback(() => count.value++, []);
+///
+///     return ChildWidget(onTap: increment);
+///   }
+/// }
+/// ```
+///
+/// When [keys] change, the callback is recreated:
+///
+/// ```dart
+/// final submit = useCallback(
+///   () => api.submit(userId),
+///   [userId], // Recreated when userId changes
+/// );
+/// ```
+T useCallback<T extends Function>(T callback, [List<Object?>? keys]) {
+  final state = SparkState.current!;
+  return state
+      .use(() => _CallbackHookState<T>(callback, keys))
+      .maybeUpdate(callback, keys);
+}
+
+class _CallbackHookState<T extends Function> extends _HookState<T> {
+  _CallbackHookState(this._callback, this._keys);
+
+  T _callback;
+  List<Object?>? _keys;
+
+  T maybeUpdate(T callback, List<Object?>? newKeys) {
+    if (newKeys == null) {
+      // null keys = always use latest callback
+      _callback = callback;
+      return _callback;
+    }
+
+    if (identical(_keys, newKeys)) return _callback;
+    if (_keys != null &&
+        _keys!.length == newKeys.length &&
+        !_sparkKeysChanged(_keys!, newKeys)) {
+      return _callback; // Keys unchanged — return cached
+    }
+
+    _keys = newKeys;
+    _callback = callback;
+    return _callback;
+  }
+}
+
+// =============================================================================
+// useValueListenable — Listen to a Flutter ValueListenable
+// =============================================================================
+
+/// Listens to a [ValueListenable] and rebuilds the Spark when the value
+/// changes. Returns the current value.
+///
+/// Use this for interop with Flutter's built-in `ValueNotifier`,
+/// `TextEditingController`, or any other `ValueListenable<T>`.
+///
+/// ```dart
+/// class SearchResults extends Spark {
+///   const SearchResults({required this.searchNotifier});
+///   final ValueNotifier<String> searchNotifier;
+///
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final query = useValueListenable(searchNotifier);
+///     return Text('Searching: $query');
+///   }
+/// }
+/// ```
+///
+/// The listener is auto-managed — attached on first build and cleaned up
+/// when the Spark disposes.
+T useValueListenable<T>(ValueListenable<T> listenable) {
+  final state = SparkState.current!;
+  return state.use(() => _ValueListenableHookState<T>(listenable)).value;
+}
+
+class _ValueListenableHookState<T> extends _HookState<T> {
+  _ValueListenableHookState(this._listenable);
+
+  final ValueListenable<T> _listenable;
+  late T value;
+  late final void Function() _listener;
+
+  @override
+  void init() {
+    value = _listenable.value;
+    _listener = () {
+      value = _listenable.value;
+      _state.rebuild();
+    };
+    _listenable.addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    _listenable.removeListener(_listener);
+  }
+}
+
+// =============================================================================
+// usePrevious — Remember the previous value
+// =============================================================================
+
+/// Returns the previous value of [value] from the last build.
+///
+/// On the first build, returns `null`. On subsequent builds, returns
+/// whatever [value] was during the previous `ignite()` call.
+///
+/// ```dart
+/// class DiffWidget extends Spark {
+///   @override
+///   Widget ignite(BuildContext context) {
+///     final count = useCore(0);
+///     final prev = usePrevious(count.value);
+///
+///     return Column(children: [
+///       Text('Current: ${count.value}'),
+///       Text('Previous: ${prev ?? "none"}'),
+///       FilledButton(
+///         onPressed: () => count.value++,
+///         child: Text('Increment'),
+///       ),
+///     ]);
+///   }
+/// }
+/// ```
+T? usePrevious<T>(T value) {
+  final state = SparkState.current!;
+  final hook = state.use(() => _PreviousHookState<T>());
+  final previous = hook._previous;
+  hook._previous = value;
+  return previous;
+}
+
+class _PreviousHookState<T> extends _HookState<T> {
+  T? _previous;
 }

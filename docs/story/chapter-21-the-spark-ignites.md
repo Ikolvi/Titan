@@ -346,6 +346,69 @@ When `selectedChannel` changes, `useStream` cancels the old subscription and sub
 
 ---
 
+### useFuture — Async Data Without Boilerplate
+
+Not every async source is a stream. Sometimes a single Future needs tracking:
+
+```dart
+class UserProfile extends Spark {
+  const UserProfile({required this.userId});
+  final String userId;
+
+  @override
+  Widget ignite(BuildContext context) {
+    final snapshot = useFuture(
+      fetchUser(userId),
+      keys: [userId],
+    );
+
+    return switch (snapshot) {
+      AsyncData(:final data) => Text('Hello, ${data.name}'),
+      AsyncError(:final error) => Text('Error: $error'),
+      _ => const CircularProgressIndicator(),
+    };
+  }
+}
+```
+
+When `userId` changes, `useFuture` discards the stale result and awaits the new one. A monotonic token ensures late completions from abandoned futures are ignored — no `setState after dispose` errors.
+
+---
+
+### useCallback — Stable References
+
+Closures are recreated every build. When passed as props to child widgets, this causes unnecessary rebuilds. `useCallback` returns the same function instance until its keys change:
+
+```dart
+final increment = useCallback(() => count.value++, []);
+final submit = useCallback(() => api.submit(userId), [userId]);
+```
+
+---
+
+### useValueListenable — Flutter Interop
+
+Flutter's own `ValueNotifier`, `TextEditingController.text`, and ecosystem packages often expose `ValueListenable<T>`. The `useValueListenable` hook bridges them into Spark's reactive world:
+
+```dart
+final query = useValueListenable(searchNotifier);
+```
+
+The listener is attached automatically and cleaned up on disposal.
+
+---
+
+### usePrevious — Remembering What Was
+
+Sometimes you need to know what changed, not just what *is*. `usePrevious` returns the value from the prior build:
+
+```dart
+final count = useCore(0);
+final prev = usePrevious(count.value); // null on first build, then prior value
+```
+
+---
+
 ### Spark vs StatefulWidget
 
 | Aspect | StatefulWidget | Spark |
