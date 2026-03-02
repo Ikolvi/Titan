@@ -279,9 +279,11 @@ print(result.path); // SaveResult with file path
 
 ### Lens Debug Overlay
 
-Add a performance tab to the Lens debug overlay:
+Lens (debug overlay) is part of `titan_colossus`. Add performance tabs to the Lens debug overlay:
 
 ```dart
+import 'package:titan_colossus/titan_colossus.dart';
+
 Lens(
   plugins: [ColossusLensTab()],
   child: MaterialApp(...),

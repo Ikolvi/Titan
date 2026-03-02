@@ -1378,7 +1378,7 @@ const Confluence4<A extends Pillar, B extends Pillar, C extends Pillar, D extend
 
 ---
 
-## Debug Overlay (package:titan_bastion)
+## Debug Overlay (package:titan_colossus)
 
 ### Lens
 

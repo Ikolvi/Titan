@@ -69,7 +69,7 @@ Vestige<CounterPillar>(
 | **Vestige\<P\>** | Auto-tracking consumer — rebuilds only when read Cores change |
 | **Beacon** | Scoped Pillar provider — creates, initializes, and auto-disposes |
 | **Confluence2/3/4** | Multi-Pillar consumer widget |
-| **Lens** | In-app debug panel |
+| **Lens** | In-app debug panel (moved to `titan_colossus`) |
 | **Spark** | Hooks-style widget — `useCore`, `useEffect`, auto-managed lifecycle |
 
 ### Vestige — Auto-Tracking Consumer
@@ -128,7 +128,11 @@ Typed variants: `Confluence2`, `Confluence3`, `Confluence4`. Same auto-tracking 
 
 ### Lens — Debug Overlay
 
+> **Note:** Lens has moved to `titan_colossus`. Import from `package:titan_colossus/titan_colossus.dart`.
+
 ```dart
+import 'package:titan_colossus/titan_colossus.dart';
+
 Lens(
   enabled: kDebugMode,
   child: MaterialApp(home: MyApp()),

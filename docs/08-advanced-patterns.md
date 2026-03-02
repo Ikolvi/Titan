@@ -1171,10 +1171,13 @@ Confluence4<AuthPillar, CartPillar, ThemePillar, NavPillar>(
 
 **Lens** wraps your app with a toggleable floating debug panel that displays real-time Pillars, Herald events, Vigil errors, and Chronicle logs.
 
+> **Package:** `titan_colossus` — Lens was moved from `titan_bastion` to `titan_colossus`.
+
 ### Setup
 
 ```dart
 import 'package:flutter/foundation.dart';
+import 'package:titan_colossus/titan_colossus.dart';
 
 void main() {
   runApp(

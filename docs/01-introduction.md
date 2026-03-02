@@ -99,6 +99,7 @@ test('counter works', () {
 │              titan_colossus                   │
 │  Colossus · Pulse · Stride · Vessel · Echo   │
 │  Tremor · Decree · Shade · Phantom · Inscribe│
+│  Lens · LensPlugin · LensLogSink             │
 ├──────────────────────────────────────────────┤
 │              titan_argus                      │
 │  Argus · Garrison · CoreRefresh              │
@@ -109,7 +110,7 @@ test('counter works', () {
 ├──────────────────────────────────────────────┤
 │              titan_bastion                    │
 │  Vestige · Beacon · Spark · Obs · Rampart    │
-│  Confluence · Lens · VestigeRaw              │
+│  Confluence · VestigeRaw                     │
 ├──────────────────────────────────────────────┤
 │                   titan                       │
 │  ┌──────────┐ ┌──────────┐ ┌──────────────┐ │

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- **Lens** — `Lens`, `LensPlugin`, and `LensLogSink` moved here from `titan_bastion`. Import from `package:titan_colossus/titan_colossus.dart`.
+
 ## 1.0.0
 
 - Initial release

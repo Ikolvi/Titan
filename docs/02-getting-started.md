@@ -41,7 +41,7 @@ dependencies:
   titan_colossus: ^1.0.0
 ```
 
-`titan_colossus` provides enterprise performance monitoring — frame tracking (Pulse), page load timing (Stride), memory monitoring (Vessel), rebuild counting (Echo), threshold alerts (Tremor), and reporting (Decree). Integrates with Lens via `ColossusLensTab` and with Atlas via `ColossusAtlasObserver`.
+`titan_colossus` provides enterprise performance monitoring — frame tracking (Pulse), page load timing (Stride), memory monitoring (Vessel), rebuild counting (Echo), threshold alerts (Tremor), reporting (Decree), and the Lens debug overlay. Integrates with Atlas via `ColossusAtlasObserver`.
 
 ### Pure Dart Projects
 

@@ -24,7 +24,8 @@ Colossus — named after the Colossus of Rhodes, a representation of the Titan H
 | Report Export | **Inscribe** | Export as Markdown, JSON, or HTML |
 | Gesture Recording | **Shade** | Record user interactions as replayable macros |
 | Gesture Replay | **Phantom** | Replay recorded sessions with synthetic events |
-| Debug Overlay | **Lens Tab** | Auto-registered "Perf" and "Shade" tabs in Lens |
+| Debug Overlay | **Lens** | In-app debug overlay with extensible plugin tabs |
+| Lens Tabs | **Lens Tab** | Auto-registered "Perf" and "Shade" tabs in Lens |
 | Route Integration | **Atlas Observer** | Automatic page load timing via Atlas |
 
 ## Quick Start

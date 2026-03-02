@@ -5,6 +5,11 @@ All notable changes to the Titan packages will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-03-03
+
+### Changed
+- **Lens** — Moved `Lens`, `LensPlugin`, and `LensLogSink` from `titan_bastion` to `titan_colossus`. Import from `package:titan_colossus/titan_colossus.dart`.
+
 ## [1.0.0] - 2026-03-02
 
 ### 🎉 Stable Release
@@ -137,7 +142,7 @@ No breaking changes are planned for the 1.x series.
 - **Confluence** — Multi-Pillar consumer widgets
   - `Confluence2<A,B>`, `Confluence3<A,B,C>`, `Confluence4<A,B,C,D>`
   - Typed builders, Beacon/Titan resolution, auto-tracking via TitanEffect
-- **Lens** — In-app debug overlay
+- **Lens** — In-app debug overlay (now in `titan_colossus`)
   - `Lens` — floating debug panel with 4 tabs (Pillars, Herald, Vigil, Chronicle)
   - `LensLogSink` — buffered Chronicle log capture for overlay display
   - Static control: `Lens.show()`, `Lens.hide()`, `Lens.toggle()`
