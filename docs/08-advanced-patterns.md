@@ -2722,4 +2722,86 @@ Text('Processing: ${queue.isProcessing}');
 
 ---
 
+## Banner — Reactive Feature Flags
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart'`
+
+A **Banner** is a reactive feature flag registry with percentage-based rollout, context-aware targeting rules, developer overrides, expiration, and remote config integration.
+
+### Basic Setup
+
+```dart
+class AppPillar extends Pillar {
+  late final flags = banner(
+    flags: [
+      BannerFlag(name: 'dark-mode', defaultValue: false),
+      BannerFlag(name: 'new-checkout', rollout: 0.25),
+      BannerFlag(
+        name: 'premium-feature',
+        rules: [
+          BannerRule(
+            name: 'is-premium',
+            evaluate: (ctx) => ctx['tier'] == 'premium',
+          ),
+        ],
+      ),
+    ],
+  );
+
+  late final showCheckout = derived(
+    () => flags['new-checkout'].value,
+  );
+}
+```
+
+### Evaluating Flags
+
+```dart
+// Simple check
+final enabled = flags.isEnabled('dark-mode');
+
+// With targeting context
+final premium = flags.isEnabled(
+  'premium-feature',
+  context: {'tier': user.tier},
+);
+
+// With rollout (deterministic per user)
+final checkout = flags.isEnabled(
+  'new-checkout',
+  userId: user.id,
+);
+
+// Full evaluation with reason
+final eval = flags.evaluate('dark-mode');
+print(eval.reason); // BannerReason.defaultValue
+```
+
+### Developer Overrides
+
+```dart
+flags.setOverride('dark-mode', true);   // Force enable
+flags.clearOverride('dark-mode');       // Back to normal
+flags.clearAllOverrides();              // Clear all
+```
+
+### Remote Config Integration
+
+```dart
+// Bulk update from Firebase/LaunchDarkly/custom backend
+flags.updateFlags({'dark-mode': true, 'new-checkout': false});
+```
+
+### Expiring Flags
+
+```dart
+BannerFlag(
+  name: 'holiday-sale',
+  defaultValue: true,
+  expiresAt: DateTime(2025, 1, 7),
+)
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)

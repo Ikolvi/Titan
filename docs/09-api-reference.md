@@ -2637,4 +2637,91 @@ late final retryQueue = anvil<String>(
 
 ---
 
+## Banner — Reactive Feature Flags
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart'`
+
+### Banner Constructor
+
+```dart
+Banner({
+  required List<BannerFlag> flags,
+  String? name,
+})
+```
+
+### BannerFlag Constructor
+
+```dart
+const BannerFlag({
+  required String name,
+  bool defaultValue = false,
+  List<BannerRule> rules = const [],
+  double? rollout,         // 0.0–1.0
+  DateTime? expiresAt,
+  String? description,
+})
+```
+
+### BannerRule Constructor
+
+```dart
+const BannerRule({
+  required String name,
+  required bool Function(Map<String, dynamic> context) evaluate,
+  String? reason,
+})
+```
+
+### Banner Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `isEnabled(name, {context, userId})` | `bool` | Evaluate flag with optional context and userId |
+| `evaluate(name, {context, userId})` | `BannerEvaluation` | Full evaluation with reason |
+| `operator [](name)` | `Core<bool>` | Reactive flag state |
+| `setOverride(name, value)` | `void` | Force a flag value |
+| `clearOverride(name)` | `void` | Remove override |
+| `clearAllOverrides()` | `void` | Remove all overrides |
+| `hasOverride(name)` | `bool` | Check if override exists |
+| `updateFlags(values)` | `void` | Bulk update from remote config |
+| `register(flag)` | `void` | Add flag at runtime |
+| `unregister(name)` | `bool` | Remove flag |
+| `has(name)` | `bool` | Check flag existence |
+| `config(name)` | `BannerFlag?` | Get flag configuration |
+
+### Banner Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `names` | `List<String>` | All registered flag names |
+| `count` | `int` | Number of flags |
+| `enabledCount` | `Derived<int>` | Reactive enabled count |
+| `totalCount` | `Derived<int>` | Reactive total count |
+| `snapshot` | `Map<String, bool>` | All flag states |
+| `overrides` | `Map<String, bool>` | Active overrides |
+| `managedNodes` | `Iterable<ReactiveNode>` | Pillar lifecycle nodes |
+
+### BannerEvaluation
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `flagName` | `String` | Evaluated flag |
+| `enabled` | `bool` | Resolved value |
+| `reason` | `BannerReason` | Why this value |
+| `matchedRule` | `String?` | Rule that matched |
+
+### BannerReason
+
+| Value | Description |
+|-------|-------------|
+| `forceOverride` | Override set via `setOverride()` |
+| `rule` | A BannerRule matched |
+| `rollout` | Rollout percentage hash |
+| `defaultValue` | No rules/rollout, using default |
+| `expired` | Flag past expiresAt |
+| `notFound` | Flag not registered |
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

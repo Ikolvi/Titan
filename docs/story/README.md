@@ -52,6 +52,7 @@
 | [XXXVI](chapter-36-the-ledger-binds.md) | **The Ledger Binds** | `Ledger`, `LedgerTransaction`, `transact()`, `capture()`, atomic commit/rollback, `LedgerRecord` |
 | [XXXVII](chapter-37-the-portcullis-descends.md) | **The Portcullis Descends** | `Portcullis`, `PortcullisState`, `protect()`, circuit breaker, `shouldTrip`, `PortcullisOpenException` |
 | [XXXVIII](chapter-38-the-anvil-strikes.md) | **The Anvil Strikes** | `Anvil`, `AnvilBackoff`, `AnvilEntry`, `AnvilStatus`, dead letter queue, retry with backoff, `retryDeadLetters()` |
+| [XXXIX](chapter-39-the-banner-rises.md) | **The Banner Rises** | `Banner`, `BannerFlag`, `BannerRule`, `BannerEvaluation`, reactive feature flags, rollout, targeting rules, overrides |
 
 ---
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+### Added
+
+- **Banner** — Reactive feature flag registry with percentage-based rollout, context-aware targeting rules, developer overrides, expiration, and remote config integration. Each flag is a reactive `Core<bool>` that triggers UI rebuilds when updated.
+
 ## 1.0.0
 
 ### Initial Release

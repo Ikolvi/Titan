@@ -20,6 +20,7 @@ import 'package:meta/meta.dart';
 import 'package:titan/titan.dart';
 
 import 'anvil.dart';
+import 'banner.dart';
 import 'bulwark.dart';
 import 'codex.dart';
 import 'moat.dart';
@@ -408,5 +409,49 @@ extension PillarBasaltExtension on Pillar {
     final v = Volley<T>(concurrency: concurrency, name: name);
     registerNodes(v.managedNodes);
     return v;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Banner — reactive feature flags
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Banner] (reactive feature flag registry) managed by this Pillar.
+  ///
+  /// A Banner manages feature flags with reactive state, percentage-based
+  /// rollout, context-aware targeting rules, developer overrides, and
+  /// expiration. Each flag's state is a reactive [Core<bool>] that
+  /// triggers UI rebuilds when updated.
+  ///
+  /// ```dart
+  /// late final flags = banner(
+  ///   flags: [
+  ///     BannerFlag(name: 'dark-mode', defaultValue: false),
+  ///     BannerFlag(
+  ///       name: 'new-checkout',
+  ///       rollout: 0.5,
+  ///       description: 'New checkout flow',
+  ///     ),
+  ///     BannerFlag(
+  ///       name: 'premium',
+  ///       rules: [
+  ///         BannerRule(
+  ///           name: 'is-premium',
+  ///           evaluate: (ctx) => ctx['tier'] == 'premium',
+  ///         ),
+  ///       ],
+  ///     ),
+  ///   ],
+  /// );
+  ///
+  /// // Reactive — UI rebuilds when flag changes
+  /// late final showNewCheckout = derived(
+  ///   () => flags['new-checkout'].value,
+  /// );
+  /// ```
+  @protected
+  Banner banner({required List<BannerFlag> flags, String? name}) {
+    final b = Banner(flags: flags, name: name);
+    registerNodes(b.managedNodes);
+    return b;
   }
 }

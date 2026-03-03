@@ -23,7 +23,7 @@ enum QuestAction { claim, start, complete, fail, reset }
 ///   Bulwark    — Circuit breaker for resilient API calls
 ///   Saga       — Multi-step workflow (quest publish)
 ///   Volley     — Batch async operations
-///   Sigil      — Feature flags
+///   Sigil      — Feature flags\n///   Banner     — Reactive feature flags with rollout & rules
 ///   Aegis      — Retry with backoff
 ///   Annals     — Audit trail
 ///   Tether     — Request-response channels
@@ -189,6 +189,46 @@ class EnterpriseDemoPillar extends Pillar {
   );
 
   // --------------- Sigil (Feature Flags) ---------------
+
+  // --------------- Banner (Reactive Feature Flags) ---------------
+
+  /// Reactive feature flag registry with rollout, rules, and overrides.
+  late final flags = banner(
+    flags: [
+      const BannerFlag(
+        name: 'experimental-ui',
+        description: 'New experimental quest UI',
+      ),
+      const BannerFlag(
+        name: 'premium-quests',
+        defaultValue: true,
+        description: 'Premium quest tier',
+      ),
+      const BannerFlag(
+        name: 'gradual-rollout',
+        rollout: 0.5,
+        description: 'Feature in 50% rollout',
+      ),
+    ],
+    name: 'questboard',
+  );
+
+  /// Whether the experimental UI is enabled (reactive).
+  late final showExperimentalUi = derived(
+    () => flags['experimental-ui'].value,
+    name: 'showExperimentalUi',
+  );
+
+  /// Toggle a banner flag override for demo purposes.
+  void toggleBannerFlag(String flagName) {
+    strike(() {
+      if (flags.hasOverride(flagName)) {
+        flags.clearOverride(flagName);
+      } else {
+        flags.setOverride(flagName, !flags.isEnabled(flagName));
+      }
+    });
+  }
 
   // --------------- Prism (Fine-Grained State Projections) ---------------
 

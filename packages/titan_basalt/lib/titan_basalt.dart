@@ -34,6 +34,7 @@ library;
 // Infrastructure features
 export 'src/annals.dart';
 export 'src/anvil.dart';
+export 'src/banner.dart';
 export 'src/bulwark.dart';
 export 'src/codex.dart';
 export 'src/moat.dart';

@@ -6,7 +6,7 @@ import '../pillars/enterprise_demo_pillar.dart';
 
 /// Enterprise Demo Screen — showcases enterprise features.
 ///
-/// Demonstrates: Loom, Bulwark, Saga, Volley, Sigil, Aegis, Annals,
+/// Demonstrates: Loom, Bulwark, Saga, Volley, Sigil, Aegis, Annals, Banner,
 /// Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
 class EnterpriseDemoScreen extends StatelessWidget {
   const EnterpriseDemoScreen({super.key});
@@ -1104,6 +1104,45 @@ class _ToolkitTab extends StatelessWidget {
                               : Colors.red,
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Banner (Reactive Feature Flags)
+              _SectionHeader('Banner (Reactive Feature Flags)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Column(
+                  children: [
+                    for (final name in pillar.flags.names)
+                      ListTile(
+                        leading: Icon(
+                          pillar.flags[name].value
+                              ? Icons.flag
+                              : Icons.flag_outlined,
+                          color: pillar.flags[name].value
+                              ? Colors.green
+                              : Colors.grey,
+                        ),
+                        title: Text(name),
+                        subtitle: Text(
+                          pillar.flags.config(name)?.description ?? '',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        trailing: Switch(
+                          value: pillar.flags[name].value,
+                          onChanged: (_) => pillar.toggleBannerFlag(name),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        'Enabled: ${pillar.flags.enabledCount.value}'
+                        ' / ${pillar.flags.count}',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                   ],

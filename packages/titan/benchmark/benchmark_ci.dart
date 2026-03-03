@@ -35,6 +35,7 @@ void main() {
   _benchPrismProjection();
   _benchNexusListAdd();
   _benchRefreshCycle();
+  _benchBannerLookup();
 
   // Output JSON
   print(
@@ -545,3 +546,24 @@ class _BenchPillar extends Pillar {
 enum _QuestState { available, claiming, active, completed }
 
 enum _QuestAction { claim, start, complete }
+
+// ---------------------------------------------------------------------------
+// Banner — feature flag lookup
+// ---------------------------------------------------------------------------
+
+void _benchBannerLookup() {
+  const n = 100000;
+  final b = Banner(
+    flags: [
+      for (var i = 0; i < 100; i++)
+        BannerFlag(name: 'flag-$i', defaultValue: i.isEven),
+    ],
+  );
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    b.isEnabled('flag-${i % 100}');
+  }
+  sw.stop();
+  final usPerLookup = sw.elapsedMicroseconds / n;
+  _record('Banner Lookup (100 flags, 100K)', 'µs/op', usPerLookup);
+}

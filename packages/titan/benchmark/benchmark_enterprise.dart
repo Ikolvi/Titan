@@ -33,6 +33,7 @@ import 'package:titan_basalt/titan_basalt.dart';
 //  36. Ledger — State transactions
 //  37. Portcullis — Reactive circuit breaker
 //  38. Anvil — Dead letter & retry queue
+//  39. Banner — Reactive feature flags
 // =============================================================================
 
 void main() async {
@@ -65,6 +66,7 @@ void main() async {
   await _benchLedger();
   await _benchPortcullis();
   await _benchAnvil();
+  await _benchBanner();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -2479,6 +2481,147 @@ Future<void> _benchAnvil() async {
     print(
       '38. Anvil       | BackoffCompute           '
       '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 39. Banner — Reactive Feature Flags
+// ---------------------------------------------------------------------------
+
+Future<void> _benchBanner() async {
+  const iter = 100000;
+
+  print('┌─ 39. Banner (Feature Flags) ─────────────────────────');
+
+  // 39a. Flag lookup (isEnabled) — no rules, default value
+  {
+    final b = Banner(
+      flags: [
+        for (var i = 0; i < 100; i++)
+          BannerFlag(name: 'flag-$i', defaultValue: i.isEven),
+      ],
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      b.isEnabled('flag-${i % 100}');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '39. Banner      | DefaultLookup(100 flags) '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // 39b. Flag lookup with rules evaluation
+  {
+    final b = Banner(
+      flags: [
+        for (var i = 0; i < 100; i++)
+          BannerFlag(
+            name: 'rule-$i',
+            rules: [
+              BannerRule(
+                name: 'tier-check',
+                evaluate: (ctx) => ctx['tier'] == 'premium',
+              ),
+              BannerRule(
+                name: 'region-check',
+                evaluate: (ctx) => ctx['region'] == 'us',
+              ),
+            ],
+          ),
+      ],
+    );
+    final ctx = {'tier': 'free', 'region': 'eu'};
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      b.isEnabled('rule-${i % 100}', context: ctx);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '39. Banner      | RulesEval(2 rules)       '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // 39c. Rollout percentage evaluation (with userId hashing)
+  {
+    final b = Banner(
+      flags: [const BannerFlag(name: 'rollout-test', rollout: 0.5)],
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      b.isEnabled('rollout-test', userId: 'user-${i % 1000}');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '39. Banner      | RolloutHash(50%)         '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // 39d. Override lookup (fastest path)
+  {
+    final b = Banner(
+      flags: [for (var i = 0; i < 100; i++) BannerFlag(name: 'ovr-$i')],
+    );
+    for (var i = 0; i < 100; i++) {
+      b.setOverride('ovr-$i', true);
+    }
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      b.isEnabled('ovr-${i % 100}');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '39. Banner      | OverrideLookup(100)      '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // 39e. Bulk flag creation at scale
+  {
+    for (final count in [100, 1000, 5000]) {
+      final sw = Stopwatch()..start();
+      final b = Banner(
+        flags: [for (var i = 0; i < count; i++) BannerFlag(name: 'bulk-$i')],
+      );
+      sw.stop();
+      final usPerFlag = sw.elapsedMicroseconds / count;
+      print(
+        '39. Banner      | Create($count flags)     '
+        '${count < 1000 ? ' ' : ''}| ${_pad(count)} × '
+        '${usPerFlag.toStringAsFixed(3)} µs/flag = ${_ms(sw)}',
+      );
+      // Prevent GC
+      b.isEnabled('bulk-0');
+    }
+  }
+
+  // 39f. Snapshot generation
+  {
+    final b = Banner(
+      flags: [
+        for (var i = 0; i < 1000; i++)
+          BannerFlag(name: 'snap-$i', defaultValue: i.isEven),
+      ],
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 1000; i++) {
+      b.snapshot;
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 1000;
+    print(
+      '39. Banner      | Snapshot(1k flags)       '
+      '| ${_pad(1000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
   }
 
