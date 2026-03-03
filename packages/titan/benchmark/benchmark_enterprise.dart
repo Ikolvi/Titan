@@ -76,6 +76,7 @@ void main() async {
   await _benchWarden();
   await _benchArbiter();
   await _benchLode();
+  _benchTithe();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -3256,6 +3257,67 @@ Future<void> _benchLode() async {
       '46. Lode        | Warmup5+Drain(1K)         '
       '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
+  }
+
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 47. Tithe — Reactive Quota & Budget Manager
+// ---------------------------------------------------------------------------
+
+void _benchTithe() {
+  print('\n─── 47. Tithe (Quota & Budget) ───');
+
+  // Consume throughput
+  {
+    final t = Tithe(budget: 1000000, name: 'bench');
+    const ops = 100000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      t.consume(1);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '47. Tithe       | consume(100K)             '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    t.dispose();
+  }
+
+  // Consume with key (per-resource breakdown)
+  {
+    final t = Tithe(budget: 1000000, name: 'bench');
+    const ops = 100000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      t.consume(1, key: 'api');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '47. Tithe       | consume+key(100K)         '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    t.dispose();
+  }
+
+  // tryConsume throughput
+  {
+    final t = Tithe(budget: 1000000, name: 'bench');
+    const ops = 100000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      t.tryConsume(1);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '47. Tithe       | tryConsume(100K)           '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    t.dispose();
   }
 
   print('');

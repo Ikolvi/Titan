@@ -31,6 +31,7 @@ enum QuestAction { claim, start, complete, fail, reset }
 ///   Warden     — Reactive service health monitoring
 ///   Arbiter    — Reactive conflict resolution
 ///   Lode       — Reactive resource pool
+///   Tithe      — Reactive quota & budget manager
 ///   Aegis      — Retry with backoff
 ///   Annals     — Audit trail
 ///   Tether     — Request-response channels
@@ -249,10 +250,7 @@ class EnterpriseDemoPillar extends Pillar {
       {'title': 'Village Defense', 'difficulty': 4, 'region': 'Lowlands'},
       {'title': 'Royal Delivery', 'difficulty': 1, 'region': 'Capital'},
     ],
-    textFields: [
-      (q) => q['title'] as String,
-      (q) => q['region'] as String,
-    ],
+    textFields: [(q) => q['title'] as String, (q) => q['region'] as String],
     name: 'questSearch',
   );
 
@@ -282,30 +280,18 @@ class EnterpriseDemoPillar extends Pillar {
         await Future<void>.delayed(const Duration(milliseconds: 50));
         return {'apiUrl': 'https://api.questboard.dev', 'version': '2.1'};
       })
-      ..node(
-        'auth',
-        (r) async {
-          await Future<void>.delayed(const Duration(milliseconds: 30));
-          return {'userId': 'kael-42', 'token': 'bearer-xyz'};
-        },
-        dependsOn: ['config'],
-      )
-      ..node(
-        'flags',
-        (r) async {
-          await Future<void>.delayed(const Duration(milliseconds: 20));
-          return {'darkMode': true, 'betaFeatures': false};
-        },
-        dependsOn: ['config'],
-      )
-      ..node(
-        'userData',
-        (r) async {
-          await Future<void>.delayed(const Duration(milliseconds: 40));
-          return {'name': 'Kael', 'level': 10, 'guild': 'Ironclad'};
-        },
-        dependsOn: ['auth'],
-      );
+      ..node('auth', (r) async {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        return {'userId': 'kael-42', 'token': 'bearer-xyz'};
+      }, dependsOn: ['config'])
+      ..node('flags', (r) async {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        return {'darkMode': true, 'betaFeatures': false};
+      }, dependsOn: ['config'])
+      ..node('userData', (r) async {
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        return {'name': 'Kael', 'level': 10, 'guild': 'Ironclad'};
+      }, dependsOn: ['auth']);
 
     await startupGraph.execute();
   }
@@ -427,6 +413,30 @@ class EnterpriseDemoPillar extends Pillar {
   /// Drain idle connections.
   Future<void> drainPool() async {
     await dbPool.drain();
+  }
+
+  // --------------- Tithe (Quota & Budget) ---------------
+
+  /// API call budget — 100 calls per hour.
+  late final apiQuota = tithe(
+    budget: 100,
+    resetInterval: const Duration(hours: 1),
+    name: 'api_quota',
+  );
+
+  /// Consume API quota for a request.
+  bool consumeApiCall({String? endpoint}) {
+    return apiQuota.tryConsume(1, key: endpoint);
+  }
+
+  /// Consume multiple units (e.g., bulk operation).
+  void consumeBulk(int units) {
+    apiQuota.consume(units, key: 'bulk');
+  }
+
+  /// Reset the API quota manually.
+  void resetQuota() {
+    apiQuota.reset();
   }
 
   // --------------- Prism (Fine-Grained State Projections) ---------------

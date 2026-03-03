@@ -1165,8 +1165,7 @@ class _ToolkitTab extends StatelessWidget {
                           hintText: 'Search quests...',
                           isDense: true,
                         ),
-                        onChanged: (v) =>
-                            pillar.questSearch.query.value = v,
+                        onChanged: (v) => pillar.questSearch.query.value = v,
                       ),
                       const SizedBox(height: 8),
                       Wrap(
@@ -1177,9 +1176,8 @@ class _ToolkitTab extends StatelessWidget {
                               label: Text('$d+'),
                               selected:
                                   pillar.questSearch.hasFilter('difficulty') &&
-                                      d > 1,
-                              onSelected: (_) =>
-                                  pillar.filterByDifficulty(d),
+                                  d > 1,
+                              onSelected: (_) => pillar.filterByDifficulty(d),
                             ),
                         ],
                       ),
@@ -1231,23 +1229,23 @@ class _ToolkitTab extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       FilledButton.tonal(
-                        onPressed: pillar.startupGraph.status.value ==
+                        onPressed:
+                            pillar.startupGraph.status.value ==
                                 LatticeStatus.idle
                             ? () => pillar.runStartupGraph()
                             : pillar.startupGraph.status.value !=
-                                    LatticeStatus.running
-                                ? () {
-                                    pillar.startupGraph.reset();
-                                  }
-                                : null,
+                                  LatticeStatus.running
+                            ? () {
+                                pillar.startupGraph.reset();
+                              }
+                            : null,
                         child: Text(
-                          pillar.startupGraph.status.value ==
-                                  LatticeStatus.idle
+                          pillar.startupGraph.status.value == LatticeStatus.idle
                               ? 'Run Startup Graph'
                               : pillar.startupGraph.status.value ==
-                                      LatticeStatus.running
-                                  ? 'Running...'
-                                  : 'Reset',
+                                    LatticeStatus.running
+                              ? 'Running...'
+                              : 'Reset',
                         ),
                       ),
                     ],
@@ -1281,15 +1279,12 @@ class _ToolkitTab extends StatelessWidget {
                         onPressed: pillar.purchaseLock.isLocked.value
                             ? null
                             : () async {
-                                final msg =
-                                    await pillar.guardedPurchase();
+                                final msg = await pillar.guardedPurchase();
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(
+                                  ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(msg),
-                                      behavior:
-                                          SnackBarBehavior.floating,
+                                      behavior: SnackBarBehavior.floating,
                                     ),
                                   );
                                 }
@@ -1467,6 +1462,68 @@ class _ToolkitTab extends StatelessWidget {
                           FilledButton.tonal(
                             onPressed: () => pillar.drainPool(),
                             child: const Text('Drain'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Tithe (Quota & Budget)
+              _SectionHeader('Tithe (Quota & Budget)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Consumed: ${pillar.apiQuota.consumed.value} / ${pillar.apiQuota.budget}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: pillar.apiQuota.ratio.value.clamp(0.0, 1.0),
+                        backgroundColor: Colors.grey.shade300,
+                        color: pillar.apiQuota.exceeded.value
+                            ? Colors.red
+                            : pillar.apiQuota.ratio.value > 0.8
+                            ? Colors.orange
+                            : Colors.green,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Remaining: ${pillar.apiQuota.remaining.value} '
+                        '| Exceeded: ${pillar.apiQuota.exceeded.value}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if (pillar.apiQuota.breakdown.value.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'By key: ${pillar.apiQuota.breakdown.value.entries.map((e) => '${e.key}=${e.value}').join(', ')}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          FilledButton.tonal(
+                            onPressed: () =>
+                                pillar.consumeApiCall(endpoint: '/quests'),
+                            child: const Text('API Call'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: () => pillar.consumeBulk(10),
+                            child: const Text('Bulk (10)'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: () => pillar.resetQuota(),
+                            child: const Text('Reset'),
                           ),
                         ],
                       ),

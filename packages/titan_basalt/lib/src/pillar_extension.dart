@@ -34,6 +34,7 @@ import 'pyre.dart';
 import 'quarry.dart';
 import 'saga.dart';
 import 'sieve.dart';
+import 'tithe.dart';
 import 'trove.dart';
 import 'volley.dart';
 import 'warden.dart';
@@ -709,5 +710,35 @@ extension PillarBasaltExtension on Pillar {
     );
     registerNodes(l.managedNodes);
     return l;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tithe — quota & budget manager
+  // ---------------------------------------------------------------------------
+
+  /// Creates a lifecycle-managed [Tithe] for reactive quota tracking.
+  ///
+  /// Tracks cumulative resource consumption against a budget with
+  /// reactive signals, per-key breakdown, threshold alerts, and
+  /// optional auto-reset.
+  ///
+  /// ```dart
+  /// class ApiPillar extends Pillar {
+  ///   late final apiQuota = tithe(
+  ///     budget: 1000,
+  ///     resetInterval: Duration(hours: 1),
+  ///   );
+  ///
+  ///   Future<void> callApi() async {
+  ///     if (!apiQuota.tryConsume(1)) throw QuotaExceeded();
+  ///     // ...
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Tithe tithe({required int budget, Duration? resetInterval, String? name}) {
+    final t = Tithe(budget: budget, resetInterval: resetInterval, name: name);
+    registerNodes(t.managedNodes);
+    return t;
   }
 }

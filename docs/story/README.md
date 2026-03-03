@@ -60,6 +60,7 @@
 | [XLIV](chapter-44-the-warden-patrols.md) | **The Warden Patrols** | `Warden`, `WardenService`, `ServiceStatus`, reactive health monitoring, per-service latency/failures, `checkAll()` |
 | [XLV](chapter-45-the-arbiter-judges.md) | **The Arbiter Judges** | `Arbiter`, `ArbiterStrategy`, `ArbiterConflict`, `ArbiterResolution`, conflict resolution, merge, autoResolve |
 | [XLVI](chapter-46-the-lode-opens.md) | **The Lode Opens** | `Lode`, `LodeLease`, `LodeStatus`, reactive resource pool, acquire/release, validate, warmup, drain |
+| [XLVII](chapter-47-the-tithe-is-tallied.md) | **The Tithe is Tallied** | `Tithe`, reactive quota & budget, `consume()`, `tryConsume()`, threshold alerts, per-key breakdown, auto-reset |
 
 ---
 

@@ -43,6 +43,7 @@ void main() async {
   await _benchWardenCheck();
   _benchArbiterResolve();
   await _benchLodeAcquireRelease();
+  _benchTitheConsume();
 
   // Output JSON
   print(
@@ -703,4 +704,21 @@ Future<void> _benchLodeAcquireRelease() async {
   await pool.dispose();
   final usPerOp = sw.elapsedMicroseconds / ops;
   _record('Lode Acquire+Release (10K)', 'µs/op', usPerOp);
+}
+
+// ---------------------------------------------------------------------------
+// Tithe — Consume throughput
+// ---------------------------------------------------------------------------
+
+void _benchTitheConsume() {
+  final t = Tithe(budget: 1000000, name: 'bench');
+  const n = 100000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    t.consume(1);
+  }
+  sw.stop();
+  t.dispose();
+  final usPerOp = sw.elapsedMicroseconds / n;
+  _record('Tithe Consume (100K)', 'µs/op', usPerOp);
 }

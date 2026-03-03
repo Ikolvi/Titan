@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0
+
+### Added
+
+- **Tithe** — Reactive quota & budget manager. Tracks cumulative resource consumption against configurable budgets with reactive signals (consumed, remaining, exceeded, ratio), per-key breakdown, threshold alerts at configurable percentages, auto-reset with periodic timer, and tryConsume for safe budget checks.
+
 ## 1.8.0
 
 ### Added

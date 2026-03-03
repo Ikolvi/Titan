@@ -3172,4 +3172,52 @@ class PoolPillar extends Pillar {
 
 ---
 
+## Tithe
+
+Reactive quota & budget manager for tracking cumulative consumption.
+
+### `Tithe`
+
+```dart
+Tithe({
+  required int budget,
+  Duration? resetInterval,
+  String? name,
+})
+```
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `consumed` | `Core<int>` | Total consumed in current period |
+| `remaining` | `Derived<int>` | Budget - consumed |
+| `exceeded` | `Derived<bool>` | Whether budget is exhausted |
+| `ratio` | `Derived<double>` | consumed / budget (0.0–1.0+) |
+| `breakdown` | `Core<Map<String, int>>` | Per-key consumption |
+| `budget` | `int` | Configured budget |
+
+#### Methods
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `consume(amount, {key})` | `void` | Deduct from budget, optionally per key |
+| `tryConsume(amount, {key})` | `bool` | Consume if within budget, else false |
+| `reset()` | `void` | Reset consumption and re-arm thresholds |
+| `onThreshold(pct, fn)` | `void` | Register alert at percentage |
+| `dispose()` | `void` | Cancel timers, dispose nodes |
+
+### Pillar Extension
+
+```dart
+class ApiPillar extends Pillar {
+  late final quota = tithe(
+    budget: 1000,
+    resetInterval: Duration(hours: 1),
+  );
+}
+```
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

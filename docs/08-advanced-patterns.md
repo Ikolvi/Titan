@@ -3287,4 +3287,43 @@ await pillar.pool.dispose();   // Full shutdown
 
 ---
 
+## Tithe — Reactive Quota & Budget Manager
+
+Tithe tracks cumulative resource consumption against configurable budgets — API calls, storage bytes, tokens — with reactive signals, threshold alerts, and auto-reset.
+
+### Basic Usage
+
+```dart
+class ApiPillar extends Pillar {
+  late final apiQuota = tithe(
+    budget: 1000,
+    resetInterval: Duration(hours: 1),
+  );
+
+  Future<void> callApi() async {
+    if (!apiQuota.tryConsume(1)) throw QuotaExceeded();
+    // ...
+  }
+}
+```
+
+### Reactive Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `consumed` | `Core<int>` | Total consumed in current period |
+| `remaining` | `Derived<int>` | Budget - consumed |
+| `exceeded` | `Derived<bool>` | Whether budget is exhausted |
+| `ratio` | `Derived<double>` | consumed / budget (0.0–1.0+) |
+| `breakdown` | `Core<Map<String, int>>` | Per-key consumption |
+
+### Threshold Alerts
+
+```dart
+apiQuota.onThreshold(0.8, () => showWarning('80% used'));
+apiQuota.onThreshold(1.0, () => lockFeatures());
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)
