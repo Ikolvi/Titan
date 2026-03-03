@@ -77,6 +77,7 @@ void main() async {
   await _benchArbiter();
   await _benchLode();
   _benchTithe();
+  await _benchSluice();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -3318,6 +3319,85 @@ void _benchTithe() {
       '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
     t.dispose();
+  }
+
+  print('');
+}
+
+// 48. Sluice — Reactive Data Pipeline
+// ────────────────────────────────────
+
+Future<void> _benchSluice() async {
+  print('\n─── 48. Sluice (Data Pipeline) ───');
+  const ops = 100000;
+
+  // Benchmark 1: Single sync stage feed+flush.
+  {
+    final s = Sluice<int>(
+      stages: [SluiceStage(name: 'pass', process: (n) => n)],
+      bufferSize: ops + 1,
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      s.feed(i);
+    }
+    await s.flush();
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '48. Sluice      | feed+flush 1-stage(100K)   '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    s.dispose();
+  }
+
+  // Benchmark 2: Three sync stages feed+flush.
+  {
+    final s = Sluice<int>(
+      stages: [
+        SluiceStage(name: 'a', process: (n) => n + 1),
+        SluiceStage(name: 'b', process: (n) => n * 2),
+        SluiceStage(name: 'c', process: (n) => n - 1),
+      ],
+      bufferSize: ops + 1,
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      s.feed(i);
+    }
+    await s.flush();
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '48. Sluice      | feed+flush 3-stage(100K)   '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    s.dispose();
+  }
+
+  // Benchmark 3: Feed with filter (50% filtered out).
+  {
+    final s = Sluice<int>(
+      stages: [
+        SluiceStage(
+          name: 'even',
+          process: (n) => n.isEven ? n : null,
+        ),
+      ],
+      bufferSize: ops + 1,
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      s.feed(i);
+    }
+    await s.flush();
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '48. Sluice      | feed+filter 50%(100K)      '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    s.dispose();
   }
 
   print('');

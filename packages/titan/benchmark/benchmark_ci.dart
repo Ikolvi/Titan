@@ -44,6 +44,7 @@ void main() async {
   _benchArbiterResolve();
   await _benchLodeAcquireRelease();
   _benchTitheConsume();
+  await _benchSluiceFeedFlush();
 
   // Output JSON
   print(
@@ -721,4 +722,24 @@ void _benchTitheConsume() {
   t.dispose();
   final usPerOp = sw.elapsedMicroseconds / n;
   _record('Tithe Consume (100K)', 'µs/op', usPerOp);
+}
+
+// Sluice — Feed+flush throughput
+// ---------------------------------------------------------------------------
+
+Future<void> _benchSluiceFeedFlush() async {
+  final s = Sluice<int>(
+    stages: [SluiceStage(name: 'pass', process: (n) => n)],
+    bufferSize: 100001,
+  );
+  const n = 100000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    s.feed(i);
+  }
+  await s.flush();
+  sw.stop();
+  s.dispose();
+  final usPerOp = sw.elapsedMicroseconds / n;
+  _record('Sluice Feed+Flush 1-stage (100K)', 'µs/op', usPerOp);
 }

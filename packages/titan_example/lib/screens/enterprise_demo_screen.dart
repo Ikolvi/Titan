@@ -1533,6 +1533,54 @@ class _ToolkitTab extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
+              // Sluice (Data Pipeline)
+              _SectionHeader('Sluice (Data Pipeline)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Fed: ${pillar.questPipeline.fed.value} '
+                        '| Completed: ${pillar.questPipeline.completed.value} '
+                        '| Failed: ${pillar.questPipeline.failed.value}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'In-flight: ${pillar.questPipeline.inFlight.value} '
+                        '| Status: ${pillar.questPipeline.status.value.name} '
+                        '| Error rate: ${(pillar.questPipeline.errorRate.value * 100).toStringAsFixed(0)}%',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          FilledButton.tonal(
+                            onPressed: () =>
+                                pillar.submitQuest('Defeat the Dragon'),
+                            child: const Text('Submit Quest'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: () => pillar.submitQuest(''),
+                            child: const Text('Invalid Quest'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: () => pillar.flushPipeline(),
+                            child: const Text('Flush'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Annals Audit Trail
               _SectionHeader('Annals (Audit Trail)'),
               const SizedBox(height: 8),

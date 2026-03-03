@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.0
+
+### Added
+
+- **Sluice** — Reactive multi-stage data pipeline. Processes items through configurable stages with per-stage metrics (processed, filtered, errors, queued), retry with configurable attempts, per-stage timeout, overflow strategies (backpressure, dropOldest, dropNewest), pause/resume control, and aggregate reactive state (fed, completed, failed, inFlight, status, errorRate).
+
 ## 1.9.0
 
 ### Added

@@ -3220,4 +3220,84 @@ class ApiPillar extends Pillar {
 
 ---
 
+## Sluice
+
+Reactive multi-stage data pipeline.
+
+### `Sluice<T>`
+
+```dart
+Sluice<T>({
+  required List<SluiceStage<T>> stages,
+  int bufferSize = 256,
+  SluiceOverflow overflow = SluiceOverflow.backpressure,
+  void Function(T item)? onComplete,
+  void Function(T item, Object error, String stageName)? onError,
+  String? name,
+})
+```
+
+#### Properties
+
+| Property    | Type                   | Description                       |
+|-------------|------------------------|-----------------------------------|
+| `fed`       | `Core<int>`            | Total items fed                   |
+| `completed` | `Core<int>`            | Items exiting final stage         |
+| `failed`    | `Core<int>`            | Permanently failed items          |
+| `inFlight`  | `Core<int>`            | Items currently in pipeline       |
+| `status`    | `Core<SluiceStatus>`   | Pipeline lifecycle status         |
+| `isIdle`    | `Derived<bool>`        | No items in pipeline              |
+| `errorRate` | `Derived<double>`      | failed / fed ratio                |
+| `stageNames`| `List<String>`         | Ordered stage names               |
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `feed(T item)` | Feed item, returns `true` if accepted |
+| `feedAll(Iterable<T>)` | Feed multiple, returns accepted count |
+| `stage(String name)` | Get per-stage metrics |
+| `pause()` | Pause processing |
+| `resume()` | Resume after pause |
+| `flush()` | Wait for all in-flight items |
+| `dispose()` | Dispose pipeline |
+
+### `SluiceStage<T>`
+
+```dart
+SluiceStage<T>({
+  required String name,
+  required FutureOr<T?> Function(T item) process,
+  int concurrency = 1,
+  int maxRetries = 0,
+  Duration? timeout,
+  void Function(T item, Object error)? onError,
+})
+```
+
+### `SluiceStageMetrics`
+
+| Property    | Type           | Description                  |
+|-------------|----------------|------------------------------|
+| `processed` | `Core<int>`    | Successfully processed       |
+| `filtered`  | `Core<int>`    | Filtered out (null return)   |
+| `errors`    | `Core<int>`    | Permanent failures           |
+| `queued`    | `Core<int>`    | Waiting to be processed      |
+| `isIdle`    | `Derived<bool>`| No work in this stage        |
+
+### Pillar Extension
+
+```dart
+class OrderPillar extends Pillar {
+  late final pipeline = sluice<Order>(
+    stages: [
+      SluiceStage(name: 'validate', process: (o) => validate(o)),
+      SluiceStage(name: 'charge', process: (o) async => charge(o)),
+    ],
+  );
+}
+```
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

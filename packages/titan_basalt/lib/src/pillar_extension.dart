@@ -34,6 +34,7 @@ import 'pyre.dart';
 import 'quarry.dart';
 import 'saga.dart';
 import 'sieve.dart';
+import 'sluice.dart';
 import 'tithe.dart';
 import 'trove.dart';
 import 'volley.dart';
@@ -740,5 +741,43 @@ extension PillarBasaltExtension on Pillar {
     final t = Tithe(budget: budget, resetInterval: resetInterval, name: name);
     registerNodes(t.managedNodes);
     return t;
+  }
+
+  /// Creates a [Sluice] data pipeline managed by this Pillar.
+  ///
+  /// Items are processed through ordered [stages], each of which can
+  /// transform, filter, retry, and timeout. The pipeline exposes
+  /// reactive state (fed, completed, failed, inFlight, status) and
+  /// per-stage metrics.
+  ///
+  /// ```dart
+  /// class OrderPillar extends Pillar {
+  ///   late final pipeline = sluice<Order>(
+  ///     stages: [
+  ///       SluiceStage(name: 'validate', process: (o) => validate(o)),
+  ///       SluiceStage(name: 'charge', process: (o) async => charge(o)),
+  ///     ],
+  ///   );
+  /// }
+  /// ```
+  @protected
+  Sluice<T> sluice<T>({
+    required List<SluiceStage<T>> stages,
+    int bufferSize = 256,
+    SluiceOverflow overflow = SluiceOverflow.backpressure,
+    void Function(T item)? onComplete,
+    void Function(T item, Object error, String stageName)? onError,
+    String? name,
+  }) {
+    final s = Sluice<T>(
+      stages: stages,
+      bufferSize: bufferSize,
+      overflow: overflow,
+      onComplete: onComplete,
+      onError: onError,
+      name: name,
+    );
+    registerNodes(s.managedNodes);
+    return s;
   }
 }

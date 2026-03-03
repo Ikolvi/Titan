@@ -32,6 +32,7 @@ enum QuestAction { claim, start, complete, fail, reset }
 ///   Arbiter    — Reactive conflict resolution
 ///   Lode       — Reactive resource pool
 ///   Tithe      — Reactive quota & budget manager
+///   Sluice     — Reactive data pipeline
 ///   Aegis      — Retry with backoff
 ///   Annals     — Audit trail
 ///   Tether     — Request-response channels
@@ -437,6 +438,31 @@ class EnterpriseDemoPillar extends Pillar {
   /// Reset the API quota manually.
   void resetQuota() {
     apiQuota.reset();
+  }
+
+  // --------------- Sluice (Data Pipeline) ---------------
+
+  /// Quest processing pipeline — validate, score, log.
+  late final questPipeline = sluice<String>(
+    stages: [
+      SluiceStage(
+        name: 'validate',
+        process: (quest) => quest.isNotEmpty ? quest : null,
+      ),
+      SluiceStage(name: 'score', process: (quest) => '$quest [scored]'),
+      SluiceStage(name: 'log', process: (quest) => '$quest [logged]'),
+    ],
+    name: 'quest_pipeline',
+  );
+
+  /// Feed a quest into the pipeline.
+  void submitQuest(String quest) {
+    questPipeline.feed(quest);
+  }
+
+  /// Flush the pipeline.
+  Future<void> flushPipeline() async {
+    await questPipeline.flush();
   }
 
   // --------------- Prism (Fine-Grained State Projections) ---------------

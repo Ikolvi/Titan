@@ -3326,4 +3326,64 @@ apiQuota.onThreshold(1.0, () => lockFeatures());
 
 ---
 
+## Sluice — Reactive Data Pipeline
+
+Sluice processes items through a configurable sequence of named stages — each of which can transform, filter, retry, and timeout. Every stage exposes reactive metrics and the pipeline provides aggregate observability.
+
+```dart
+class OrderPillar extends Pillar {
+  late final pipeline = sluice<Order>(
+    stages: [
+      SluiceStage(name: 'validate', process: (o) {
+        if (o.total <= 0) return null; // filter out
+        return o.copyWith(validated: true);
+      }),
+      SluiceStage(
+        name: 'charge',
+        process: (o) async => await paymentService.charge(o),
+        maxRetries: 2,
+        timeout: Duration(seconds: 10),
+      ),
+      SluiceStage(name: 'fulfill', process: (o) async {
+        await warehouse.ship(o);
+        return o.copyWith(shipped: true);
+      }),
+    ],
+    onComplete: (o) => log.info('Order ${o.id} fulfilled'),
+    onError: (o, err, stage) => log.error('Failed at $stage'),
+  );
+}
+```
+
+### Reactive State
+
+| Property    | Type                   | Description                        |
+|-------------|------------------------|------------------------------------|  
+| `fed`       | `Core<int>`            | Total items fed into pipeline      |
+| `completed` | `Core<int>`            | Items exiting final stage          |
+| `failed`    | `Core<int>`            | Permanently failed items           |
+| `inFlight`  | `Core<int>`            | Items currently inside pipeline    |
+| `status`    | `Core<SluiceStatus>`   | idle / processing / paused / disposed |
+| `isIdle`    | `Derived<bool>`        | No items in pipeline               |
+| `errorRate` | `Derived<double>`      | failed / fed ratio                 |
+
+### Per-Stage Metrics
+
+```dart
+pipeline.stage('charge').processed.value  // Successful
+pipeline.stage('charge').errors.value     // Failed
+pipeline.stage('charge').filtered.value   // Filtered out
+pipeline.stage('charge').queued.value     // Waiting
+```
+
+### Overflow Strategies
+
+| Strategy       | Behavior                                    |
+|----------------|---------------------------------------------|
+| `backpressure` | `feed()` returns `false` when buffer full   |
+| `dropOldest`   | Discards oldest queued item to make room    |
+| `dropNewest`   | Discards the incoming item                  |
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)
