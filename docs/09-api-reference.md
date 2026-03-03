@@ -3103,6 +3103,71 @@ class SyncPillar extends Pillar {
   );
 }
 ```
+
+---
+
+## Lode
+
+Reactive resource pool for managing reusable resources with lifecycle control.
+
+### `Lode<T>`
+
+```dart
+Lode<T>({
+  required Future<T> Function() create,
+  Future<void> Function(T)? destroy,
+  Future<bool> Function(T)? validate,
+  int maxSize = 10,
+  String? name,
+})
+```
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `available` | `Core<int>` | Idle resources |
+| `inUse` | `Core<int>` | Checked-out resources |
+| `size` | `Core<int>` | Total pool size |
+| `waiters` | `Core<int>` | Callers awaiting a resource |
+| `utilization` | `Derived<double>` | inUse / maxSize (0.0–1.0) |
+| `status` | `LodeStatus` | Current pool status |
+| `maxSize` | `int` | Maximum pool capacity |
+
+#### Methods
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `acquire({Duration? timeout})` | `Future<LodeLease<T>>` | Acquire a resource lease |
+| `withResource<R>(fn)` | `Future<R>` | Acquire, execute, auto-release |
+| `warmup(int count)` | `Future<void>` | Pre-create resources |
+| `drain()` | `Future<void>` | Destroy idle resources |
+| `dispose()` | `Future<void>` | Shut down the pool |
+
+### `LodeLease<T>`
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `resource` | `T` | The leased resource |
+| `release()` | `void` | Return to pool |
+| `invalidate()` | `Future<void>` | Destroy instead of return |
+
+### `LodeStatus`
+
+```dart
+enum LodeStatus { idle, active, exhausted, draining }
+```
+
+### Pillar Extension
+
+```dart
+class PoolPillar extends Pillar {
+  late final pool = lode<DbConnection>(
+    create: () async => DbConnection.open(),
+    destroy: (c) async => c.close(),
+    maxSize: 10,
+  );
+}
 ```
 
 ---

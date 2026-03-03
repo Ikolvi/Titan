@@ -3246,4 +3246,45 @@ late final sync = arbiter<Map<String, dynamic>>(
 
 ---
 
+## Lode — Reactive Resource Pool
+
+Lode manages a bounded pool of reusable resources (database connections, HTTP clients, WebSocket channels) with create/destroy lifecycle, health validation, and reactive pool metrics.
+
+### Basic Usage
+
+```dart
+class DbPillar extends Pillar {
+  late final pool = lode<DbConnection>(
+    create: () async => DbConnection.open('postgres://...'),
+    destroy: (conn) async => conn.close(),
+    validate: (conn) async => conn.isOpen,
+    maxSize: 10,
+  );
+
+  Future<List<Row>> query(String sql) async {
+    return pool.withResource((conn) => conn.query(sql));
+  }
+}
+```
+
+### Reactive Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `available` | `Core<int>` | Idle resources ready for checkout |
+| `inUse` | `Core<int>` | Resources currently checked out |
+| `size` | `Core<int>` | Total pool size (idle + in-use) |
+| `waiters` | `Core<int>` | Callers waiting for a resource |
+| `utilization` | `Derived<double>` | inUse / maxSize (0.0–1.0) |
+
+### Pool Lifecycle
+
+```dart
+await pillar.pool.warmup(5);  // Pre-create 5 resources
+await pillar.pool.drain();     // Destroy idle resources
+await pillar.pool.dispose();   // Full shutdown
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)

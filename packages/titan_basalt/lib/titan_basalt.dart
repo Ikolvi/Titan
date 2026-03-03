@@ -41,6 +41,7 @@ export 'src/bulwark.dart';
 export 'src/codex.dart';
 export 'src/embargo.dart';
 export 'src/lattice.dart';
+export 'src/lode.dart';
 export 'src/moat.dart';
 export 'src/portcullis.dart';
 export 'src/pyre.dart';

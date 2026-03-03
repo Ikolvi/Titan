@@ -75,6 +75,7 @@ void main() async {
   await _benchCensus();
   await _benchWarden();
   await _benchArbiter();
+  await _benchLode();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -3188,6 +3189,72 @@ Future<void> _benchArbiter() async {
     print(
       '45. Arbiter     | AutoResolve(LWW, 10K)     '
       '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 46. Lode — Reactive Resource Pool
+// ---------------------------------------------------------------------------
+
+Future<void> _benchLode() async {
+  print('\n─── 46. Lode (Resource Pool) ───');
+
+  // Acquire + Release cycle
+  {
+    var n = 0;
+    final pool = Lode<int>(create: () async => ++n, maxSize: 100);
+    const ops = 10000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      final lease = await pool.acquire();
+      lease.release();
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '46. Lode        | Acquire+Release(10K)      '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    await pool.dispose();
+  }
+
+  // withResource convenience
+  {
+    var n = 0;
+    final pool = Lode<int>(create: () async => ++n, maxSize: 100);
+    const ops = 10000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      await pool.withResource((r) async => r);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '46. Lode        | withResource(10K)         '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    await pool.dispose();
+  }
+
+  // Warmup + Drain
+  {
+    const ops = 1000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      var n = 0;
+      final pool = Lode<int>(create: () async => ++n, maxSize: 10);
+      await pool.warmup(5);
+      await pool.drain();
+      await pool.dispose();
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '46. Lode        | Warmup5+Drain(1K)         '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
   }
 

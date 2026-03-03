@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0
+
+### Added
+
+- **Lode** — Reactive resource pool for managing bounded pools of reusable expensive resources (database connections, HTTP clients, worker isolates). Acquire/release with LodeLease, withResource convenience, health validation on checkout, warmup/drain lifecycle, timeout on exhausted pool, and reactive metrics (available, inUse, size, waiters, utilization).
+
 ## 1.7.0
 
 ### Added

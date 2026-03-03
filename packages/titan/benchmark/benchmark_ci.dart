@@ -42,6 +42,7 @@ void main() async {
   _benchCensusRecord();
   await _benchWardenCheck();
   _benchArbiterResolve();
+  await _benchLodeAcquireRelease();
 
   // Output JSON
   print(
@@ -683,4 +684,23 @@ void _benchArbiterResolve() {
   sw.stop();
   final usPerOp = sw.elapsedMicroseconds / n;
   _record('Arbiter Submit+Resolve LWW (10K)', 'µs/op', usPerOp);
+}
+
+// ---------------------------------------------------------------------------
+// Lode — Acquire + Release cycle
+// ---------------------------------------------------------------------------
+
+Future<void> _benchLodeAcquireRelease() async {
+  var n = 0;
+  final pool = Lode<int>(create: () async => ++n, maxSize: 100);
+  const ops = 10000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < ops; i++) {
+    final lease = await pool.acquire();
+    lease.release();
+  }
+  sw.stop();
+  await pool.dispose();
+  final usPerOp = sw.elapsedMicroseconds / ops;
+  _record('Lode Acquire+Release (10K)', 'µs/op', usPerOp);
 }

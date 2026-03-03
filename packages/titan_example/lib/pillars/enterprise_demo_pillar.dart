@@ -30,6 +30,7 @@ enum QuestAction { claim, start, complete, fail, reset }
 ///   Census     — Sliding-window data aggregation
 ///   Warden     — Reactive service health monitoring
 ///   Arbiter    — Reactive conflict resolution
+///   Lode       — Reactive resource pool
 ///   Aegis      — Retry with backoff
 ///   Annals     — Audit trail
 ///   Tether     — Request-response channels
@@ -390,6 +391,42 @@ class EnterpriseDemoPillar extends Pillar {
   /// Resolve the current conflict.
   ArbiterResolution<String>? resolveConflict() {
     return questSync.resolve();
+  }
+
+  // --------------- Lode (Resource Pool) ---------------
+
+  /// Pool of simulated database connections.
+  late final dbPool = lode<int>(
+    create: () async {
+      // Simulate expensive connection setup
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      return DateTime.now().millisecondsSinceEpoch;
+    },
+    destroy: (conn) async {
+      // Simulate connection teardown
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    },
+    validate: (conn) async => true,
+    maxSize: 5,
+    name: 'db_pool',
+  );
+
+  /// Simulate a database query using a pooled connection.
+  Future<String> simulateQuery(String query) async {
+    return dbPool.withResource((conn) async {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      return 'Result from conn $conn: $query';
+    });
+  }
+
+  /// Warmup the connection pool.
+  Future<void> warmupPool() async {
+    await dbPool.warmup(3);
+  }
+
+  /// Drain idle connections.
+  Future<void> drainPool() async {
+    await dbPool.drain();
   }
 
   // --------------- Prism (Fine-Grained State Projections) ---------------

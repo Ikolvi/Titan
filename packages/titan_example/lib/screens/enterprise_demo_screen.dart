@@ -7,7 +7,7 @@ import '../pillars/enterprise_demo_pillar.dart';
 /// Enterprise Demo Screen — showcases enterprise features.
 ///
 /// Demonstrates: Loom, Bulwark, Saga, Volley, Sigil, Aegis, Annals, Banner, Sieve,
-/// Lattice, Embargo, Census, Warden, Arbiter, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
+/// Lattice, Embargo, Census, Warden, Arbiter, Lode, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
 class EnterpriseDemoScreen extends StatelessWidget {
   const EnterpriseDemoScreen({super.key});
 
@@ -1421,6 +1421,52 @@ class _ToolkitTab extends StatelessWidget {
                                 ? () => pillar.resolveConflict()
                                 : null,
                             child: const Text('Resolve'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Lode (Resource Pool)
+              _SectionHeader('Lode (Resource Pool)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pool: ${pillar.dbPool.inUse.value}/${pillar.dbPool.maxSize} in use '
+                        '| Available: ${pillar.dbPool.available.value}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Utilization: ${(pillar.dbPool.utilization.value * 100).toStringAsFixed(0)}% '
+                        '| Waiters: ${pillar.dbPool.waiters.value} '
+                        '| Status: ${pillar.dbPool.status.name}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          FilledButton.tonal(
+                            onPressed: () => pillar.warmupPool(),
+                            child: const Text('Warmup'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: () => pillar.simulateQuery('SELECT 1'),
+                            child: const Text('Query'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: () => pillar.drainPool(),
+                            child: const Text('Drain'),
                           ),
                         ],
                       ),

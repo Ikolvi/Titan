@@ -27,6 +27,7 @@ import 'census.dart';
 import 'codex.dart';
 import 'embargo.dart';
 import 'lattice.dart';
+import 'lode.dart';
 import 'moat.dart';
 import 'portcullis.dart';
 import 'pyre.dart';
@@ -667,5 +668,46 @@ extension PillarBasaltExtension on Pillar {
     );
     registerNodes(a.managedNodes);
     return a;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lode — resource pool
+  // ---------------------------------------------------------------------------
+
+  /// Creates a lifecycle-managed [Lode] for reactive resource pooling.
+  ///
+  /// Manages a bounded pool of reusable resources with create/destroy
+  /// lifecycle, optional health validation, and reactive metrics.
+  ///
+  /// ```dart
+  /// class DbPillar extends Pillar {
+  ///   late final pool = lode<DbConnection>(
+  ///     create: () async => DbConnection.open('postgres://...'),
+  ///     destroy: (conn) async => conn.close(),
+  ///     maxSize: 10,
+  ///   );
+  ///
+  ///   Future<List<Row>> query(String sql) async {
+  ///     return pool.withResource((conn) => conn.query(sql));
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Lode<T> lode<T>({
+    required Future<T> Function() create,
+    Future<void> Function(T resource)? destroy,
+    Future<bool> Function(T resource)? validate,
+    int maxSize = 10,
+    String? name,
+  }) {
+    final l = Lode<T>(
+      create: create,
+      destroy: destroy,
+      validate: validate,
+      maxSize: maxSize,
+      name: name,
+    );
+    registerNodes(l.managedNodes);
+    return l;
   }
 }

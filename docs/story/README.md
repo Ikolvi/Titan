@@ -59,6 +59,7 @@
 | [XLIII](chapter-43-the-census-counts.md) | **The Census Counts** | `Census`, sliding-window aggregation, `record()`, reactive stats, `percentile()`, `maxEntries` |
 | [XLIV](chapter-44-the-warden-patrols.md) | **The Warden Patrols** | `Warden`, `WardenService`, `ServiceStatus`, reactive health monitoring, per-service latency/failures, `checkAll()` |
 | [XLV](chapter-45-the-arbiter-judges.md) | **The Arbiter Judges** | `Arbiter`, `ArbiterStrategy`, `ArbiterConflict`, `ArbiterResolution`, conflict resolution, merge, autoResolve |
+| [XLVI](chapter-46-the-lode-opens.md) | **The Lode Opens** | `Lode`, `LodeLease`, `LodeStatus`, reactive resource pool, acquire/release, validate, warmup, drain |
 
 ---
 
