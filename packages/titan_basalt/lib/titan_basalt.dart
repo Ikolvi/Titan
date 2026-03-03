@@ -49,6 +49,7 @@ export 'src/sieve.dart';
 export 'src/tether.dart';
 export 'src/trove.dart';
 export 'src/volley.dart';
+export 'src/warden.dart';
 
 // Pillar integration
 export 'src/pillar_extension.dart';

@@ -34,6 +34,7 @@ import 'saga.dart';
 import 'sieve.dart';
 import 'trove.dart';
 import 'volley.dart';
+import 'warden.dart';
 
 /// Basalt infrastructure extensions on [Pillar].
 ///
@@ -590,5 +591,43 @@ extension PillarBasaltExtension on Pillar {
     );
     registerNodes(c.managedNodes);
     return c;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Warden — service health monitor
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Warden] (service health monitor) managed by this Pillar.
+  ///
+  /// All reactive nodes are registered for automatic disposal. Timers
+  /// are cancelled when the Pillar is disposed.
+  ///
+  /// ```dart
+  /// class ApiPillar extends Pillar {
+  ///   late final health = warden(
+  ///     interval: Duration(seconds: 30),
+  ///     services: [
+  ///       WardenService(
+  ///         name: 'auth',
+  ///         check: () => api.ping('/auth/health'),
+  ///       ),
+  ///     ],
+  ///   );
+  ///
+  ///   @override
+  ///   void onInit() {
+  ///     health.start();
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Warden warden({
+    required Duration interval,
+    required List<WardenService> services,
+    String? name,
+  }) {
+    final w = Warden(interval: interval, services: services, name: name);
+    registerNodes(w.managedNodes);
+    return w;
   }
 }

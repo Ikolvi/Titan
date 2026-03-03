@@ -3091,4 +3091,93 @@ census<double>(
 
 ---
 
+## Warden — Reactive Service Health Monitor
+
+Monitor the health of external services with continuous polling, per-service reactive state, and aggregate health status.
+
+### Basic Usage
+
+```dart
+class ApiPillar extends Pillar {
+  late final health = warden(
+    interval: Duration(seconds: 30),
+    services: [
+      WardenService(
+        name: 'auth',
+        check: () => api.ping('/auth/health'),
+      ),
+      WardenService(
+        name: 'payments',
+        check: () => api.ping('/payments/health'),
+        downThreshold: 5,
+      ),
+      WardenService(
+        name: 'analytics',
+        check: () => api.ping('/analytics/health'),
+        critical: false,
+        interval: Duration(minutes: 2),
+      ),
+    ],
+  );
+
+  @override
+  void onInit() {
+    health.start();
+  }
+}
+```
+
+### Per-Service Reactive State
+
+```dart
+health.status('auth').value       // ServiceStatus.healthy
+health.latency('auth').value      // 45 (ms)
+health.failures('auth').value     // 0
+health.lastChecked('auth').value  // DateTime?
+```
+
+### Aggregate Health
+
+```dart
+health.overallHealth.value   // ServiceStatus (all critical services)
+health.healthyCount.value    // int
+health.degradedCount.value   // int
+health.isChecking.value      // bool
+health.totalChecks.value     // int
+```
+
+### Manual Checks
+
+```dart
+await health.checkService('payments');
+await health.checkAll();
+```
+
+### Service Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | `String` | required | Service identifier |
+| `check` | `Future<void> Function()` | required | Health check function (throws on failure) |
+| `interval` | `Duration?` | null | Per-service interval override |
+| `critical` | `bool` | `true` | Affects `overallHealth` |
+| `downThreshold` | `int` | `3` | Consecutive failures before "down" |
+
+### Graceful Degradation
+
+```dart
+Vestige<ApiPillar>(
+  builder: (context, pillar) {
+    final ok = pillar.health.status('payments').value ==
+        ServiceStatus.healthy;
+    return FilledButton(
+      onPressed: ok ? () => pay() : null,
+      child: Text(ok ? 'Pay' : 'Payments Offline'),
+    );
+  },
+)
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)

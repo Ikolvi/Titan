@@ -40,6 +40,7 @@ void main() async {
   await _benchLatticeDiamond();
   await _benchEmbargoMutex();
   _benchCensusRecord();
+  await _benchWardenCheck();
 
   // Output JSON
   print(
@@ -642,4 +643,24 @@ void _benchCensusRecord() {
   sw.stop();
   final usPerRecord = sw.elapsedMicroseconds / n;
   _record('Census Record (10K)', 'µs/op', usPerRecord);
+}
+
+// ---------------------------------------------------------------------------
+// Warden — service health check
+// ---------------------------------------------------------------------------
+
+Future<void> _benchWardenCheck() async {
+  final w = Warden(
+    interval: const Duration(seconds: 60),
+    services: [WardenService(name: 'api', check: () async {})],
+    name: 'bench',
+  );
+  const n = 1000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    await w.checkService('api');
+  }
+  sw.stop();
+  final usPerCheck = sw.elapsedMicroseconds / n;
+  _record('Warden CheckService (1K)', 'µs/op', usPerCheck);
 }

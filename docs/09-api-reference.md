@@ -2966,4 +2966,76 @@ class DashboardPillar extends Pillar {
 
 ---
 
+## Warden
+
+Reactive service health monitor with continuous polling, per-service reactive state, and aggregate health.
+
+### `Warden`
+
+```dart
+Warden({
+  required List<WardenService> services,
+  required Duration interval,
+  String? name,
+})
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `overallHealth` | `Derived<ServiceStatus>` | Aggregate health of critical services |
+| `healthyCount` | `Derived<int>` | Number of healthy services |
+| `degradedCount` | `Derived<int>` | Number of degraded services |
+| `isChecking` | `Core<bool>` | Whether a check is in progress |
+| `totalChecks` | `Core<int>` | Total number of checks performed |
+| `serviceNames` | `List<String>` | Names of all registered services |
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `start()` | `void` | Start periodic health checks |
+| `stop()` | `void` | Cancel all timers |
+| `checkService(name)` | `Future<void>` | Force-check a single service |
+| `checkAll()` | `Future<void>` | Force-check all services |
+| `status(name)` | `Core<ServiceStatus>` | Per-service status |
+| `latency(name)` | `Core<int>` | Last check latency in ms |
+| `failures(name)` | `Core<int>` | Consecutive failure count |
+| `lastChecked(name)` | `Core<DateTime?>` | Timestamp of last check |
+| `reset()` | `void` | Reset all state and stop polling |
+| `dispose()` | `void` | Dispose all resources |
+
+### `WardenService`
+
+```dart
+WardenService({
+  required String name,
+  required Future<void> Function() check,
+  Duration? interval,
+  bool critical = true,
+  int downThreshold = 3,
+})
+```
+
+### `ServiceStatus`
+
+```dart
+enum ServiceStatus { unknown, healthy, degraded, down }
+```
+
+### Pillar Extension
+
+```dart
+class ApiPillar extends Pillar {
+  late final health = warden(
+    interval: Duration(seconds: 30),
+    services: [
+      WardenService(
+        name: 'auth',
+        check: () => api.ping('/auth/health'),
+      ),
+    ],
+  );
+}
+```
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

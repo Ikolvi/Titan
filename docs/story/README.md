@@ -57,6 +57,7 @@
 | [XLI](chapter-41-the-lattice-aligns.md) | **The Lattice Aligns** | `Lattice`, DAG task executor, Kahn's algorithm, dependency resolution, parallel execution, reactive progress |
 | [XLII](chapter-42-the-embargo-holds.md) | **The Embargo Holds** | `Embargo`, async mutex/semaphore, `guard()`, reactive lock status, FIFO queuing, timeout |
 | [XLIII](chapter-43-the-census-counts.md) | **The Census Counts** | `Census`, sliding-window aggregation, `record()`, reactive stats, `percentile()`, `maxEntries` |
+| [XLIV](chapter-44-the-warden-patrols.md) | **The Warden Patrols** | `Warden`, `WardenService`, `ServiceStatus`, reactive health monitoring, per-service latency/failures, `checkAll()` |
 
 ---
 

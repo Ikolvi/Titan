@@ -73,6 +73,7 @@ void main() async {
   await _benchLattice();
   await _benchEmbargo();
   await _benchCensus();
+  await _benchWarden();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -3040,6 +3041,81 @@ Future<void> _benchCensus() async {
     final us = sw.elapsedMicroseconds / 10000;
     print(
       '43. Census      | ReactiveSource(10k)      '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  print('');
+}
+
+// =============================================================================
+// 44. Warden — Service Health Monitor
+// =============================================================================
+
+Future<void> _benchWarden() async {
+  print('');
+  print('── 44. Warden ───────────────────────────────────────');
+
+  // Create with multiple services
+  {
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      Warden(
+        interval: const Duration(seconds: 30),
+        services: [
+          WardenService(name: 'auth', check: () async {}),
+          WardenService(name: 'db', check: () async {}),
+          WardenService(name: 'cache', check: () async {}),
+        ],
+        name: 'w$i',
+      );
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '44. Warden      | Create(3 services)       '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // CheckAll (3 healthy services)
+  {
+    final w = Warden(
+      interval: const Duration(seconds: 60),
+      services: [
+        WardenService(name: 'auth', check: () async {}),
+        WardenService(name: 'db', check: () async {}),
+        WardenService(name: 'cache', check: () async {}),
+      ],
+      name: 'bench',
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 1000; i++) {
+      await w.checkAll();
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 1000;
+    print(
+      '44. Warden      | CheckAll(3 svcs, 1K)     '
+      '| ${_pad(1000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Single checkService
+  {
+    final w = Warden(
+      interval: const Duration(seconds: 60),
+      services: [WardenService(name: 'api', check: () async {})],
+      name: 'bench',
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      await w.checkService('api');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '44. Warden      | CheckService(10K)        '
       '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
   }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0
+
+### Added
+
+- **Warden** — Reactive service health monitor with continuous polling, per-service reactive state (status, latency, failures, lastChecked), aggregate health for critical services, configurable down thresholds, per-service interval overrides, and manual `checkService()`/`checkAll()` methods.
+
 ## 1.5.0
 
 ### Added

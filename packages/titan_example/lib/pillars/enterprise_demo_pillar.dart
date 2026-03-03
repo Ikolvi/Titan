@@ -28,6 +28,7 @@ enum QuestAction { claim, start, complete, fail, reset }
 ///   Lattice    — Reactive DAG task executor
 ///   Embargo    — Reactive async mutex/semaphore
 ///   Census     — Sliding-window data aggregation
+///   Warden     — Reactive service health monitoring
 ///   Aegis      — Retry with backoff
 ///   Annals     — Audit trail
 ///   Tether     — Request-response channels
@@ -333,6 +334,34 @@ class EnterpriseDemoPillar extends Pillar {
   /// Records a quest completion time.
   void recordQuestTime(int ms) {
     questTimes.record(ms);
+  }
+
+  // --------------- Warden (Service Health Monitoring) ---------------
+
+  /// Monitors quest-related service health.
+  late final serviceHealth = warden(
+    interval: const Duration(seconds: 30),
+    services: [
+      WardenService(
+        name: 'quest_api',
+        check: () async {
+          // Simulated health check
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        },
+      ),
+      WardenService(
+        name: 'leaderboard',
+        check: () async {
+          await Future<void>.delayed(const Duration(milliseconds: 15));
+        },
+        critical: false,
+      ),
+    ],
+  );
+
+  /// Force-check all services.
+  Future<void> checkHealth() async {
+    await serviceHealth.checkAll();
   }
 
   // --------------- Prism (Fine-Grained State Projections) ---------------

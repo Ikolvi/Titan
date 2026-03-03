@@ -7,7 +7,7 @@ import '../pillars/enterprise_demo_pillar.dart';
 /// Enterprise Demo Screen — showcases enterprise features.
 ///
 /// Demonstrates: Loom, Bulwark, Saga, Volley, Sigil, Aegis, Annals, Banner, Sieve,
-/// Lattice, Embargo, Census, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
+/// Lattice, Embargo, Census, Warden, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
 class EnterpriseDemoScreen extends StatelessWidget {
   const EnterpriseDemoScreen({super.key});
 
@@ -1334,6 +1334,46 @@ class _ToolkitTab extends StatelessWidget {
                           pillar.recordQuestTime(ms);
                         },
                         child: const Text('Record Quest Time'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Warden (Service Health Monitoring)
+              _SectionHeader('Warden (Service Health)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Overall: ${pillar.serviceHealth.overallHealth.value.name}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Healthy: ${pillar.serviceHealth.healthyCount.value} '
+                        '| Degraded: ${pillar.serviceHealth.degradedCount.value} '
+                        '| Checks: ${pillar.serviceHealth.totalChecks.value}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 4),
+                      ...pillar.serviceHealth.serviceNames.map(
+                        (name) => Text(
+                          '$name: ${pillar.serviceHealth.status(name).value.name} '
+                          '(${pillar.serviceHealth.latency(name).value}ms, '
+                          '${pillar.serviceHealth.failures(name).value} failures)',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.tonal(
+                        onPressed: () => pillar.checkHealth(),
+                        child: const Text('Check All Services'),
                       ),
                     ],
                   ),
