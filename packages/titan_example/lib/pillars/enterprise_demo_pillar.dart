@@ -27,6 +27,7 @@ enum QuestAction { claim, start, complete, fail, reset }
 ///   Sieve      — Reactive search, filter & sort
 ///   Lattice    — Reactive DAG task executor
 ///   Embargo    — Reactive async mutex/semaphore
+///   Census     — Sliding-window data aggregation
 ///   Aegis      — Retry with backoff
 ///   Annals     — Audit trail
 ///   Tether     — Request-response channels
@@ -317,6 +318,21 @@ class EnterpriseDemoPillar extends Pillar {
       await Future<void>.delayed(const Duration(milliseconds: 200));
       return 'Potion purchased!';
     });
+  }
+
+  // --------------- Prism (Fine-Grained State Projections) ---------------
+
+  // --------------- Census (Sliding-Window Data Aggregation) ---------------
+
+  /// Tracks quest completion times over the last 5 minutes.
+  late final questTimes = census<int>(
+    window: const Duration(minutes: 5),
+    name: 'quest_times',
+  );
+
+  /// Records a quest completion time.
+  void recordQuestTime(int ms) {
+    questTimes.record(ms);
   }
 
   // --------------- Prism (Fine-Grained State Projections) ---------------

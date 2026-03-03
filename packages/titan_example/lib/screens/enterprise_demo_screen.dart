@@ -7,7 +7,7 @@ import '../pillars/enterprise_demo_pillar.dart';
 /// Enterprise Demo Screen — showcases enterprise features.
 ///
 /// Demonstrates: Loom, Bulwark, Saga, Volley, Sigil, Aegis, Annals, Banner, Sieve,
-/// Lattice, Embargo, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
+/// Lattice, Embargo, Census, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
 class EnterpriseDemoScreen extends StatelessWidget {
   const EnterpriseDemoScreen({super.key});
 
@@ -1299,6 +1299,41 @@ class _ToolkitTab extends StatelessWidget {
                               ? 'Purchasing...'
                               : 'Buy Potion (Guarded)',
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Census (Sliding-Window Data Aggregation)
+              _SectionHeader('Census (Data Aggregation)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Count: ${pillar.questTimes.count.value} '
+                        '| Sum: ${pillar.questTimes.sum.value.toStringAsFixed(0)} ms',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Avg: ${pillar.questTimes.average.value.toStringAsFixed(1)} ms '
+                        '| Min: ${pillar.questTimes.min.value == double.infinity ? "—" : pillar.questTimes.min.value.toStringAsFixed(0)} '
+                        '| Max: ${pillar.questTimes.max.value == double.negativeInfinity ? "—" : pillar.questTimes.max.value.toStringAsFixed(0)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.tonal(
+                        onPressed: () {
+                          final ms = 100 + (DateTime.now().millisecond % 400);
+                          pillar.recordQuestTime(ms);
+                        },
+                        child: const Text('Record Quest Time'),
                       ),
                     ],
                   ),

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+
+- **Census** — Reactive sliding-window data aggregation with count, sum, average, min, max, percentile. Auto-records from reactive sources or accepts manual `record()` calls. Incremental O(1) updates on the hot path, configurable `maxEntries` buffer cap.
+
 ## 1.4.0
 
 ### Added

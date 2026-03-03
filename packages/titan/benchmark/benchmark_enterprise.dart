@@ -72,6 +72,7 @@ void main() async {
   await _benchSieve();
   await _benchLattice();
   await _benchEmbargo();
+  await _benchCensus();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -2936,6 +2937,109 @@ Future<void> _benchEmbargo() async {
     final us = sw.elapsedMicroseconds / 10000;
     print(
       '42. Embargo     | AcquireRelease           '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  print('');
+}
+
+// =============================================================================
+// 43. Census — Sliding-Window Aggregation
+// =============================================================================
+
+Future<void> _benchCensus() async {
+  print('');
+  print('── 43. Census ───────────────────────────────────────');
+
+  // Record throughput (10,000 entries)
+  {
+    final c = Census<int>(window: const Duration(seconds: 60), name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      c.record(i);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '43. Census      | Record(10k)              '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Record + evict (window causes constant eviction)
+  {
+    final c = Census<int>(
+      window: const Duration(milliseconds: 1),
+      name: 'bench',
+    );
+    // Pre-populate.
+    for (var i = 0; i < 100; i++) {
+      c.record(i);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      c.record(i);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '43. Census      | Record+Evict(10k)        '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Percentile computation (1,000 entries)
+  {
+    final c = Census<int>(window: const Duration(seconds: 60), name: 'bench');
+    for (var i = 0; i < 1000; i++) {
+      c.record(i);
+    }
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      c.percentile(95);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '43. Census      | Percentile(95, n=1000)   '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Create
+  {
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 100000; i++) {
+      Census<int>(window: const Duration(seconds: 60), name: 'c$i');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 100000;
+    print(
+      '43. Census      | Create                   '
+      '| ${_pad(100000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Reactive source (10,000 updates)
+  {
+    final source = TitanState<int>(0, name: 'source');
+    final c = Census<int>(
+      window: const Duration(seconds: 60),
+      source: source,
+      name: 'bench',
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      source.value = i;
+    }
+    sw.stop();
+    c.dispose();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '43. Census      | ReactiveSource(10k)      '
       '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
   }

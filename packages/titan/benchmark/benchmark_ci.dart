@@ -39,6 +39,7 @@ void main() async {
   _benchSieveFilter();
   await _benchLatticeDiamond();
   await _benchEmbargoMutex();
+  _benchCensusRecord();
 
   // Output JSON
   print(
@@ -625,4 +626,20 @@ Future<void> _benchEmbargoMutex() async {
   sw.stop();
   final usPerGuard = sw.elapsedMicroseconds / n;
   _record('Embargo MutexGuard (1K)', 'µs/op', usPerGuard);
+}
+
+// ---------------------------------------------------------------------------
+// Census — sliding-window record
+// ---------------------------------------------------------------------------
+
+void _benchCensusRecord() {
+  final c = Census<int>(window: const Duration(seconds: 60), name: 'bench');
+  const n = 10000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    c.record(i);
+  }
+  sw.stop();
+  final usPerRecord = sw.elapsedMicroseconds / n;
+  _record('Census Record (10K)', 'µs/op', usPerRecord);
 }

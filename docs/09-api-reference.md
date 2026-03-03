@@ -2906,4 +2906,64 @@ class ShopPillar extends Pillar {
 
 ---
 
+## Census — Sliding-Window Data Aggregation
+
+### Constructor
+
+```dart
+Census<T extends num>({
+  required Duration window,
+  Core<T>? source,
+  int maxEntries = 10000,
+  String? name,
+})
+```
+
+### Census Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `record(T value)` | `void` | Record a value into the window |
+| `evict()` | `void` | Remove stale entries |
+| `percentile(int p)` | `double` | Compute Nth percentile (0–100) |
+| `reset()` | `void` | Clear all entries and aggregates |
+| `dispose()` | `void` | Cancel source subscription |
+
+### Census Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `count` | `Core<int>` | Entries in the window (reactive) |
+| `sum` | `Core<double>` | Sum of values (reactive) |
+| `average` | `Derived<double>` | Mean of values (reactive) |
+| `min` | `Core<double>` | Minimum value (reactive) |
+| `max` | `Core<double>` | Maximum value (reactive) |
+| `last` | `Core<double>` | Most recent value (reactive) |
+| `entries` | `List<CensusEntry<T>>` | Snapshot of all entries |
+| `window` | `Duration` | Sliding time window |
+| `maxEntries` | `int` | Buffer size cap |
+| `name` | `String?` | Debug name |
+| `managedNodes` | `Iterable<ReactiveNode>` | Lifecycle nodes for Pillar |
+
+### CensusEntry
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `value` | `T` | The recorded value |
+| `timestamp` | `DateTime` | When it was recorded |
+
+### Pillar Extension
+
+```dart
+class DashboardPillar extends Pillar {
+  late final orderValue = core(0.0);
+  late final stats = census<double>(
+    source: orderValue,
+    window: Duration(minutes: 5),
+  );
+}
+```
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

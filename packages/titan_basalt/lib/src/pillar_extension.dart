@@ -22,6 +22,7 @@ import 'package:titan/titan.dart';
 import 'anvil.dart';
 import 'banner.dart';
 import 'bulwark.dart';
+import 'census.dart';
 import 'codex.dart';
 import 'embargo.dart';
 import 'lattice.dart';
@@ -548,5 +549,46 @@ extension PillarBasaltExtension on Pillar {
     final e = Embargo(permits: permits, timeout: timeout, name: name);
     registerNodes(e.managedNodes);
     return e;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Census — sliding-window data aggregation
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Census] (sliding-window aggregation) managed by this Pillar.
+  ///
+  /// All reactive nodes are registered for automatic disposal. The
+  /// source subscription (if any) is cleaned up on dispose.
+  ///
+  /// ```dart
+  /// class DashboardPillar extends Pillar {
+  ///   late final orderValue = core(0.0);
+  ///
+  ///   late final orderStats = census<double>(
+  ///     source: orderValue,
+  ///     window: Duration(minutes: 5),
+  ///     name: 'orders',
+  ///   );
+  ///
+  ///   // orderStats.count.value   → entries in window
+  ///   // orderStats.average.value → running mean
+  ///   // orderStats.percentile(95) → 95th percentile
+  /// }
+  /// ```
+  @protected
+  Census<T> census<T extends num>({
+    required Duration window,
+    Core<T>? source,
+    int maxEntries = 10000,
+    String? name,
+  }) {
+    final c = Census<T>(
+      window: window,
+      source: source,
+      maxEntries: maxEntries,
+      name: name,
+    );
+    registerNodes(c.managedNodes);
+    return c;
   }
 }

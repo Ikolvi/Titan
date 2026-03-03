@@ -56,6 +56,7 @@
 | [XL](chapter-40-the-sieve-filters.md) | **The Sieve Filters** | `Sieve<T>`, reactive search/filter/sort, text search, predicate filters, composable pipeline |
 | [XLI](chapter-41-the-lattice-aligns.md) | **The Lattice Aligns** | `Lattice`, DAG task executor, Kahn's algorithm, dependency resolution, parallel execution, reactive progress |
 | [XLII](chapter-42-the-embargo-holds.md) | **The Embargo Holds** | `Embargo`, async mutex/semaphore, `guard()`, reactive lock status, FIFO queuing, timeout |
+| [XLIII](chapter-43-the-census-counts.md) | **The Census Counts** | `Census`, sliding-window aggregation, `record()`, reactive stats, `percentile()`, `maxEntries` |
 
 ---
 

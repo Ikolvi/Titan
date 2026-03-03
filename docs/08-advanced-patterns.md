@@ -3026,4 +3026,69 @@ if (buyLock.canAcquire) {
 
 ---
 
+## Census — Sliding-Window Data Aggregation
+
+Census collects numeric values over a configurable time window and maintains reactive statistical aggregates (count, sum, average, min, max, percentile).
+
+### Auto-Record from Source
+
+```dart
+class DashboardPillar extends Pillar {
+  late final orderValue = core(0.0);
+
+  late final stats = census<double>(
+    source: orderValue,
+    window: Duration(minutes: 5),
+    name: 'orders',
+  );
+}
+```
+
+Every change to `orderValue` is automatically recorded into the Census.
+
+### Manual Recording
+
+```dart
+class LatencyPillar extends Pillar {
+  late final latency = census<int>(
+    window: Duration(minutes: 1),
+    name: 'latency',
+  );
+
+  void onResponse(int ms) {
+    latency.record(ms);
+  }
+}
+```
+
+### Reactive Aggregates
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `count` | `Core<int>` | Entries in the window |
+| `sum` | `Core<double>` | Sum of values |
+| `average` | `Derived<double>` | Mean (sum ÷ count) |
+| `min` | `Core<double>` | Minimum value |
+| `max` | `Core<double>` | Maximum value |
+| `last` | `Core<double>` | Most recent value |
+
+### Percentile
+
+```dart
+final p50 = stats.percentile(50);  // median
+final p95 = stats.percentile(95);  // 95th percentile
+final p99 = stats.percentile(99);  // 99th percentile
+```
+
+### Buffer Cap
+
+```dart
+census<double>(
+  window: Duration(minutes: 10),
+  maxEntries: 5000,  // Hard limit
+);
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)
