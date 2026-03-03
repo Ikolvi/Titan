@@ -26,6 +26,7 @@ enum QuestAction { claim, start, complete, fail, reset }
 ///   Sigil      — Feature flags\n///   Banner     — Reactive feature flags with rollout & rules
 ///   Sieve      — Reactive search, filter & sort
 ///   Lattice    — Reactive DAG task executor
+///   Embargo    — Reactive async mutex/semaphore
 ///   Aegis      — Retry with backoff
 ///   Annals     — Audit trail
 ///   Tether     — Request-response channels
@@ -303,6 +304,19 @@ class EnterpriseDemoPillar extends Pillar {
       );
 
     await startupGraph.execute();
+  }
+
+  // --------------- Embargo (Reactive Async Mutex/Semaphore) ---------------
+
+  /// Mutex lock — prevents double-submit on the purchase action.
+  late final purchaseLock = embargo(name: 'purchase');
+
+  /// Simulates a guarded purchase action (mutex).
+  Future<String> guardedPurchase() async {
+    return purchaseLock.guard(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      return 'Potion purchased!';
+    });
   }
 
   // --------------- Prism (Fine-Grained State Projections) ---------------

@@ -2953,4 +2953,77 @@ final result = await startup.execute();
 
 ---
 
+## Embargo — Reactive Async Mutex/Semaphore
+
+> **Package:** `titan_basalt`
+
+An **Embargo** controls concurrent access to shared resources. In mutex mode (`permits: 1`, the default), only one task runs at a time. In semaphore mode (`permits: N`), up to N tasks run concurrently.
+
+### Setup
+
+```dart
+class ShopPillar extends Pillar {
+  // Mutex — prevent double-submit
+  late final buyLock = embargo(name: 'buy');
+
+  // Semaphore — max 3 concurrent API calls
+  late final apiPool = embargo(permits: 3, name: 'api');
+}
+```
+
+### Guard (Automatic Release)
+
+```dart
+final result = await buyLock.guard(() async {
+  return await api.purchase('potion');
+});
+```
+
+The permit is released automatically, even if the action throws.
+
+### Manual Acquire/Release
+
+```dart
+final lease = await lock.acquire();
+try {
+  // critical section
+} finally {
+  lease.release();
+}
+```
+
+### Timeout
+
+```dart
+try {
+  await lock.guard(
+    () => api.checkout(),
+    timeout: Duration(seconds: 5),
+  );
+} on EmbargoTimeoutException {
+  showError('Operation timed out');
+}
+```
+
+### Reactive State
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `isLocked` | `Derived<bool>` | All permits acquired |
+| `activeCount` | `Core<int>` | In-flight tasks |
+| `queueLength` | `Core<int>` | Waiting tasks |
+| `totalAcquires` | `Core<int>` | Lifetime acquire count |
+| `status` | `Derived<EmbargoStatus>` | available/busy/contended |
+| `isAvailable` | `Derived<bool>` | Has a free permit |
+
+### Status Check
+
+```dart
+if (buyLock.canAcquire) {
+  // Safe to acquire without waiting
+}
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)

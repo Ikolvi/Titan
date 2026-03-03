@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+
+- **Embargo** — Reactive async mutex/semaphore with configurable permits, FIFO queuing, timeout support, automatic release on error, and reactive status/queue tracking. Mutex mode (permits=1) for double-submit prevention, semaphore mode (permits=N) for connection pooling.
+
 ## 1.3.0
 
 ### Added

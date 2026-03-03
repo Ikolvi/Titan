@@ -2841,4 +2841,69 @@ class AppPillar extends Pillar {
 
 ---
 
+## Embargo — Reactive Async Mutex/Semaphore
+
+> **Package:** `titan_basalt`
+
+### Embargo Constructor
+
+```dart
+Embargo({
+  int permits = 1,
+  Duration? timeout,
+  String? name,
+})
+```
+
+### Embargo Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `guard<T>(action, {timeout})` | `Future<T>` | Execute action with auto-release |
+| `acquire({timeout})` | `Future<EmbargoLease>` | Manual permit acquisition |
+| `reset()` | `void` | Release all permits, cancel waiters |
+
+### Embargo Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `isLocked` | `Derived<bool>` | All permits currently acquired |
+| `activeCount` | `Core<int>` | Number of held permits (reactive) |
+| `queueLength` | `Core<int>` | Number of waiting tasks (reactive) |
+| `totalAcquires` | `Core<int>` | Lifetime acquire count (reactive) |
+| `status` | `Derived<EmbargoStatus>` | available/busy/contended |
+| `isAvailable` | `Derived<bool>` | Has a free permit |
+| `canAcquire` | `bool` | Whether a permit is available now |
+| `permits` | `int` | Maximum concurrent permits |
+| `timeout` | `Duration?` | Default wait timeout |
+| `name` | `String?` | Debug name |
+| `managedNodes` | `Iterable<ReactiveNode>` | Lifecycle nodes for Pillar |
+
+### EmbargoLease
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `release()` | `void` | Return the permit |
+| `isReleased` | `bool` | Whether already released |
+| `holdDuration` | `Duration` | Time permit has been held |
+
+### EmbargoStatus
+
+| Value | Description |
+|-------|-------------|
+| `available` | Free permits — executes immediately |
+| `busy` | All permits held, no queue |
+| `contended` | All permits held AND waiters queued |
+
+### Pillar Extension
+
+```dart
+class ShopPillar extends Pillar {
+  late final lock = embargo(name: 'buy');
+  late final pool = embargo(permits: 3, name: 'api');
+}
+```
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

@@ -55,6 +55,7 @@
 | [XXXIX](chapter-39-the-banner-rises.md) | **The Banner Rises** | `Banner`, `BannerFlag`, `BannerRule`, `BannerEvaluation`, reactive feature flags, rollout, targeting rules, overrides |
 | [XL](chapter-40-the-sieve-filters.md) | **The Sieve Filters** | `Sieve<T>`, reactive search/filter/sort, text search, predicate filters, composable pipeline |
 | [XLI](chapter-41-the-lattice-aligns.md) | **The Lattice Aligns** | `Lattice`, DAG task executor, Kahn's algorithm, dependency resolution, parallel execution, reactive progress |
+| [XLII](chapter-42-the-embargo-holds.md) | **The Embargo Holds** | `Embargo`, async mutex/semaphore, `guard()`, reactive lock status, FIFO queuing, timeout |
 
 ---
 

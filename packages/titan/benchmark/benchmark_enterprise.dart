@@ -71,6 +71,7 @@ void main() async {
   await _benchBanner();
   await _benchSieve();
   await _benchLattice();
+  await _benchEmbargo();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -2848,6 +2849,93 @@ Future<void> _benchLattice() async {
     final us = sw.elapsedMicroseconds / 10000;
     print(
       '41. Lattice     | CycleCheck(10 nodes)     '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  print('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 42. Embargo — Async Mutex/Semaphore
+// ═══════════════════════════════════════════════════════════════════════════════
+
+Future<void> _benchEmbargo() async {
+  print('');
+  print('── 42. Embargo ──────────────────────────────────────');
+
+  // Mutex guard (uncontended)
+  {
+    final e = Embargo(name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      await e.guard(() async => i);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '42. Embargo     | MutexGuard(uncontended)  '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Semaphore guard (permits=5, uncontended)
+  {
+    final e = Embargo(permits: 5, name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      await e.guard(() async => i);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '42. Embargo     | SemaphoreGuard(5, uncon) '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Mutex contended (100 concurrent tasks)
+  {
+    final e = Embargo(name: 'bench');
+    final sw = Stopwatch()..start();
+    final futures = List.generate(100, (i) {
+      return e.guard(() async => i);
+    });
+    await Future.wait(futures);
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 100;
+    print(
+      '42. Embargo     | MutexContended(100)      '
+      '| ${_pad(100)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Create
+  {
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 100000; i++) {
+      Embargo(name: 'e$i');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 100000;
+    print(
+      '42. Embargo     | Create                   '
+      '| ${_pad(100000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // Acquire/Release (manual)
+  {
+    final e = Embargo(name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      final lease = await e.acquire();
+      lease.release();
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '42. Embargo     | AcquireRelease           '
       '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
   }

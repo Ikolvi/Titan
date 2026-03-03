@@ -23,6 +23,7 @@ import 'anvil.dart';
 import 'banner.dart';
 import 'bulwark.dart';
 import 'codex.dart';
+import 'embargo.dart';
 import 'lattice.dart';
 import 'moat.dart';
 import 'portcullis.dart';
@@ -517,5 +518,35 @@ extension PillarBasaltExtension on Pillar {
     final l = Lattice(name: name);
     registerNodes(l.managedNodes);
     return l;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Embargo — async mutex/semaphore
+  // ---------------------------------------------------------------------------
+
+  /// Creates an [Embargo] (async mutex/semaphore) managed by this Pillar.
+  ///
+  /// All reactive nodes are registered for automatic disposal.
+  ///
+  /// ```dart
+  /// class CheckoutPillar extends Pillar {
+  ///   // Mutex — prevent double-submit.
+  ///   late final submitLock = embargo(name: 'submit');
+  ///
+  ///   // Semaphore — max 3 concurrent API calls.
+  ///   late final apiPool = embargo(permits: 3, name: 'api');
+  ///
+  ///   Future<void> submit() async {
+  ///     await submitLock.guard(() async {
+  ///       await api.placeOrder();
+  ///     });
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Embargo embargo({int permits = 1, Duration? timeout, String? name}) {
+    final e = Embargo(permits: permits, timeout: timeout, name: name);
+    registerNodes(e.managedNodes);
+    return e;
   }
 }

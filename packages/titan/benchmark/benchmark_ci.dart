@@ -38,6 +38,7 @@ void main() async {
   _benchBannerLookup();
   _benchSieveFilter();
   await _benchLatticeDiamond();
+  await _benchEmbargoMutex();
 
   // Output JSON
   print(
@@ -608,4 +609,20 @@ Future<void> _benchLatticeDiamond() async {
   sw.stop();
   final usPerExec = sw.elapsedMicroseconds / n;
   _record('Lattice Diamond (4 nodes, 1K)', 'µs/op', usPerExec);
+}
+
+// ---------------------------------------------------------------------------
+// Embargo — Async mutex
+// ---------------------------------------------------------------------------
+
+Future<void> _benchEmbargoMutex() async {
+  final e = Embargo(name: 'bench');
+  const n = 1000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    await e.guard(() async => i);
+  }
+  sw.stop();
+  final usPerGuard = sw.elapsedMicroseconds / n;
+  _record('Embargo MutexGuard (1K)', 'µs/op', usPerGuard);
 }

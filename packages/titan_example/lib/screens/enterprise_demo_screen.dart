@@ -7,7 +7,7 @@ import '../pillars/enterprise_demo_pillar.dart';
 /// Enterprise Demo Screen — showcases enterprise features.
 ///
 /// Demonstrates: Loom, Bulwark, Saga, Volley, Sigil, Aegis, Annals, Banner, Sieve,
-/// Lattice, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
+/// Lattice, Embargo, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
 class EnterpriseDemoScreen extends StatelessWidget {
   const EnterpriseDemoScreen({super.key});
 
@@ -1248,6 +1248,56 @@ class _ToolkitTab extends StatelessWidget {
                                       LatticeStatus.running
                                   ? 'Running...'
                                   : 'Reset',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Embargo (Reactive Async Mutex/Semaphore)
+              _SectionHeader('Embargo (Async Mutex)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Status: ${pillar.purchaseLock.status.value.name}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Active: ${pillar.purchaseLock.activeCount.value} '
+                        '| Queue: ${pillar.purchaseLock.queueLength.value} '
+                        '| Total: ${pillar.purchaseLock.totalAcquires.value}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.tonal(
+                        onPressed: pillar.purchaseLock.isLocked.value
+                            ? null
+                            : () async {
+                                final msg =
+                                    await pillar.guardedPurchase();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(
+                                    SnackBar(
+                                      content: Text(msg),
+                                      behavior:
+                                          SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              },
+                        child: Text(
+                          pillar.purchaseLock.isLocked.value
+                              ? 'Purchasing...'
+                              : 'Buy Potion (Guarded)',
                         ),
                       ),
                     ],
