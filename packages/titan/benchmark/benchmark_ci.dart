@@ -2,6 +2,7 @@
 import 'dart:convert';
 
 import 'package:titan/titan.dart';
+import 'package:titan_basalt/titan_basalt.dart';
 
 // =============================================================================
 // Titan CI Benchmark Runner

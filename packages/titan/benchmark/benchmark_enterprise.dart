@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import 'package:titan/titan.dart';
+import 'package:titan_basalt/titan_basalt.dart';
 
 // =============================================================================
 // Titan Enterprise Benchmarks
@@ -24,6 +25,14 @@ import 'package:titan/titan.dart';
 //  28. Conduit — Core-level middleware pipeline throughput
 //  29. Prism — Fine-grained state projections
 //  30. Nexus — Reactive collections (NexusList, NexusMap, NexusSet)
+//  31. Trove — Reactive TTL/LRU cache
+//  32. Moat — Token-bucket rate limiter
+//  33. Omen — Reactive async derived
+//  34. Pyre — Priority task queue
+//  35. Mandate — Reactive policy engine
+//  36. Ledger — State transactions
+//  37. Portcullis — Reactive circuit breaker
+//  38. Anvil — Dead letter & retry queue
 // =============================================================================
 
 void main() async {
@@ -48,6 +57,14 @@ void main() async {
   await _benchPrism();
   await _benchNexus();
   await _benchRefreshPipeline();
+  await _benchTrove();
+  await _benchMoat();
+  await _benchOmen();
+  await _benchPyre();
+  await _benchMandate();
+  await _benchLedger();
+  await _benchPortcullis();
+  await _benchAnvil();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -1606,8 +1623,642 @@ Future<void> _benchRefreshPipeline() async {
   print('');
 }
 
+// ---------------------------------------------------------------------------
+// 31. Trove — Reactive TTL/LRU In-Memory Cache
+// ---------------------------------------------------------------------------
+
+Future<void> _benchTrove() async {
+  print('┌─ 31. Trove (TTL/LRU Cache) ────────────────────────');
+
+  // a) Put throughput
+  {
+    for (final count in [1000, 10000, 100000]) {
+      final cache = Trove<int, int>(name: 'bench-put');
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < count; i++) {
+        cache.put(i, i);
+      }
+      sw.stop();
+      final perOp = sw.elapsedMicroseconds / count;
+      print(
+        '│  Put           (${_pad(count)}):  ${_ms(sw)}'
+        '  (${perOp.toStringAsFixed(3)} µs/op)',
+      );
+      cache.dispose();
+    }
+  }
+
+  // b) Get throughput (hits)
+  {
+    const count = 100000;
+    final cache = Trove<int, int>(name: 'bench-get');
+    for (var i = 0; i < count; i++) {
+      cache.put(i, i);
+    }
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      cache.get(i);
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Get (hits)    (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    print('│  Hit rate: ${cache.hitRate.toStringAsFixed(1)}%');
+    cache.dispose();
+  }
+
+  // c) Get throughput (misses)
+  {
+    const count = 100000;
+    final cache = Trove<int, int>(name: 'bench-miss');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      cache.get(i);
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Get (misses)  (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    cache.dispose();
+  }
+
+  // d) LRU eviction overhead
+  {
+    const maxEntries = 1000;
+    const insertions = 10000;
+    final cache = Trove<int, int>(maxEntries: maxEntries, name: 'bench-lru');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < insertions; i++) {
+      cache.put(i, i);
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / insertions;
+    print(
+      '│  LRU eviction  (${_pad(insertions)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op, cap=$maxEntries)',
+    );
+    print('│  Evictions: ${cache.evictions.value}');
+    cache.dispose();
+  }
+
+  // e) putIfAbsent pattern (sync)
+  {
+    const count = 100000;
+    final cache = Trove<int, int>(name: 'bench-putIfAbsent');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      cache.putIfAbsent(i % 1000, () => i);
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  putIfAbsent   (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    cache.dispose();
+  }
+
+  print('└───────────────────────────────────────────────────────');
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 32. Moat — Rate Limiter
+// ---------------------------------------------------------------------------
+
+Future<void> _benchMoat() async {
+  print('┌─ 32. Moat (Rate Limiter) ──────────────────────────');
+
+  // a) tryConsume throughput (with tokens available)
+  {
+    const count = 100000;
+    final limiter = Moat(
+      maxTokens: count,
+      refillRate: const Duration(seconds: 60),
+      name: 'bench-consume',
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      limiter.tryConsume();
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  tryConsume    (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    limiter.dispose();
+  }
+
+  // b) tryConsume throughput (rejected — empty bucket)
+  {
+    const count = 100000;
+    final limiter = Moat(
+      maxTokens: 1,
+      refillRate: const Duration(seconds: 60),
+      initialTokens: 0,
+      name: 'bench-reject',
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      limiter.tryConsume();
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  tryConsume rej(${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    limiter.dispose();
+  }
+
+  // c) MoatPool per-key creation + consume
+  {
+    const keys = 1000;
+    final pool = MoatPool(
+      maxTokens: 10,
+      refillRate: const Duration(seconds: 60),
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < keys; i++) {
+      pool.tryConsume('key_$i');
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / keys;
+    print(
+      '│  Pool create   (${_pad(keys)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/key)',
+    );
+    pool.dispose();
+  }
+
+  // d) MoatPool existing key lookup
+  {
+    const count = 100000;
+    final pool = MoatPool(
+      maxTokens: count,
+      refillRate: const Duration(seconds: 60),
+    );
+    // Pre-create 100 keys
+    for (var i = 0; i < 100; i++) {
+      pool.tryConsume('key_$i');
+    }
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      pool.tryConsume('key_${i % 100}');
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Pool lookup   (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    pool.dispose();
+  }
+
+  print('└───────────────────────────────────────────────────────');
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 33. Omen — Reactive Async Derived
+// ---------------------------------------------------------------------------
+
+Future<void> _benchOmen() async {
+  print('┌─ 33. Omen (Reactive Async Derived) ─────────────────');
+
+  // a) Omen creation + eager execution overhead
+  {
+    const count = 10000;
+    final sw = Stopwatch()..start();
+    final omens = <Omen<int>>[];
+    for (var i = 0; i < count; i++) {
+      omens.add(Omen<int>(() async => i, name: 'bench-$i'));
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Create eager  (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    for (final o in omens) {
+      o.dispose();
+    }
+  }
+
+  // b) Omen creation with lazy (no eager execution)
+  {
+    const count = 10000;
+    final sw = Stopwatch()..start();
+    final omens = <Omen<int>>[];
+    for (var i = 0; i < count; i++) {
+      omens.add(Omen<int>(() async => i, eager: false, name: 'lazy-$i'));
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Create lazy   (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    for (final o in omens) {
+      o.dispose();
+    }
+  }
+
+  // c) Full resolution cycle: create → await → read data
+  {
+    const count = 1000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      final o = Omen<int>(() async => i);
+      await Future<void>.delayed(Duration.zero);
+      o.value; // trigger read
+      o.dispose();
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Full cycle    (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+  }
+
+  // d) Refresh throughput
+  {
+    const count = 5000;
+    var counter = 0;
+    final o = Omen<int>(() async => counter++);
+    await Future<void>.delayed(Duration.zero); // first resolution
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      o.refresh();
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Refresh       (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    o.dispose();
+  }
+
+  // e) Cancel throughput
+  {
+    const count = 10000;
+    final o = Omen<int>(() async => 1);
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      o.refresh();
+      o.cancel();
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Refresh+cancel(${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    o.dispose();
+  }
+
+  print('└───────────────────────────────────────────────────────');
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 34. Pyre — Priority Task Queue
+// ---------------------------------------------------------------------------
+
+Future<void> _benchPyre() async {
+  print('┌─ 34. Pyre (Priority Task Queue) ─────────────────────');
+
+  // a) Enqueue throughput (autoStart: false)
+  {
+    const count = 10000;
+    final q = Pyre<int>(concurrency: 5, autoStart: false, name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      q.enqueue(() async => i);
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Enqueue       (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    q.dispose();
+  }
+
+  // b) Priority-sorted enqueue
+  {
+    const count = 10000;
+    final q = Pyre<int>(concurrency: 5, autoStart: false, name: 'prio-bench');
+    final priorities = [
+      PyrePriority.low,
+      PyrePriority.normal,
+      PyrePriority.high,
+      PyrePriority.critical,
+    ];
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      q.enqueue(() async => i, priority: priorities[i % 4]);
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Sorted enq   (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    q.dispose();
+  }
+
+  // c) Full execution cycle
+  {
+    const count = 1000;
+    final q = Pyre<int>(concurrency: 10, name: 'exec-bench');
+    final sw = Stopwatch()..start();
+    final futures = <Future<int>>[];
+    for (var i = 0; i < count; i++) {
+      futures.add(q.enqueue(() async => i));
+    }
+    await Future.wait(futures);
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Execute      (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    q.dispose();
+  }
+
+  // d) Cancel throughput
+  {
+    const count = 10000;
+    final q = Pyre<int>(concurrency: 1, autoStart: false, name: 'cancel-bench');
+    for (var i = 0; i < count; i++) {
+      q.enqueue(() async => i, id: 'task_$i');
+    }
+    final sw = Stopwatch()..start();
+    q.cancelAll();
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  CancelAll    (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    q.dispose();
+  }
+
+  print('└───────────────────────────────────────────────────────');
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 35. Mandate — Reactive Policy Engine
+// ---------------------------------------------------------------------------
+
+Future<void> _benchMandate() async {
+  print('┌─ 35. Mandate (Reactive Policy Engine) ───────────────');
+
+  // a) Creation with N writs
+  {
+    const count = 10000;
+    final role = TitanState<String>('user');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      final m = Mandate(
+        writs: [
+          Writ(name: 'auth', evaluate: () => role.value != ''),
+          Writ(name: 'role', evaluate: () => role.value == 'admin'),
+          Writ(name: 'flag', evaluate: () => true),
+        ],
+        name: 'bench_$i',
+      );
+      m.dispose();
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Create(3w)   (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+  }
+
+  // b) Verdict evaluation (cached)
+  {
+    const count = 100000;
+    final flag = TitanState<bool>(true);
+    final m = Mandate(
+      writs: [
+        Writ(name: 'a', evaluate: () => flag.value),
+        Writ(name: 'b', evaluate: () => true),
+        Writ(name: 'c', evaluate: () => true),
+      ],
+    );
+    // Prime
+    m.verdict.value;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      m.verdict.value;
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Verdict(cch) (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    m.dispose();
+  }
+
+  // c) Reactive re-evaluation (toggle Core, read verdict)
+  {
+    const count = 10000;
+    final flag = TitanState<bool>(true);
+    final m = Mandate(
+      writs: [
+        Writ(name: 'flag', evaluate: () => flag.value),
+        Writ(name: 'ok', evaluate: () => true),
+      ],
+    );
+    m.verdict.value; // prime
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      flag.value = i.isEven;
+      m.verdict.value;
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  Re-evaluate  (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    m.dispose();
+  }
+
+  // d) can() lookup
+  {
+    const count = 100000;
+    final m = Mandate(
+      writs: [
+        Writ(name: 'auth', evaluate: () => true),
+        Writ(name: 'role', evaluate: () => true),
+        Writ(name: 'plan', evaluate: () => true),
+      ],
+    );
+    m.can('auth').value; // prime
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      m.can('role').value;
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  can() lookup (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    m.dispose();
+  }
+
+  // e) addWrit throughput
+  {
+    const count = 10000;
+    final m = Mandate();
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      m.addWrit(Writ(name: 'w_$i', evaluate: () => true));
+    }
+    sw.stop();
+    final perOp = sw.elapsedMicroseconds / count;
+    print(
+      '│  addWrit      (${_pad(count)}):  ${_ms(sw)}'
+      '  (${perOp.toStringAsFixed(3)} µs/op)',
+    );
+    m.dispose();
+  }
+
+  print('└───────────────────────────────────────────────────────');
+  print('');
+}
+
 // =============================================================================
-// Helpers
+// 36. Ledger — State Transactions
+// =============================================================================
+
+Future<void> _benchLedger() async {
+  print('┌─ 36. Ledger (State Transactions) ───────────────────');
+
+  // --- Create ---
+  {
+    const n = 10000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < n; i++) {
+      Ledger(name: 'bench');
+    }
+    sw.stop();
+    print(
+      '│  Create        (${'$n'.padLeft(6)}): '
+      '${_ms(sw)}  (${(sw.elapsedMicroseconds / n).toStringAsFixed(3)} µs/op)',
+    );
+  }
+
+  // --- Begin/commit (no captures) ---
+  {
+    const n = 100000;
+    final l = Ledger();
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < n; i++) {
+      final tx = l.begin();
+      tx.commit();
+    }
+    sw.stop();
+    print(
+      '│  Begin/Commit  (${'$n'.padLeft(6)}): '
+      '${_ms(sw)}  (${(sw.elapsedMicroseconds / n).toStringAsFixed(3)} µs/op)',
+    );
+    l.dispose();
+  }
+
+  // --- Capture + commit (3 Cores) ---
+  {
+    const n = 10000;
+    final l = Ledger();
+    final a = TitanState(0);
+    final b = TitanState(0);
+    final c = TitanState(0);
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < n; i++) {
+      final tx = l.begin();
+      tx.capture(a);
+      tx.capture(b);
+      tx.capture(c);
+      a.value = i;
+      b.value = i;
+      c.value = i;
+      tx.commit();
+    }
+    sw.stop();
+    print(
+      '│  Capture+Cmit  (${'$n'.padLeft(6)}): '
+      '${_ms(sw)}  (${(sw.elapsedMicroseconds / n).toStringAsFixed(3)} µs/op)',
+    );
+    l.dispose();
+  }
+
+  // --- Rollback (3 Cores) ---
+  {
+    const n = 10000;
+    final l = Ledger();
+    final a = TitanState(0);
+    final b = TitanState(0);
+    final c = TitanState(0);
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < n; i++) {
+      final tx = l.begin();
+      tx.capture(a);
+      tx.capture(b);
+      tx.capture(c);
+      a.value = i + 100;
+      b.value = i + 200;
+      c.value = i + 300;
+      tx.rollback();
+    }
+    sw.stop();
+    print(
+      '│  Rollback(3c)  (${'$n'.padLeft(6)}): '
+      '${_ms(sw)}  (${(sw.elapsedMicroseconds / n).toStringAsFixed(3)} µs/op)',
+    );
+    l.dispose();
+  }
+
+  // --- transactSync ---
+  {
+    const n = 10000;
+    final l = Ledger();
+    final a = TitanState(0);
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < n; i++) {
+      l.transactSync((tx) {
+        tx.capture(a);
+        a.value = i;
+      });
+    }
+    sw.stop();
+    print(
+      '│  transactSync  (${'$n'.padLeft(6)}): '
+      '${_ms(sw)}  (${(sw.elapsedMicroseconds / n).toStringAsFixed(3)} µs/op)',
+    );
+    l.dispose();
+  }
+
+  print('└───────────────────────────────────────────────────────');
+  print('');
+}
+
+// =============================================================================
+// Helpers (tail)
 // =============================================================================
 
 class _BenchPillar extends Pillar {
@@ -1631,3 +2282,205 @@ String _ms(Stopwatch sw) {
 }
 
 String _pad(int n) => n.toString().padLeft(6);
+
+// ---------------------------------------------------------------------------
+// 37. Portcullis — Reactive Circuit Breaker
+// ---------------------------------------------------------------------------
+
+Future<void> _benchPortcullis() async {
+  const iter = 10000;
+
+  // 37a. Create
+  {
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      final p = Portcullis(
+        failureThreshold: 5,
+        resetTimeout: const Duration(seconds: 30),
+        name: 'bench',
+      );
+      p.dispose();
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '37. Portcullis  | Create                  '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // 37b. protect (success path)
+  {
+    final p = Portcullis(failureThreshold: 100);
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      await p.protect(() async => i);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '37. Portcullis  | Protect(success)         '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    p.dispose();
+  }
+
+  // 37c. protectSync (success path)
+  {
+    final p = Portcullis(failureThreshold: 100);
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      p.protectSync(() => i);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '37. Portcullis  | ProtectSync(success)     '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    p.dispose();
+  }
+
+  // 37d. Trip + reject (fast-fail)
+  {
+    final p = Portcullis(failureThreshold: 1);
+    // Trip it once
+    try {
+      await p.protect(() async => throw Exception('trip'));
+    } catch (_) {}
+
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      try {
+        await p.protect(() async => i);
+      } on PortcullisOpenException catch (_) {}
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '37. Portcullis  | Reject(open)             '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    p.dispose();
+  }
+
+  // 37e. Failure path (not tripping)
+  {
+    final p = Portcullis(failureThreshold: iter + 1);
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      try {
+        await p.protect(() async => throw Exception('fail'));
+      } catch (_) {}
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '37. Portcullis  | Protect(failure)         '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    p.dispose();
+  }
+
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 38. Anvil — Dead Letter & Retry Queue
+// ---------------------------------------------------------------------------
+
+Future<void> _benchAnvil() async {
+  const iter = 10000;
+
+  // 38a. Create
+  {
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      final a = Anvil<String>(name: 'bench');
+      a.dispose();
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '38. Anvil       | Create                  '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // 38b. Enqueue (autoStart: false — no async overhead)
+  {
+    final a = Anvil<String>(autoStart: false, name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      a.enqueue(() async => 'ok', id: 'job-$i');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '38. Anvil       | Enqueue(no-start)        '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    a.dispose();
+  }
+
+  // 38c. Enqueue + success (async processing)
+  {
+    final a = Anvil<String>(name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      a.enqueue(() async => 'ok', id: 'async-$i');
+    }
+    // Wait for all to complete
+    while (a.succeededCount < iter) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '38. Anvil       | Enqueue+Success          '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    a.dispose();
+  }
+
+  // 38d. FindById lookup
+  {
+    final a = Anvil<String>(autoStart: false, name: 'bench');
+    for (var i = 0; i < 1000; i++) {
+      a.enqueue(() async => 'ok', id: 'lookup-$i');
+    }
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      a.findById('lookup-${i % 1000}');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '38. Anvil       | FindById(1k pool)        '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    a.dispose();
+  }
+
+  // 38e. Backoff delay computation
+  {
+    final backoff = AnvilBackoff.exponential(
+      initial: const Duration(seconds: 1),
+      multiplier: 2.0,
+      jitter: true,
+      maxDelay: const Duration(minutes: 5),
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < iter; i++) {
+      backoff.delayFor(i % 20);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / iter;
+    print(
+      '38. Anvil       | BackoffCompute           '
+      '| ${_pad(iter)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  print('');
+}

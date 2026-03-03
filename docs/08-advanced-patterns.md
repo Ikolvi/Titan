@@ -969,6 +969,8 @@ Future<void> submit() async {
 
 ## Codex — Paginated Data
 
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
 **Codex** manages paginated data fetching — loading pages incrementally, tracking loading/error/empty states, and appending results. Supports both offset and cursor-based pagination.
 
 ### Offset Pagination
@@ -1041,6 +1043,8 @@ Vestige<QuestListPillar>(
 ---
 
 ## Quarry — Data Fetching & Caching
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
 
 **Quarry** manages a single async data resource with stale-while-revalidate caching, automatic deduplication, retry with exponential backoff, and optimistic updates.
 
@@ -1417,6 +1421,8 @@ questFlow.history; // [LoomTransition(idle, claim, claiming)]
 
 ## Bulwark — Circuit Breaker
 
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
 Prevents cascading failures by tracking consecutive errors and short-circuiting when a threshold is reached:
 
 ```dart
@@ -1447,6 +1453,8 @@ breaker.state; // BulwarkState.closed/open/halfOpen
 ---
 
 ## Saga — Multi-Step Workflows
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
 
 Sequential async operations with automatic compensation (rollback) on failure:
 
@@ -1497,6 +1505,8 @@ pillar.checkout.currentStepName; // 'charge-payment'
 
 ## Volley — Batch Async Operations
 
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
 Parallel async tasks with concurrency limits and partial-failure handling:
 
 ```dart
@@ -1526,6 +1536,8 @@ uploader.cancel(); // stop starting new tasks
 ---
 
 ## Annals — Audit Trail
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
 
 Immutable, append-only record of state mutations for compliance:
 
@@ -1560,6 +1572,8 @@ Annals.stream.listen((entry) => sendToSIEM(entry));
 ---
 
 ## Tether — Request-Response Channels
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
 
 Typed, bidirectional async communication between Pillars:
 
@@ -2074,6 +2088,637 @@ final messages = useStream(
 1. Always call hooks in the **same order** — no hooks inside conditionals or loops
 2. Only call hooks inside `ignite()` — not in callbacks or async code
 3. Hooks are identified by call position, just like React hooks
+
+---
+
+## Trove — Reactive Caching
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+**Trove** is a reactive in-memory cache with TTL expiry and LRU eviction. All statistics are reactive Cores.
+
+### Basic Cache Pattern
+
+```dart
+class ProductPillar extends Pillar {
+  late final productCache = trove<String, Product>(
+    defaultTtl: Duration(minutes: 10),
+    maxEntries: 200,
+    name: 'products',
+  );
+
+  Future<Product> getProduct(String id) async {
+    return await productCache.getOrPut(id, () async {
+      return await api.fetchProduct(id);
+    });
+  }
+}
+```
+
+### TTL + LRU Eviction
+
+```dart
+final cache = Trove<String, dynamic>(
+  defaultTtl: Duration(minutes: 5),   // entries expire after 5 min
+  maxEntries: 100,                     // LRU eviction at capacity
+  onEvict: (key, value, reason) {
+    log.debug('Evicted $key: $reason');
+  },
+);
+
+cache.put('key', value);                        // uses default TTL
+cache.put('key', value, ttl: Duration(hours: 1)); // override TTL
+```
+
+### Reactive Stats
+
+```dart
+// All are reactive Cores — drive UI rebuilds automatically
+cache.size       // current entry count
+cache.hits       // total cache hits
+cache.misses     // total cache misses
+cache.evictions  // total evictions
+cache.hitRate    // percentage (0.0–100.0)
+```
+
+---
+
+## Moat — Rate Limiting
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+**Moat** is a token-bucket rate limiter. Tokens are consumed per request and refilled at a steady rate.
+
+### Basic Rate Limiting
+
+```dart
+class ApiPillar extends Pillar {
+  late final limiter = moat(
+    maxTokens: 10,
+    refillRate: Duration(seconds: 1),
+    name: 'api',
+  );
+
+  Future<dynamic> fetchData() async {
+    return await limiter.guard(
+      () async => await api.getData(),
+      onLimit: () => showError('Rate limited'),
+    );
+  }
+}
+```
+
+### Per-Key Limiting with MoatPool
+
+```dart
+final pool = MoatPool(
+  maxTokens: 5,
+  refillRate: Duration(seconds: 1),
+);
+
+pool.tryConsume('search');   // independent bucket per key
+pool.tryConsume('users');    // separate bucket
+```
+
+### Blocking Consume
+
+```dart
+final allowed = await limiter.consume(timeout: Duration(seconds: 5));
+if (allowed) {
+  await performAction();
+}
+```
+
+---
+
+## Omen — Reactive Async Derived
+
+`Omen<T>` is the async counterpart to `Derived`. It automatically tracks which Cores are read inside an async computation and re-executes whenever those dependencies change.
+
+### Basic Usage
+
+```dart
+class SearchPillar extends Pillar {
+  late final query = core('');
+  late final sortBy = core('relevance');
+
+  late final results = omen<List<Product>>(
+    () async => api.search(query.value, sort: sortBy.value),
+    debounce: Duration(milliseconds: 300),
+  );
+}
+```
+
+Reading `query.value` and `sortBy.value` inside the compute function automatically registers them as dependencies. When either changes, the computation re-executes after the debounce period.
+
+### AsyncValue Lifecycle
+
+Omen exposes its state as `AsyncValue<T>`:
+
+```dart
+switch (pillar.results.value) {
+  case AsyncData(:final data):
+    return ProductList(data);
+  case AsyncLoading():
+    return Spinner();
+  case AsyncRefreshing(:final data):
+    return Stack(children: [ProductList(data), MiniSpinner()]);
+  case AsyncError(:final error):
+    return ErrorWidget(error);
+}
+```
+
+### Stale-While-Revalidate
+
+With `keepPreviousData: true` (default), previous data is visible via `AsyncRefreshing` while re-computing:
+
+```dart
+late final dashboard = omen<DashboardStats>(
+  () async => api.fetchStats(userId.value),
+  keepPreviousData: true,  // show stale data while refreshing
+);
+```
+
+### Manual Controls
+
+```dart
+pillar.results.refresh();  // force re-execution
+pillar.results.cancel();   // cancel in-flight request
+pillar.results.reset();    // clear data + re-execute
+```
+
+---
+
+## Pyre — Priority Task Queue
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+`Pyre<T>` is a priority-ordered async task queue with concurrency control. Tasks are executed in priority order (critical > high > normal > low), with configurable worker concurrency and backpressure limits.
+
+### Basic Usage
+
+```dart
+class UploadPillar extends Pillar {
+  late final queue = pyre<String>(
+    concurrency: 3,
+    maxQueueSize: 100,
+    onTaskComplete: (taskId, result) => log.info('Done: $result'),
+  );
+
+  void uploadFile(String path) {
+    queue.enqueue(
+      () async {
+        await api.upload(path);
+        return 'Uploaded: $path';
+      },
+      priority: PyrePriority.high,
+    );
+  }
+}
+```
+
+### Priority Ordering
+
+Tasks are inserted in priority order. Equal-priority tasks execute in FIFO order:
+
+```dart
+queue.enqueue(() async => 'low', priority: PyrePriority.low);
+queue.enqueue(() async => 'critical', priority: PyrePriority.critical);
+queue.enqueue(() async => 'normal'); // default: PyrePriority.normal
+
+// Execution order: critical, normal, low
+```
+
+### Backpressure
+
+When the queue is full, `enqueue()` throws `PyreBackpressureException`:
+
+```dart
+late final queue = pyre<void>(maxQueueSize: 50);
+
+try {
+  queue.enqueue(() async => doWork());
+} on PyreBackpressureException {
+  showSnackBar('Too many pending tasks');
+}
+```
+
+### Pause / Resume
+
+```dart
+queue.pause();   // suspend processing, running tasks complete
+queue.resume();  // resume processing pending tasks
+```
+
+### Cancellation
+
+```dart
+// Cancel a specific task by ID
+final taskId = queue.enqueue(() async => work());
+queue.cancel(taskId);
+
+// Cancel all pending tasks (running tasks complete)
+queue.cancelAll();
+
+// Cancel pending + wait for running to finish
+await queue.drain();
+```
+
+### Retry with Backoff
+
+```dart
+late final queue = pyre<String>(
+  maxRetries: 3,  // retry failed tasks up to 3 times
+  onTaskFailed: (taskId, error) => log.warning('Task $taskId failed: $error'),
+);
+```
+
+### Reactive State
+
+Pyre exposes reactive state for building progress UIs:
+
+```dart
+// In a Vestige builder:
+Text('Queue: ${pillar.queue.queueLength}');
+Text('Running: ${pillar.queue.runningCount}');
+Text('Done: ${pillar.queue.completedCount}/${pillar.queue.totalEnqueued}');
+Text('Progress: ${(pillar.queue.progress * 100).toInt()}%');
+LinearProgressIndicator(value: pillar.queue.progress);
+```
+
+### PyreResult
+
+Each completed task returns a `PyreResult<T>`:
+
+```dart
+final future = queue.enqueue(() async => compute());
+final result = await future;
+
+switch (result) {
+  case PyreSuccess(:final value):
+    print('Got: $value');
+  case PyreFailure(:final error):
+    print('Failed: $error');
+}
+```
+
+---
+
+## Mandate — Reactive Policy Engine
+
+Mandate evaluates named policy rules (**Writs**) against reactive state, producing a sealed `MandateVerdict`.
+
+### Basic Usage
+
+```dart
+class EditorPillar extends Pillar {
+  late final role = core('viewer');
+  late final isVerified = core(false);
+
+  late final editAccess = mandate(
+    writs: [
+      Writ(
+        name: 'is-editor',
+        evaluate: () => role.value == 'editor' || role.value == 'admin',
+        reason: 'Editor role required',
+      ),
+      Writ(
+        name: 'verified',
+        evaluate: () => isVerified.value,
+        reason: 'Email verification required',
+      ),
+    ],
+  );
+}
+```
+
+### Strategies
+
+```dart
+// All writs must pass (default)
+mandate(strategy: MandateStrategy.allOf, writs: [...]);
+
+// At least one writ must pass
+mandate(strategy: MandateStrategy.anyOf, writs: [...]);
+
+// Passing writs outweigh failing by total weight
+mandate(strategy: MandateStrategy.majority, writs: [...]);
+```
+
+### Reading the Verdict
+
+```dart
+// Sealed class — pattern match
+switch (pillar.editAccess.verdict.value) {
+  case MandateGrant():
+    return EditButton();
+  case MandateDenial(:final violations):
+    return DeniedBanner(violations.map((v) => v.reason).toList());
+}
+
+// Convenience boolean
+if (pillar.editAccess.isGranted.value) { ... }
+
+// Check individual writ
+if (pillar.editAccess.can('is-editor').value) { ... }
+```
+
+### Dynamic Writ Management
+
+```dart
+// Add a rule at runtime
+pillar.editAccess.addWrit(
+  Writ(name: 'rate-limit', evaluate: () => edits.value < 100),
+);
+
+// Replace a rule
+pillar.editAccess.replaceWrit(
+  Writ(name: 'is-editor', evaluate: () => role.value != 'viewer'),
+);
+
+// Remove a rule
+pillar.editAccess.removeWrit('rate-limit');
+
+// Change strategy
+pillar.editAccess.updateStrategy(MandateStrategy.anyOf);
+```
+
+### Weighted Majority
+
+```dart
+late final publishReady = mandate(
+  strategy: MandateStrategy.majority,
+  writs: [
+    Writ(name: 'title', evaluate: () => title.value.isNotEmpty, weight: 3),
+    Writ(name: 'desc', evaluate: () => desc.value.isNotEmpty, weight: 1),
+    Writ(name: 'reward', evaluate: () => reward.value > 0, weight: 2),
+  ],
+);
+// title(3) passes, desc(1)+reward(2) fail → 3 > 3 is false → denied
+// title(3)+desc(1) pass → 4 > 2 → granted
+```
+
+---
+
+## Ledger — Reactive State Transactions
+
+Ledger provides ACID-like transaction semantics for multi-Core mutations. All changes commit atomically or roll back together — no partial state corruption.
+
+### Basic Usage
+
+```dart
+class CheckoutPillar extends Pillar {
+  late final inventory = core(100);
+  late final balance = core(500.0);
+  late final orderId = core<String?>(null);
+
+  late final txManager = ledger(maxHistory: 50, name: 'checkout');
+
+  Future<void> placeOrder(int qty, double price) async {
+    await txManager.transact(
+      (tx) async {
+        tx.capture(inventory);
+        tx.capture(balance);
+        tx.capture(orderId);
+
+        inventory.value -= qty;
+        balance.value -= price;
+        orderId.value = await api.createOrder(qty, price);
+      },
+      name: 'place-order',
+    );
+  }
+}
+```
+
+### Manual Transactions
+
+```dart
+final tx = ledger.begin(name: 'transfer');
+tx.capture(source);
+tx.capture(destination);
+
+source.value -= amount;
+destination.value += amount;
+
+if (source.value >= 0) {
+  tx.commit();   // atomic notification
+} else {
+  tx.rollback(); // revert both Cores
+}
+```
+
+### Auto-Scope (async & sync)
+
+```dart
+// Async — auto-commits on success, auto-rolls back on exception
+final result = await ledger.transact((tx) async {
+  tx.capture(inventory);
+  inventory.value -= qty;
+  return await api.placeOrder(qty);
+}, name: 'checkout');
+
+// Sync — same commit/rollback semantics
+ledger.transactSync((tx) {
+  tx.capture(a);
+  tx.capture(b);
+  a.value = 10;
+  b.value = 20;
+});
+```
+
+### Reactive Counters
+
+```dart
+// All counters are reactive — use them in Derived or Vestige
+final hasActivity = derived(() => txManager.hasActive);
+final totalCommits = derived(() => txManager.commitCount);
+
+// History audit
+final lastTx = txManager.lastRecord;
+print(lastTx); // LedgerRecord(#3, committed, cores: 2, name: checkout)
+```
+
+### Rollback on Error
+
+```dart
+try {
+  await txManager.transact((tx) async {
+    tx.capture(balance);
+    balance.value -= 1000;
+    await paymentApi.charge(1000); // throws!
+  });
+} catch (e) {
+  // balance automatically reverted to pre-transaction value
+  print(txManager.failCount);    // 1
+  print(txManager.lastRecord);   // LedgerRecord(#0, failed, ...)
+}
+```
+
+---
+
+## Portcullis — Reactive Circuit Breaker
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+Portcullis monitors failure rates for external service calls and automatically trips the circuit when failures exceed a threshold, fast-failing subsequent requests until the service recovers.
+
+### Basic Usage
+
+```dart
+class PaymentPillar extends Pillar {
+  late final gateway = portcullis(
+    failureThreshold: 3,
+    resetTimeout: Duration(seconds: 30),
+    name: 'payment-api',
+  );
+
+  Future<Receipt> charge(double amount) async {
+    return gateway.protect(() => api.charge(amount));
+  }
+}
+```
+
+### Handling Open Circuit
+
+```dart
+try {
+  final receipt = await pillar.charge(100.0);
+} on PortcullisOpenException catch (e) {
+  showWarning('Service recovering. Retry in ${e.remainingTimeout?.inSeconds}s');
+} catch (e) {
+  showError('Payment failed: $e');
+}
+```
+
+### Selective Failure Counting
+
+```dart
+late final gateway = portcullis(
+  failureThreshold: 5,
+  shouldTrip: (error, stack) {
+    if (error is ApiException) return error.statusCode >= 500;
+    return true; // network errors always count
+  },
+);
+```
+
+### Multiple Recovery Probes
+
+```dart
+late final critical = portcullis(
+  failureThreshold: 5,
+  resetTimeout: Duration(seconds: 60),
+  halfOpenMaxProbes: 3, // need 3 consecutive successes
+);
+```
+
+### Reactive Dashboard
+
+```dart
+// All state is reactive — use in Vestige, Derived, etc.
+Text('State: ${breaker.state.name}');
+Text('Failures: ${breaker.failureCount}');
+Text('Trips: ${breaker.tripCount}');
+Text('Healthy: ${breaker.isClosed}');
+
+// Manual controls
+breaker.trip();   // Proactive protection
+breaker.reset();  // Force recovery
+```
+
+---
+
+## Anvil — Dead Letter & Retry Queue
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+Anvil queues failed operations and retries them with configurable backoff strategies. Operations that exhaust retries move to a dead-letter state for manual inspection and replay.
+
+### Basic Usage
+
+```dart
+class SyncPillar extends Pillar {
+  late final retryQueue = anvil<String>(
+    maxRetries: 5,
+    backoff: AnvilBackoff.exponential(),
+    name: 'sync-retry',
+  );
+
+  Future<void> syncData(String payload) async {
+    try {
+      await api.sync(payload);
+    } catch (e) {
+      retryQueue.enqueue(
+        () => api.sync(payload).then((_) => 'synced'),
+        id: 'sync-$payload',
+      );
+    }
+  }
+}
+```
+
+### Backoff Strategies
+
+```dart
+// Exponential: 1s, 2s, 4s, 8s...
+AnvilBackoff.exponential(
+  initial: Duration(seconds: 1),
+  multiplier: 2.0,
+  jitter: true,       // ±25% random variation
+  maxDelay: Duration(minutes: 5), // safety cap
+);
+
+// Linear: 500ms, 1000ms, 1500ms...
+AnvilBackoff.linear(
+  initial: Duration(milliseconds: 500),
+  increment: Duration(milliseconds: 500),
+);
+
+// Constant: 2s, 2s, 2s...
+AnvilBackoff.constant(Duration(seconds: 2));
+```
+
+### Dead Letter Management
+
+```dart
+// Inspect dead letters
+for (final entry in queue.deadLetters) {
+  print('${entry.id}: ${entry.lastError} (${entry.attempts} attempts)');
+}
+
+// Re-enqueue all dead letters
+final count = queue.retryDeadLetters();
+
+// Purge dead letters
+queue.purge();
+
+// Remove specific entry
+queue.remove('sync-payload-42');
+```
+
+### Per-Entry Overrides
+
+```dart
+// Critical operation — more retries than default
+queue.enqueue(
+  () => api.processPayment(order),
+  id: 'payment-${order.id}',
+  maxRetries: 10,  // override queue default of 5
+  onSuccess: (result) => log.info('Payment recovered'),
+  onDeadLetter: (entry) => log.error('Payment permanently failed'),
+);
+```
+
+### Reactive Dashboard
+
+```dart
+// All counts are reactive
+Text('Pending: ${queue.pendingCount}');
+Text('Dead Letters: ${queue.deadLetterCount}');
+Text('Succeeded: ${queue.succeededCount}');
+Text('Processing: ${queue.isProcessing}');
+```
 
 ---
 

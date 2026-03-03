@@ -1,3 +1,4 @@
+import 'package:titan_basalt/titan_basalt.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 
 import '../data/quest_api.dart';

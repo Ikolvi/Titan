@@ -34,6 +34,8 @@ dependencies:
     sdk: flutter
   titan_bastion:
     path: ../titan_bastion
+  titan_basalt:
+    path: ../titan_basalt
   titan_atlas:
     path: ../titan_atlas
   titan_argus:

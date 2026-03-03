@@ -33,7 +33,7 @@
 library;
 
 import 'dart:async';
-import '../core/state.dart';
+import 'package:titan/titan.dart';
 
 /// The three states of a circuit breaker.
 enum BulwarkState {

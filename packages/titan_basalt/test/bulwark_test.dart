@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 import 'package:titan/titan.dart';
+import 'package:titan_basalt/titan_basalt.dart';
 
 class _ApiPillar extends Pillar {
   late final apiBreaker = bulwark<String>(

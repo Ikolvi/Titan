@@ -5,6 +5,38 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - Unreleased
+
+### Added
+- **Omen** — Reactive async derived with automatic dependency tracking (`Omen<T>`)
+  - Auto-tracks Core reads inside async compute function
+  - `AsyncValue` lifecycle: loading → data, refreshing, error
+  - `keepPreviousData` stale-while-revalidate pattern
+  - Debounce coalesces rapid dependency changes
+  - `refresh()`, `cancel()`, `reset()` manual controls
+  - Reactive `executionCount` tracking
+  - Pillar integration via `omen()` factory method
+- **Mandate** — Reactive policy evaluation engine with declarative writ rules (`Mandate`, `Writ`)
+  - `MandateStrategy`: `allOf` (AND), `anyOf` (OR), `majority` (weighted)
+  - `MandateVerdict` sealed class: `MandateGrant`, `MandateDenial` with `WritViolation` details
+  - Reactive `verdict`, `isGranted`, `violations` via `TitanComputed`
+  - `can(name)` per-writ reactive query
+  - Dynamic management: `addWrit()`, `addWrits()`, `removeWrit()`, `replaceWrit()`, `updateStrategy()`
+  - Inspection API: `writNames`, `writCount`, `hasWrit()`, `strategy`
+  - Pillar integration via `mandate()` factory method
+- **Ledger** — Reactive state transaction manager with atomic commit/rollback (`Ledger`, `LedgerTransaction`)
+  - `transact()` async and `transactSync()` with auto-commit/rollback
+  - `begin()` / `commit()` / `rollback()` manual transaction control
+  - `capture()` snapshots Core values before mutation
+  - Reactive state: `activeCount`, `commitCount`, `rollbackCount`, `failCount`, `hasActive`
+  - `LedgerRecord` audit history with `maxHistory` retention
+  - `LedgerStatus`: `active`, `committed`, `rolledBack`, `failed`
+  - Pillar integration via `ledger()` factory method
+- `Pillar.registerNodes()` — Public API for satellite packages to register lifecycle-managed reactive nodes
+
+### Changed
+- **Moved to `titan_basalt`**: Trove, Moat, Portcullis, Anvil, Pyre, Codex, Quarry, Bulwark, Saga, Volley, Tether, Annals (infrastructure/resilience features)
+
 ## [1.0.2] - 2026-03-03
 
 ### Changed

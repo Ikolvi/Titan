@@ -474,6 +474,8 @@ test('snapshot comparison', () {
 
 ### Bulwark — Test Harness
 
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
 `Bulwark` provides a structured test harness for Pillars with setup/teardown lifecycle:
 
 ```dart

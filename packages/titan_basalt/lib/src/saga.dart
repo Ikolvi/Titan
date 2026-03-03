@@ -40,7 +40,7 @@ library;
 
 import 'dart:async';
 
-import '../core/state.dart';
+import 'package:titan/titan.dart';
 
 /// The status of a [Saga] execution.
 enum SagaStatus {

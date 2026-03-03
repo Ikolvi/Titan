@@ -13,11 +13,9 @@ import '../core/observer.dart';
 import '../core/prism.dart';
 import '../core/reactive.dart';
 import '../core/state.dart';
-import '../data/codex.dart';
-import '../data/quarry.dart';
-import '../data/bulwark.dart';
-import '../data/saga.dart';
-import '../data/volley.dart';
+import '../data/mandate.dart';
+import '../data/ledger.dart';
+import '../data/omen.dart';
 import '../testing/snapshot.dart';
 import '../errors/vigil.dart';
 import '../events/herald.dart';
@@ -141,6 +139,30 @@ abstract class Pillar {
 
   /// The current number of active consumer references.
   int get refCount => _refCount;
+
+  // ---------------------------------------------------------------------------
+  // Node registration — for extension packages
+  // ---------------------------------------------------------------------------
+
+  /// Register reactive nodes for auto-disposal when this Pillar is disposed.
+  ///
+  /// Satellite packages (e.g. `titan_basalt`) use this to add lifecycle-
+  /// managed nodes from extension methods on [Pillar].
+  ///
+  /// ```dart
+  /// // In a satellite package:
+  /// extension PillarBasalt on Pillar {
+  ///   Trove<K, V> trove<K, V>({...}) {
+  ///     final t = Trove<K, V>(...);
+  ///     registerNodes(t.managedNodes);
+  ///     return t;
+  ///   }
+  /// }
+  /// ```
+  void registerNodes(Iterable<ReactiveNode> nodes) {
+    assert(!_isDisposed, '$runtimeType has already been disposed.');
+    _managedNodes.addAll(nodes);
+  }
 
   // ---------------------------------------------------------------------------
   // Core creation — reactive state managed by this Pillar
@@ -413,186 +435,109 @@ abstract class Pillar {
   }
 
   // ---------------------------------------------------------------------------
-  // Codex — paginated data
+  // Omen — Reactive async Derived
   // ---------------------------------------------------------------------------
 
-  /// Creates a [Codex] (paginated data manager) managed by this Pillar.
+  /// Creates an [Omen] (reactive async Derived) managed by this Pillar.
   ///
-  /// A Codex handles paginated data loading with reactive state for items,
-  /// loading status, errors, and page tracking. Supports both offset-based
-  /// and cursor-based pagination.
+  /// An Omen re-evaluates its async computation whenever the reactive Cores
+  /// read inside it change. It is the async counterpart to [derived].
   ///
   /// ```dart
-  /// late final quests = codex<Quest>(
-  ///   fetcher: (request) async {
-  ///     final result = await api.getQuests(
-  ///       page: request.page,
-  ///       limit: request.pageSize,
-  ///     );
-  ///     return CodexPage(
-  ///       items: result.items,
-  ///       hasMore: result.hasMore,
-  ///     );
-  ///   },
-  ///   pageSize: 20,
+  /// late final query = core('');
+  /// late final results = omen<List<Product>>(
+  ///   () async => api.search(query.value),
+  ///   debounce: Duration(milliseconds: 300),
   /// );
-  ///
-  /// Future<void> loadQuests() => quests.loadFirst();
-  /// Future<void> loadMore() => quests.loadNext();
   /// ```
   @protected
-  Codex<T> codex<T>(
-    Future<CodexPage<T>> Function(CodexRequest request) fetcher, {
-    int pageSize = 20,
+  Omen<T> omen<T>(
+    Future<T> Function() compute, {
+    Duration? debounce,
+    bool keepPreviousData = true,
     String? name,
+    bool eager = true,
   }) {
     _assertNotDisposed();
-    final c = Codex<T>(fetcher: fetcher, pageSize: pageSize, name: name);
-    _managedNodes.addAll(c.managedNodes);
-    return c;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Quarry — data fetching with caching
-  // ---------------------------------------------------------------------------
-
-  /// Creates a [Quarry] (data fetching query) managed by this Pillar.
-  ///
-  /// A Quarry manages a single async data resource with reactive state,
-  /// stale-while-revalidate caching, automatic deduplication, retry logic,
-  /// and optimistic update support.
-  ///
-  /// ```dart
-  /// late final userQuery = quarry<User>(
-  ///   fetcher: () => api.getUser(),
-  ///   staleTime: Duration(minutes: 5),
-  /// );
-  ///
-  /// @override
-  /// void onInit() => userQuery.fetch();
-  /// ```
-  @protected
-  Quarry<T> quarry<T>({
-    required Future<T> Function() fetcher,
-    Duration? staleTime,
-    QuarryRetry retry = const QuarryRetry(maxAttempts: 0),
-    void Function(T data)? onSuccess,
-    void Function(Object error)? onError,
-    String? name,
-  }) {
-    _assertNotDisposed();
-    final q = Quarry<T>(
-      fetcher: fetcher,
-      staleTime: staleTime,
-      retry: retry,
-      onSuccess: onSuccess,
-      onError: onError,
+    final o = Omen<T>(
+      compute,
+      debounce: debounce,
+      keepPreviousData: keepPreviousData,
       name: name,
+      eager: eager,
     );
-    _managedNodes.addAll(q.managedNodes);
-    return q;
+    _managedNodes.addAll(o.managedNodes);
+    return o;
   }
 
   // ---------------------------------------------------------------------------
-  // Bulwark — circuit breaker
+  // Mandate — reactive policy engine
   // ---------------------------------------------------------------------------
 
-  /// Creates a [Bulwark] (circuit breaker) managed by this Pillar.
+  /// Creates a [Mandate] (reactive policy engine) managed by this Pillar.
   ///
-  /// A Bulwark shields your app from cascading failures by tracking
-  /// error rates and automatically opening the circuit when a failure
-  /// threshold is breached. All state fields are reactive [Core]s.
+  /// A Mandate evaluates [Writ] policies reactively — when any [Core]
+  /// read inside a Writ's evaluation function changes, the verdict
+  /// automatically re-evaluates and downstream Vestige widgets rebuild.
   ///
   /// ```dart
-  /// late final apiBreaker = bulwark<String>(
-  ///   failureThreshold: 3,
-  ///   resetTimeout: Duration(seconds: 30),
-  ///   name: 'api',
+  /// late final editAccess = mandate(
+  ///   writs: [
+  ///     Writ(
+  ///       name: 'authenticated',
+  ///       evaluate: () => currentUser.value != null,
+  ///       reason: 'Must be logged in',
+  ///     ),
+  ///     Writ(
+  ///       name: 'is-owner',
+  ///       evaluate: () => doc.value?.ownerId == currentUser.value?.id,
+  ///       reason: 'Only the owner can edit',
+  ///     ),
+  ///   ],
+  ///   name: 'edit-access',
   /// );
+  /// ```
+  @protected
+  Mandate mandate({
+    List<Writ> writs = const [],
+    MandateStrategy strategy = MandateStrategy.allOf,
+    String? name,
+  }) {
+    _assertNotDisposed();
+    final m = Mandate(writs: writs, strategy: strategy, name: name);
+    _managedNodes.addAll(m.managedNodes);
+    _managedNodes.addAll(m.managedStateNodes);
+    return m;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Ledger — state transactions
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Ledger] (state transaction manager) managed by this Pillar.
   ///
-  /// Future<String> fetchData() async {
-  ///   return apiBreaker.call(() => api.getData());
+  /// Provides ACID-like transactions for multi-Core mutations:
+  /// commit atomically or roll back to pre-transaction state.
+  ///
+  /// ```dart
+  /// late final txManager = ledger(name: 'checkout');
+  ///
+  /// Future<void> placeOrder() async {
+  ///   await txManager.transact((tx) async {
+  ///     tx.capture(inventory);
+  ///     tx.capture(balance);
+  ///     inventory.value -= qty;
+  ///     balance.value -= price;
+  ///   });
   /// }
   /// ```
   @protected
-  Bulwark<T> bulwark<T>({
-    int failureThreshold = 3,
-    Duration resetTimeout = const Duration(seconds: 30),
-    void Function(Object error)? onOpen,
-    void Function()? onClose,
-    void Function()? onHalfOpen,
-    String? name,
-  }) {
+  Ledger ledger({int maxHistory = 100, String? name}) {
     _assertNotDisposed();
-    final b = Bulwark<T>(
-      failureThreshold: failureThreshold,
-      resetTimeout: resetTimeout,
-      onOpen: onOpen,
-      onClose: onClose,
-      onHalfOpen: onHalfOpen,
-      name: name,
-    );
-    _managedNodes.addAll(b.managedNodes);
-    return b;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Saga — multi-step workflow orchestration
-  // ---------------------------------------------------------------------------
-
-  /// Creates a [Saga] (multi-step workflow) managed by this Pillar.
-  ///
-  /// A Saga coordinates a sequence of async steps with automatic
-  /// compensation (rollback) on failure. All progress is reactive.
-  ///
-  /// ```dart
-  /// late final checkout = saga<Order>(
-  ///   steps: [
-  ///     SagaStep(name: 'validate', execute: (_) async => validate()),
-  ///     SagaStep(
-  ///       name: 'charge',
-  ///       execute: (_) async => chargeCard(),
-  ///       compensate: (_) async => refundCard(),
-  ///     ),
-  ///   ],
-  /// );
-  /// ```
-  @protected
-  Saga<T> saga<T>({
-    required List<SagaStep<T>> steps,
-    void Function(T? result)? onComplete,
-    void Function(Object error, String failedStep)? onError,
-    void Function(String stepName, int index, int total)? onStepComplete,
-    String? name,
-  }) {
-    final s = Saga<T>(
-      steps: steps,
-      onComplete: onComplete,
-      onError: onError,
-      onStepComplete: onStepComplete,
-      name: name,
-    );
-    _managedNodes.addAll(s.managedNodes);
-    return s;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Volley — batch async operations
-  // ---------------------------------------------------------------------------
-
-  /// Creates a [Volley] (batch async executor) managed by this Pillar.
-  ///
-  /// A Volley runs multiple async tasks in parallel with a configurable
-  /// concurrency limit and reactive progress tracking.
-  ///
-  /// ```dart
-  /// late final upload = volley<String>(concurrency: 3);
-  /// ```
-  @protected
-  Volley<T> volley<T>({int concurrency = 5, String? name}) {
-    final v = Volley<T>(concurrency: concurrency, name: name);
-    _managedNodes.addAll(v.managedNodes);
-    return v;
+    final l = Ledger(maxHistory: maxHistory, name: name);
+    _managedNodes.addAll(l.managedNodes);
+    _managedNodes.addAll(l.managedStateNodes);
+    return l;
   }
 
   // ---------------------------------------------------------------------------

@@ -2,6 +2,8 @@
 
 *In which Kael tests every transition, captures every state, and learns that confidence grows from proof, not hope.*
 
+> **Package:** Bulwark and Saga are in `titan_basalt` — add `import 'package:titan_basalt/titan_basalt.dart';` to use them.
+
 ---
 
 "It works on my machine."

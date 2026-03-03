@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:titan_basalt/titan_basalt.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 
 import '../pillars/enterprise_demo_pillar.dart';
@@ -44,7 +45,7 @@ class _EnterpriseTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 8,
+      length: 16,
       child: Column(
         children: [
           const TabBar(
@@ -57,6 +58,14 @@ class _EnterpriseTabs extends StatelessWidget {
               Tab(text: 'Conduit'),
               Tab(text: 'Prism'),
               Tab(text: 'Nexus'),
+              Tab(text: 'Trove'),
+              Tab(text: 'Moat'),
+              Tab(text: 'Omen'),
+              Tab(text: 'Pyre'),
+              Tab(text: 'Mandate'),
+              Tab(text: 'Ledger'),
+              Tab(text: 'Portcullis'),
+              Tab(text: 'Anvil'),
               Tab(text: 'Toolkit'),
             ],
           ),
@@ -70,6 +79,14 @@ class _EnterpriseTabs extends StatelessWidget {
                 _ConduitTab(),
                 _PrismTab(),
                 _NexusTab(),
+                _TroveTab(),
+                _MoatTab(),
+                _OmenTab(),
+                _PyreTab(),
+                _MandateTab(),
+                _LedgerTab(),
+                _PortcullisTab(),
+                _AnvilTab(),
                 _ToolkitTab(),
               ],
             ),
@@ -1149,8 +1166,626 @@ class _ToolkitTab extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Trove Tab — Reactive Cache
+// ---------------------------------------------------------------------------
+
+class _TroveTab extends StatelessWidget {
+  const _TroveTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, p) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SectionHeader('Trove — Reactive Cache'),
+              const SizedBox(height: 8),
+              const Text(
+                'Trove is a TTL + LRU in-memory cache with reactive '
+                'statistics. All stats are live Cores that drive UI rebuilds.',
+              ),
+              const SizedBox(height: 16),
+
+              // Cache stats
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _SectionHeader('Cache Stats'),
+                      const SizedBox(height: 8),
+                      Text('Status: ${p.cacheStatus.value}'),
+                      Text('Entries: ${p.questCache.size.value}'),
+                      Text('Hits: ${p.questCache.hits.value}'),
+                      Text('Misses: ${p.questCache.misses.value}'),
+                      Text('Evictions: ${p.questCache.evictions.value}'),
+                      Text(
+                        'Hit rate: '
+                        '${p.questCache.hitRate.toStringAsFixed(1)}%',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Actions
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton(
+                    onPressed: () async {
+                      final quest = await p.fetchCached('quest-1');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Fetched: ${quest.title}'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Fetch quest-1 (cached)'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final quest = await p.fetchCached('quest-2');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Fetched: ${quest.title}'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Fetch quest-2 (cached)'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => p.evictQuest('quest-1'),
+                    child: const Text('Evict quest-1'),
+                  ),
+                  OutlinedButton(
+                    onPressed: p.clearCache,
+                    child: const Text('Clear Cache'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Moat Tab — Rate Limiter
+// ---------------------------------------------------------------------------
+
+class _MoatTab extends StatelessWidget {
+  const _MoatTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, p) {
+        final remaining = p.apiLimiter.remainingTokens.value;
+        final max = p.apiLimiter.maxTokens;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SectionHeader('Moat — Rate Limiter'),
+              const SizedBox(height: 8),
+              const Text(
+                'Moat is a token-bucket rate limiter. Tokens are consumed '
+                'per request and refilled at a steady rate. All state is '
+                'reactive.',
+              ),
+              const SizedBox(height: 16),
+
+              // Token status
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _SectionHeader('Token Status'),
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(
+                        value: max > 0 ? remaining / max : 0,
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Quota: ${p.quotaStatus.value}'),
+                      Text('Consumed: ${p.apiLimiter.consumed.value}'),
+                      Text(
+                        'Fill: '
+                        '${p.apiLimiter.fillPercentage.toStringAsFixed(0)}%',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Actions
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton(
+                    onPressed: () async {
+                      final quest = await p.fetchRateLimited('quest-1');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              quest != null
+                                  ? 'Fetched: ${quest.title}'
+                                  : 'Rate limited!',
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Fetch (rate limited)'),
+                  ),
+                  OutlinedButton(
+                    onPressed: p.exhaustLimiter,
+                    child: const Text('Exhaust Tokens'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => p.apiLimiter.reset(),
+                    child: const Text('Reset Limiter'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Shared Widgets
 // ---------------------------------------------------------------------------
+
+class _PyreTab extends StatelessWidget {
+  const _PyreTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, pillar) {
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const _SectionHeader('Pyre — Priority Task Queue'),
+            const SizedBox(height: 8),
+            const Text(
+              'Pyre processes async tasks in priority order with '
+              'configurable concurrency, backpressure, and retry.',
+            ),
+            const SizedBox(height: 16),
+
+            // Status & progress
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Status: ',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(pillar.taskQueue.status.name),
+                        const Spacer(),
+                        Text(pillar.pyreProgressText.value),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(value: pillar.taskQueue.progress),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _PyreStatChip('Queue', pillar.taskQueue.queueLength),
+                        _PyreStatChip('Running', pillar.taskQueue.runningCount),
+                        _PyreStatChip('Done', pillar.taskQueue.completedCount),
+                        _PyreStatChip('Failed', pillar.taskQueue.failedCount),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Enqueue controls
+            const _SectionHeader('Enqueue Tasks'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: pillar.enqueueSampleTasks,
+                  icon: const Icon(Icons.add_task),
+                  label: const Text('Add 5 Sample Tasks'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => pillar.enqueueQuestTask(
+                    'Urgent Dispatch',
+                    priority: PyrePriority.critical,
+                  ),
+                  icon: const Icon(Icons.priority_high),
+                  label: const Text('Critical Task'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => pillar.enqueueQuestTask('Routine Patrol'),
+                  icon: const Icon(Icons.task),
+                  label: const Text('Normal Task'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Queue controls
+            const _SectionHeader('Queue Controls'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: pillar.taskQueue.pause,
+                  icon: const Icon(Icons.pause),
+                  label: const Text('Pause'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: pillar.taskQueue.resume,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Resume'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: pillar.taskQueue.cancelAll,
+                  icon: const Icon(Icons.cancel),
+                  label: const Text('Cancel All'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => pillar.taskQueue.drain(),
+                  icon: const Icon(Icons.water_drop),
+                  label: const Text('Drain'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: pillar.taskQueue.reset,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Reset'),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PyreStatChip extends StatelessWidget {
+  final String label;
+  final int value;
+
+  const _PyreStatChip(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          '$value',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _OmenTab extends StatelessWidget {
+  const _OmenTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, pillar) {
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const _SectionHeader('Omen — Reactive Async Derived'),
+            const SizedBox(height: 8),
+            const Text(
+              'Omen auto-tracks Core reads inside an async function '
+              'and re-executes when dependencies change.',
+            ),
+            const SizedBox(height: 16),
+
+            // Search input
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Search quests',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: pillar.updateOmenQuery,
+            ),
+            const SizedBox(height: 8),
+
+            // Sort toggle
+            Row(
+              children: [
+                const Text('Sort: '),
+                ActionChip(
+                  label: Text(pillar.omenSort.value),
+                  onPressed: pillar.toggleOmenSort,
+                ),
+                const Spacer(),
+                Text(pillar.omenExecStatus.value),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Omen results
+            Builder(
+              builder: (context) {
+                return switch (pillar.omenResults.value) {
+                  AsyncData(:final data) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final item in data)
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.task_alt),
+                          title: Text(item),
+                        ),
+                      if (data.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text('No quests match your search'),
+                          ),
+                        ),
+                    ],
+                  ),
+                  AsyncRefreshing(:final data) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const LinearProgressIndicator(),
+                      for (final item in data)
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.task_alt),
+                          title: Text(
+                            item,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  AsyncLoading() => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  AsyncError(:final error) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text('Error: $error'),
+                    ),
+                  ),
+                };
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Controls
+            Wrap(
+              spacing: 8,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: pillar.omenResults.refresh,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: pillar.omenResults.cancel,
+                  icon: const Icon(Icons.cancel),
+                  label: const Text('Cancel'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: pillar.omenResults.reset,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Reset'),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mandate Tab — Reactive Policy Engine
+// ---------------------------------------------------------------------------
+
+class _MandateTab extends StatelessWidget {
+  const _MandateTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, pillar) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SectionHeader('Edit Access (allOf)'),
+              const SizedBox(height: 8),
+
+              // Verdict card
+              Card(
+                color: pillar.editAccess.isGranted.value
+                    ? Colors.green.shade50
+                    : Colors.red.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            pillar.editAccess.isGranted.value
+                                ? Icons.check_circle
+                                : Icons.block,
+                            color: pillar.editAccess.isGranted.value
+                                ? Colors.green
+                                : Colors.red,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            pillar.editVerdictText.value,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Individual writ status
+                      ...pillar.editAccess.writNames.map((name) {
+                        final passes = pillar.editAccess.can(name).value;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Icon(
+                                passes ? Icons.check : Icons.close,
+                                size: 16,
+                                color: passes ? Colors.green : Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(name),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Controls
+              const _SectionHeader('Controls'),
+              const SizedBox(height: 8),
+
+              // Role selector
+              Row(
+                children: [
+                  const Text('Role: '),
+                  const SizedBox(width: 8),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'viewer', label: Text('Viewer')),
+                      ButtonSegment(value: 'editor', label: Text('Editor')),
+                      ButtonSegment(value: 'admin', label: Text('Admin')),
+                    ],
+                    selected: {pillar.userRole.value},
+                    onSelectionChanged: (s) => pillar.setUserRole(s.first),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Toggle switches
+              SwitchListTile(
+                title: const Text('Email Verified'),
+                value: pillar.isVerified.value,
+                onChanged: (_) => pillar.toggleVerification(),
+              ),
+              SwitchListTile(
+                title: const Text('Editing Enabled'),
+                value: pillar.editingEnabled.value,
+                onChanged: (_) => pillar.toggleEditing(),
+              ),
+              const SizedBox(height: 16),
+
+              // View access (anyOf)
+              const _SectionHeader('View Access (anyOf)'),
+              const SizedBox(height: 8),
+              Card(
+                color: pillar.viewAccess.isGranted.value
+                    ? Colors.green.shade50
+                    : Colors.red.shade50,
+                child: ListTile(
+                  leading: Icon(
+                    pillar.viewAccess.isGranted.value
+                        ? Icons.visibility
+                        : Icons.visibility_off,
+                    color: pillar.viewAccess.isGranted.value
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                  title: Text(
+                    pillar.viewAccess.isGranted.value
+                        ? 'View: GRANTED'
+                        : 'View: DENIED',
+                  ),
+                  subtitle: Text(
+                    'Strategy: anyOf — ${pillar.viewAccess.writCount} writs',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Inspection
+              const _SectionHeader('Inspection'),
+              const SizedBox(height: 8),
+              Text('Writ names: ${pillar.editAccess.writNames.join(", ")}'),
+              Text('Writ count: ${pillar.editAccess.writCount}'),
+              Text('Strategy: ${pillar.editAccess.strategy.name}'),
+              Text(
+                'Has "is-verified": ${pillar.editAccess.hasWrit("is-verified")}',
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
 
 class _SectionHeader extends StatelessWidget {
   final String title;
@@ -1163,6 +1798,522 @@ class _SectionHeader extends StatelessWidget {
       style: Theme.of(
         context,
       ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ledger Tab — State Transactions
+// ---------------------------------------------------------------------------
+
+class _LedgerTab extends StatelessWidget {
+  const _LedgerTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, pillar) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SectionHeader('State Balances'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.monetization_on,
+                              color: Colors.amber,
+                              size: 32,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${pillar.goldBalance.value}',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            const Text('Gold'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.inventory,
+                              color: Colors.blue,
+                              size: 32,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${pillar.itemCount.value}',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            const Text('Items'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Transaction actions
+              const _SectionHeader('Transactions'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => pillar.purchaseItems(5, 20),
+                    icon: const Icon(Icons.shopping_cart),
+                    label: const Text('Buy 5 items (100g)'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => pillar.purchaseItems(10, 50),
+                    icon: const Icon(Icons.shopping_cart),
+                    label: const Text('Buy 10 items (500g)'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: pillar.failedPurchase,
+                    icon: const Icon(Icons.error_outline),
+                    label: const Text('Failed Purchase'),
+                  ),
+                  TextButton.icon(
+                    onPressed: pillar.resetLedgerDemo,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reset'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Result message
+              Card(
+                color: Colors.grey.shade100,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(pillar.txResultMessage.value)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Reactive counters
+              const _SectionHeader('Reactive Counters'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _CounterChip(
+                    label: 'Commits',
+                    value: pillar.txManager.commitCount,
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 8),
+                  _CounterChip(
+                    label: 'Rollbacks',
+                    value: pillar.txManager.rollbackCount,
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 8),
+                  _CounterChip(
+                    label: 'Failed',
+                    value: pillar.txManager.failCount,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(width: 8),
+                  _CounterChip(
+                    label: 'Active',
+                    value: pillar.txManager.activeCount,
+                    color: Colors.blue,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Total started: ${pillar.txManager.totalStarted}  •  '
+                'Has active: ${pillar.txManager.hasActive}',
+              ),
+              const SizedBox(height: 16),
+
+              // History
+              const _SectionHeader('Transaction History'),
+              const SizedBox(height: 8),
+              if (pillar.txManager.history.isEmpty)
+                const Text('No transactions yet')
+              else
+                ...pillar.txManager.history.reversed.map(
+                  (r) => Card(
+                    child: ListTile(
+                      leading: Icon(
+                        r.status == LedgerStatus.committed
+                            ? Icons.check_circle
+                            : r.status == LedgerStatus.failed
+                            ? Icons.error
+                            : Icons.undo,
+                        color: r.status == LedgerStatus.committed
+                            ? Colors.green
+                            : r.status == LedgerStatus.failed
+                            ? Colors.red
+                            : Colors.orange,
+                      ),
+                      title: Text(
+                        '#${r.id} ${r.name ?? "unnamed"} — ${r.status.name}',
+                      ),
+                      subtitle: Text('Cores: ${r.coreCount}'),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CounterChip extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  const _CounterChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: CircleAvatar(
+        backgroundColor: color,
+        child: Text(
+          '$value',
+          style: const TextStyle(color: Colors.white, fontSize: 12),
+        ),
+      ),
+      label: Text(label),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Portcullis Tab — Circuit Breaker
+// ---------------------------------------------------------------------------
+
+class _PortcullisTab extends StatelessWidget {
+  const _PortcullisTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, pillar) {
+        final stateColor = switch (pillar.circuitBreaker.state) {
+          PortcullisState.closed => Colors.green,
+          PortcullisState.open => Colors.red,
+          PortcullisState.halfOpen => Colors.orange,
+        };
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SectionHeader('Circuit State'),
+              const SizedBox(height: 8),
+
+              // State indicator
+              Card(
+                color: stateColor.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        switch (pillar.circuitBreaker.state) {
+                          PortcullisState.closed => Icons.check_circle,
+                          PortcullisState.open => Icons.block,
+                          PortcullisState.halfOpen => Icons.warning,
+                        },
+                        color: stateColor,
+                        size: 40,
+                      ),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pillar.circuitBreaker.state.name.toUpperCase(),
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: stateColor,
+                                ),
+                          ),
+                          Text(
+                            'Threshold: ${pillar.circuitBreaker.failureThreshold} '
+                            '• Reset: ${pillar.circuitBreaker.resetTimeout.inSeconds}s',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Actions
+              const _SectionHeader('Simulate'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: pillar.simulateSuccess,
+                    icon: const Icon(Icons.check),
+                    label: const Text('Success Call'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: pillar.simulateFailure,
+                    icon: const Icon(Icons.error_outline),
+                    label: const Text('Failure Call'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade100,
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: pillar.tripBreaker,
+                    icon: const Icon(Icons.flash_on),
+                    label: const Text('Manual Trip'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: pillar.resetBreaker,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Manual Reset'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Result
+              Card(
+                color: Colors.grey.shade100,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(pillar.callResult.value)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Counters
+              const _SectionHeader('Counters'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _CounterChip(
+                    label: 'Failures',
+                    value: pillar.circuitBreaker.failureCount,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(width: 8),
+                  _CounterChip(
+                    label: 'Successes',
+                    value: pillar.circuitBreaker.successCount,
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 8),
+                  _CounterChip(
+                    label: 'Trips',
+                    value: pillar.circuitBreaker.tripCount,
+                    color: Colors.orange,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Healthy: ${pillar.circuitBreaker.isClosed}'),
+              const SizedBox(height: 16),
+
+              // Trip history
+              const _SectionHeader('Trip History'),
+              const SizedBox(height: 8),
+              if (pillar.circuitBreaker.tripHistory.isEmpty)
+                const Text('No trips recorded')
+              else
+                ...pillar.circuitBreaker.tripHistory.reversed.map(
+                  (r) => Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.flash_on, color: Colors.orange),
+                      title: Text(
+                        'Trip at ${r.timestamp.hour}:${r.timestamp.minute.toString().padLeft(2, '0')}:${r.timestamp.second.toString().padLeft(2, '0')}',
+                      ),
+                      subtitle: Text(
+                        'After ${r.failureCount} failures'
+                        '${r.lastError != null ? ' • ${r.lastError}' : ''}',
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AnvilTab extends StatelessWidget {
+  const _AnvilTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Vestige<EnterpriseDemoPillar>(
+      builder: (context, pillar) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SectionHeader('Anvil — Dead Letter & Retry Queue'),
+              const SizedBox(height: 8),
+              const Text(
+                'Anvil queues failed operations and retries them with '
+                'configurable backoff. Exhausted entries become dead letters.',
+              ),
+              const SizedBox(height: 16),
+
+              // Actions
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: pillar.enqueueSuccess,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Enqueue Success'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: pillar.enqueueFailure,
+                    icon: const Icon(Icons.error_outline),
+                    label: const Text('Enqueue Failure'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade100,
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: pillar.retryDead,
+                    icon: const Icon(Icons.replay),
+                    label: const Text('Retry Dead'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: pillar.purgeDead,
+                    icon: const Icon(Icons.delete_sweep),
+                    label: const Text('Purge Dead'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: pillar.clearQueue,
+                    icon: const Icon(Icons.clear_all),
+                    label: const Text('Clear All'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Result
+              Card(
+                color: Colors.grey.shade100,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(pillar.anvilResult.value)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Counters
+              const _SectionHeader('Queue Counters'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _CounterChip(
+                    label: 'Pending',
+                    value: pillar.retryQueue.pendingCount,
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(width: 8),
+                  _CounterChip(
+                    label: 'Succeeded',
+                    value: pillar.retryQueue.succeededCount,
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 8),
+                  _CounterChip(
+                    label: 'Dead Letters',
+                    value: pillar.retryQueue.deadLetterCount,
+                    color: Colors.red,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Total Enqueued: ${pillar.retryQueue.totalEnqueued}'),
+              Text('Processing: ${pillar.retryQueue.isProcessing}'),
+              const SizedBox(height: 16),
+
+              // Dead letter list
+              const _SectionHeader('Dead Letter Entries'),
+              const SizedBox(height: 8),
+              if (pillar.retryQueue.deadLetters.isEmpty)
+                const Text('No dead letters')
+              else
+                ...pillar.retryQueue.deadLetters.reversed.map(
+                  (entry) => Card(
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.warning_amber,
+                        color: Colors.red,
+                      ),
+                      title: Text(entry.id ?? 'unnamed'),
+                      subtitle: Text(
+                        'Attempts: ${entry.attempts}/${entry.maxRetries}'
+                        '${entry.lastError != null ? '\n${entry.lastError}' : ''}',
+                      ),
+                      isThreeLine: entry.lastError != null,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

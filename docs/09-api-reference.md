@@ -54,6 +54,8 @@ abstract class Pillar
 | `nexusSet<T>([Set<T>? initial, String? name])` | `NexusSet<T>` | Create a managed reactive set |
 | `epoch<T>(T value, {int maxHistory, String? name})` | `Epoch<T>` | Create a managed Core with undo/redo |
 | `watch(dynamic Function() fn, {bool fireImmediately})` | `TitanEffect` | Create a managed reactive side effect |
+| `trove<K, V>({Duration? defaultTtl, int? maxEntries, ...})` | `Trove<K, V>` | Create a managed TTL/LRU cache *(titan_basalt extension)* |
+| `moat({int maxTokens, Duration refillRate, ...})` | `Moat` | Create a managed token-bucket rate limiter *(titan_basalt extension)* |
 
 #### Mutation
 
@@ -1223,7 +1225,9 @@ ScrollGroup(List<Scroll<dynamic>> fields)
 
 ---
 
-## Data Layer (package:titan)
+## Data Layer (package:titan_basalt)
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
 
 ### Codex\<T\>
 
@@ -1656,6 +1660,8 @@ loom<S, E>({
 
 ### Bulwark
 
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
 Reactive circuit breaker for resilient async operations.
 
 #### Constructor (Pillar factory)
@@ -1695,6 +1701,8 @@ bulwark<T>({
 ---
 
 ### Saga
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
 
 Multi-step async workflow with compensation (rollback) on failure.
 
@@ -1738,6 +1746,8 @@ SagaStep<T>({
 
 ### Volley
 
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
 Batch async operations with concurrency control and partial-failure handling.
 
 #### Constructor (Pillar factory)
@@ -1770,6 +1780,8 @@ VolleyTask<T>({required String name, required Future<T> Function() execute})
 ---
 
 ### Annals
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
 
 Static audit trail for Core mutations. Immutable, append-only, FIFO-evicted.
 
@@ -1804,6 +1816,8 @@ AnnalEntry({
 ---
 
 ### Tether
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
 
 Static request-response channels between Pillars.
 
@@ -1857,6 +1871,506 @@ Static feature flag management with reactive reads.
 | `Sigil.clearOverride(name)` | `void` | Clear one override |
 | `Sigil.clearOverrides()` | `void` | Clear all overrides |
 | `Sigil.reset()` | `void` | Dispose all flags |
+
+---
+
+### Trove\<K, V\>
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+Reactive in-memory cache with TTL expiry and LRU eviction. O(1) for all operations.
+
+#### Constructor
+
+```dart
+Trove<K, V>({
+  Duration? defaultTtl,
+  int? maxEntries,
+  void Function(K, V, TroveEvictionReason)? onEvict,
+  Duration cleanupInterval = const Duration(seconds: 60),
+  String? name,
+})
+```
+
+#### Pillar Factory
+
+```dart
+trove<K, V>({Duration? defaultTtl, int? maxEntries, ...}) → Trove<K, V>
+```
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `get(key)` | `V?` | Retrieve cached value (lazy expiry) |
+| `put(key, value, {ttl})` | `void` | Store value with optional per-entry TTL |
+| `putIfAbsent(key, compute)` | `V` | Store only if key absent/expired |
+| `getOrPut(key, compute)` | `Future<V>` | Async fetch-or-cache |
+| `putAll(map, {ttl})` | `void` | Batch store |
+| `getAll(keys)` | `Map<K, V>` | Batch retrieve (skips missing/expired) |
+| `evict(key)` | `bool` | Manually evict an entry |
+| `clear()` | `void` | Clear all entries |
+| `reset()` | `void` | Clear entries and reset stats |
+| `containsKey(key)` | `bool` | Check existence (no hit/miss tracking) |
+| `remainingTtl(key)` | `Duration?` | Time until entry expires |
+| `isExpired(key)` | `bool` | Whether entry has expired |
+| `dispose()` | `void` | Dispose cache and timers |
+
+#### Reactive State
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `size` | `Core<int>` | Current entry count |
+| `hits` | `Core<int>` | Total cache hits |
+| `misses` | `Core<int>` | Total cache misses |
+| `evictions` | `Core<int>` | Total evictions |
+| `hitRate` | `double` | Hit rate percentage (0.0–100.0) |
+| `missRate` | `double` | Miss rate percentage (0.0–100.0) |
+
+#### TroveEvictionReason
+
+| Value | Description |
+|-------|-------------|
+| `expired` | TTL elapsed |
+| `capacity` | LRU eviction (cache full) |
+| `manual` | `evict()` or `clear()` called |
+
+---
+
+### Moat
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+Token-bucket rate limiter with reactive state and per-key quotas.
+
+#### Constructor
+
+```dart
+Moat({
+  int maxTokens = 10,
+  Duration refillRate = const Duration(seconds: 1),
+  int? initialTokens,
+  void Function()? onReject,
+  String? name,
+})
+```
+
+#### Pillar Factory
+
+```dart
+moat({int maxTokens, Duration refillRate, ...}) → Moat
+```
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `tryConsume([tokens])` | `bool` | Non-blocking: consume or reject |
+| `consume({tokens, timeout})` | `Future<bool>` | Blocking: wait for token with optional timeout |
+| `guard<T>(action, {onLimit, tokens})` | `Future<T?>` | Execute if allowed, null if rejected |
+| `reset()` | `void` | Refill bucket and clear stats |
+| `dispose()` | `void` | Cancel timers and dispose state |
+
+#### Reactive State
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `remainingTokens` | `Core<int>` | Available tokens |
+| `rejections` | `Core<int>` | Total rejected requests |
+| `consumed` | `Core<int>` | Total consumed tokens |
+| `hasTokens` | `bool` | Whether tokens available |
+| `isEmpty` | `bool` | Whether bucket empty |
+| `fillPercentage` | `double` | Bucket fill level (0.0–100.0) |
+| `timeToNextToken` | `Duration` | Time until next refill |
+
+---
+
+### MoatPool
+
+Per-key rate limiter pool sharing a common configuration.
+
+#### Constructor
+
+```dart
+MoatPool({
+  int maxTokens = 10,
+  Duration refillRate = const Duration(seconds: 1),
+  int? initialTokens,
+})
+```
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `tryConsume(key, [tokens])` | `bool` | Consume from key-specific bucket |
+| `get(key)` | `Moat` | Get or create limiter for key |
+| `containsKey(key)` | `bool` | Check if key has a limiter |
+| `remove(key)` | `bool` | Remove and dispose key's limiter |
+| `keys` | `Iterable<String>` | All active keys |
+| `length` | `int` | Number of active limiters |
+| `dispose()` | `void` | Dispose all limiters |
+
+---
+
+### Omen\<T\>
+
+Reactive async computed value with automatic dependency tracking. The async counterpart to `Derived`.
+
+#### Constructor
+
+```dart
+Omen<T>(
+  Future<T> Function() compute, {
+  Duration? debounce,
+  bool keepPreviousData = true,
+  String? name,
+  bool eager = true,
+})
+```
+
+#### Pillar Factory
+
+```dart
+omen<T>(Future<T> Function() compute, {Duration? debounce, ...}) → Omen<T>
+```
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `value` | `AsyncValue<T>` | Current state (reactive — auto-tracked) |
+| `state` | `TitanState<AsyncValue<T>>` | Underlying reactive state node |
+| `data` | `T?` | Current data if available |
+| `isLoading` | `bool` | Whether currently loading |
+| `hasData` | `bool` | Whether data is available |
+| `hasError` | `bool` | Whether in error state |
+| `isRefreshing` | `bool` | Whether refreshing with previous data |
+| `executionCount` | `TitanState<int>` | Reactive execution counter |
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `refresh()` | `void` | Force re-execution regardless of dependency changes |
+| `cancel()` | `void` | Cancel in-flight computation |
+| `reset()` | `void` | Clear state, reset counter, re-execute |
+| `dispose()` | `void` | Cancel, clear deps, dispose state |
+
+---
+
+### Pyre\<T\>
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+Priority-ordered async task queue with concurrency control, backpressure, and retry.
+
+#### Constructor
+
+```dart
+Pyre<T>({
+  int concurrency = 3,
+  int? maxQueueSize,
+  int maxRetries = 0,
+  Duration retryDelay = const Duration(milliseconds: 500),
+  bool autoStart = true,
+  void Function(String taskId, T result)? onTaskComplete,
+  void Function(String taskId, Object error)? onTaskFailed,
+  void Function()? onDrained,
+  String? name,
+})
+```
+
+#### Pillar Factory
+
+```dart
+pyre<T>({int concurrency, int? maxQueueSize, int maxRetries, ...}) → Pyre<T>
+```
+
+#### Reactive Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `status` | `PyreStatus` | Queue status: idle, processing, paused, stopped (reactive) |
+| `queueLength` | `int` | Number of pending tasks (reactive) |
+| `runningCount` | `int` | Number of currently executing tasks (reactive) |
+| `completedCount` | `int` | Total successfully completed tasks (reactive) |
+| `failedCount` | `int` | Total failed tasks (reactive) |
+| `totalEnqueued` | `int` | Total tasks ever enqueued (reactive) |
+| `progress` | `double` | Completion ratio 0.0–1.0 (reactive) |
+| `hasPending` | `bool` | Whether tasks are queued |
+| `isProcessing` | `bool` | Whether actively processing |
+| `isDisposed` | `bool` | Whether disposed |
+| `concurrency` | `int` | Concurrency limit |
+| `managedNodes` | `List<TitanState>` | All reactive state nodes (for Pillar disposal) |
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `enqueue(task, {priority, id})` | `Future<PyreResult<T>>` | Add task, returns result future |
+| `enqueueAll(tasks, {priority})` | `List<Future<PyreResult<T>>>` | Batch enqueue |
+| `start()` | `void` | Start processing (when `autoStart: false`) |
+| `pause()` | `void` | Suspend processing |
+| `resume()` | `void` | Resume processing |
+| `cancel(id)` | `bool` | Cancel a pending task by ID |
+| `cancelAll()` | `void` | Cancel all pending tasks |
+| `drain()` | `Future<void>` | Cancel pending, wait for running |
+| `stop()` | `void` | Permanently stop the queue |
+| `reset()` | `void` | Clear state and restart |
+| `peek()` | `String?` | ID of next task to execute |
+| `dispose()` | `void` | Stop and dispose all state |
+
+#### Enums & Types
+
+| Type | Values / Fields | Description |
+|------|----------------|-------------|
+| `PyrePriority` | `critical`, `high`, `normal`, `low` | Task priority levels |
+| `PyreStatus` | `idle`, `processing`, `paused`, `stopped` | Queue lifecycle status |
+| `PyreResult<T>` | sealed: `PyreSuccess<T>`, `PyreFailure<T>` | Task completion result |
+| `PyreBackpressureException` | `message`, `queueSize`, `maxSize` | Thrown when queue is full |
+
+---
+
+### Mandate
+
+Reactive policy evaluation engine with declarative [Writ] rules.
+
+#### Constructor
+
+```
+Mandate({
+  List<Writ> writs = const [],
+  MandateStrategy strategy = MandateStrategy.allOf,
+  String? name,
+})
+```
+
+#### Pillar Factory
+
+```
+mandate({List<Writ> writs, MandateStrategy strategy, String? name}) → Mandate
+```
+
+#### Reactive Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `verdict` | `TitanComputed<MandateVerdict>` | Composite reactive verdict |
+| `isGranted` | `TitanComputed<bool>` | Convenience: `true` when granted |
+| `violations` | `TitanComputed<List<WritViolation>>` | Current violation list (empty when granted) |
+
+#### Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `can(name)` | `TitanComputed<bool>` | Query individual writ by name |
+| `addWrit(writ)` | `void` | Add a writ (throws if duplicate name) |
+| `addWrits(writs)` | `void` | Batch add (single re-evaluation) |
+| `removeWrit(name)` | `bool` | Remove writ by name |
+| `replaceWrit(writ)` | `void` | Replace writ (same name, new logic) |
+| `updateStrategy(strategy)` | `void` | Change combination strategy |
+| `dispose()` | `void` | Dispose all internal nodes |
+
+#### Inspection
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `writNames` | `List<String>` | Names of all registered writs |
+| `writCount` | `int` | Number of registered writs |
+| `hasWrit(name)` | `bool` | Whether a writ with this name exists |
+| `strategy` | `MandateStrategy` | Current combination strategy |
+| `name` | `String?` | Debug name |
+| `isDisposed` | `bool` | Whether disposed |
+
+#### Types
+
+| Type | Values / Fields | Description |
+|------|----------------|-------------|
+| `MandateStrategy` | `allOf`, `anyOf`, `majority` | Combination mode |
+| `MandateVerdict` | sealed: `MandateGrant`, `MandateDenial` | Evaluation result |
+| `MandateGrant` | `isGranted: true`, `violations: []` | All required rules passed |
+| `MandateDenial` | `isGranted: false`, `violations: [...]` | One or more rules failed |
+| `WritViolation` | `writName`, `reason` | Details of a failed writ |
+
+#### Writ
+
+```
+Writ({
+  required String name,
+  required bool Function() evaluate,
+  String? description,
+  String? reason,
+  int weight = 1,
+})
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `String` | Unique identifier |
+| `evaluate` | `bool Function()` | Reactive rule function |
+| `description` | `String?` | Human-readable description |
+| `reason` | `String?` | Denial reason |
+| `weight` | `int` | Weight for majority strategy (default: 1) |
+
+---
+
+### Ledger
+
+Reactive state transaction manager with atomic commit/rollback.
+
+#### Constructor
+
+```
+Ledger({int maxHistory = 100, String? name})
+```
+
+#### Pillar Factory
+
+```
+ledger({int maxHistory = 100, String? name}) → Ledger
+```
+
+#### Reactive Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `activeCount` | `int` (reactive via `TitanState`) | Number of currently active transactions |
+| `commitCount` | `int` (reactive via `TitanState`) | Total committed transactions |
+| `rollbackCount` | `int` (reactive via `TitanState`) | Total rolled-back transactions |
+| `failCount` | `int` (reactive via `TitanState`) | Total failed transactions |
+| `hasActive` | `bool` (reactive via `TitanComputed`) | Whether any transaction is active |
+| `history` | `List<LedgerRecord>` | Transaction history (most recent last) |
+
+#### Transaction API
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `begin({name})` | `LedgerTransaction` | Start a manual transaction |
+| `transact(action, {name})` | `Future<T>` | Auto-commit/rollback async scope |
+| `transactSync(action, {name})` | `T` | Auto-commit/rollback sync scope |
+| `dispose()` | `void` | Dispose all internal nodes |
+
+#### Inspection
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `activeTransactionIds` | `List<int>` | IDs of active transactions |
+| `lastRecord` | `LedgerRecord?` | Most recent completed record |
+| `totalStarted` | `int` | Total transactions ever started |
+| `name` | `String?` | Debug name |
+| `isDisposed` | `bool` | Whether disposed |
+
+### LedgerTransaction
+
+Individual atomic transaction scope.
+
+| Property / Method | Type / Return | Description |
+|-------------------|--------|-------------|
+| `id` | `int` | Transaction ID |
+| `name` | `String?` | Debug name |
+| `status` | `LedgerStatus` | Current status |
+| `isActive` | `bool` | Whether still active |
+| `coreCount` | `int` | Number of captured Cores |
+| `capture(core)` | `void` | Record Core's value before mutation |
+| `commit()` | `void` | Commit all changes atomically |
+| `rollback()` | `void` | Revert all captured Cores |
+
+### LedgerRecord
+
+Completed transaction audit entry.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `int` | Transaction ID |
+| `status` | `LedgerStatus` | Final status |
+| `coreCount` | `int` | Number of modified Cores |
+| `timestamp` | `DateTime` | When completed |
+| `error` | `Object?` | Error (if failed) |
+| `name` | `String?` | Transaction name |
+
+### LedgerStatus
+
+| Value | Description |
+|-------|-------------|
+| `active` | Transaction is open |
+| `committed` | Successfully committed |
+| `rolledBack` | Manually rolled back |
+| `failed` | Failed due to exception |
+
+---
+
+### Portcullis
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+Reactive circuit breaker for service resilience.
+
+#### Constructor
+
+```
+Portcullis({
+  int failureThreshold = 5,
+  Duration resetTimeout = const Duration(seconds: 30),
+  int halfOpenMaxProbes = 1,
+  bool Function(Object error, StackTrace stack)? shouldTrip,
+  int maxTripHistory = 20,
+  String? name,
+})
+```
+
+#### Pillar Factory
+
+```
+portcullis({
+  int failureThreshold = 5,
+  Duration resetTimeout = const Duration(seconds: 30),
+  int halfOpenMaxProbes = 1,
+  bool Function(Object, StackTrace)? shouldTrip,
+  int maxTripHistory = 20,
+  String? name,
+}) → Portcullis
+```
+
+#### Reactive Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `state` | `PortcullisState` (reactive via `TitanState`) | Current circuit state |
+| `failureCount` | `int` (reactive via `TitanState`) | Consecutive failures in current cycle |
+| `successCount` | `int` (reactive via `TitanState`) | Total successful calls |
+| `tripCount` | `int` (reactive via `TitanState`) | Total circuit trips |
+| `lastTrip` | `DateTime?` (reactive via `TitanState`) | When last tripped |
+| `lastFailure` | `Object?` (reactive via `TitanState`) | Last error that failed |
+| `probeSuccessCount` | `int` (reactive via `TitanState`) | Consecutive probe successes in half-open |
+| `isClosed` | `bool` (reactive via `TitanComputed`) | Whether circuit is healthy |
+
+#### Protection API
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `protect(action)` | `Future<T>` | Execute with circuit breaker protection |
+| `protectSync(action)` | `T` | Synchronous protected execution |
+| `trip()` | `void` | Manually open the circuit |
+| `reset()` | `void` | Manually close the circuit |
+| `dispose()` | `void` | Dispose all internal nodes |
+
+#### Inspection
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `tripHistory` | `List<PortcullisTripRecord>` | Trip audit records |
+| `name` | `String?` | Debug name |
+| `isDisposed` | `bool` | Whether disposed |
+| `failureThreshold` | `int` | Configured failure threshold |
+| `resetTimeout` | `Duration` | Configured reset timeout |
+| `halfOpenMaxProbes` | `int` | Probes needed to close |
+
+#### Types
+
+| Type | Values / Fields | Description |
+|------|----------------|-------------|
+| `PortcullisState` | `closed`, `open`, `halfOpen` | Circuit lifecycle state |
+| `PortcullisOpenException` | `name`, `remainingTimeout` | Thrown when circuit is open |
+| `PortcullisTripRecord` | `timestamp`, `failureCount`, `lastError` | Trip audit entry |
 
 ---
 
@@ -2039,6 +2553,87 @@ class MySpark extends Spark {
 | `useAppLifecycleState()` | `AppLifecycleState?` | Current app lifecycle state |
 | `useOnAppLifecycleStateChange(cb)` | `void` | Callback on lifecycle transitions |
 | `useAutomaticKeepAlive({want: true})` | `void` | Keep widget alive in lazy lists |
+
+---
+
+## Anvil — Dead Letter & Retry Queue
+
+> **Package:** `titan_basalt` — `import 'package:titan_basalt/titan_basalt.dart';`
+
+### Anvil Constructor
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `maxRetries` | `int` | `3` | Maximum retry attempts per entry |
+| `backoff` | `AnvilBackoff?` | `exponential()` | Backoff strategy between retries |
+| `maxDeadLetters` | `int` | `100` | Max dead letter entries to retain |
+| `autoStart` | `bool` | `true` | Auto-process entries on enqueue |
+| `name` | `String?` | `null` | Debug name |
+
+### Pillar Factory
+
+```dart
+late final retryQueue = anvil<String>(
+  maxRetries: 5,
+  backoff: AnvilBackoff.exponential(jitter: true),
+  name: 'retry',
+);
+```
+
+### AnvilBackoff Factories
+
+| Factory | Parameters | Description |
+|---------|-----------|-------------|
+| `AnvilBackoff.exponential()` | `initial`, `multiplier`, `jitter`, `maxDelay` | Delay doubles each attempt |
+| `AnvilBackoff.linear()` | `initial`, `increment`, `jitter`, `maxDelay` | Delay increases linearly |
+| `AnvilBackoff.constant(delay)` | `jitter` | Same delay every attempt |
+
+### Reactive Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `pendingCount` | `int` | Entries waiting for retry |
+| `retryingCount` | `int` | Entries currently being retried |
+| `succeededCount` | `int` | Entries that have succeeded |
+| `deadLetterCount` | `int` | Entries in dead letter queue |
+| `totalEnqueued` | `int` | Lifetime enqueue count |
+| `isProcessing` | `bool` | Whether queue is actively processing |
+
+### Enqueue API
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `enqueue(operation, {id, metadata, onSuccess, onDeadLetter, maxRetries})` | `AnvilEntry<T>` | Add operation to retry queue |
+| `processAll()` | `void` | Manually process all pending (for autoStart: false) |
+| `retryDeadLetters()` | `int` | Re-enqueue all dead letters, returns count |
+
+### Queue Management
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `purge()` | `int` | Remove all dead letters, returns count |
+| `clear()` | `void` | Remove all entries from all queues |
+| `remove(id)` | `bool` | Remove entry by ID |
+| `findById(id)` | `AnvilEntry<T>?` | Look up entry across all queues |
+
+### Inspection
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `pending` | `List<AnvilEntry<T>>` | Current pending entries |
+| `deadLetters` | `List<AnvilEntry<T>>` | Dead letter entries |
+| `succeeded` | `List<AnvilEntry<T>>` | Succeeded entries |
+| `name` | `String?` | Debug name |
+| `maxRetries` | `int` | Queue default max retries |
+| `isDisposed` | `bool` | Whether disposed |
+
+### Types
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `AnvilStatus` | `pending`, `retrying`, `succeeded`, `deadLettered` | Entry lifecycle state |
+| `AnvilEntry<T>` | `id`, `status`, `attempts`, `maxRetries`, `lastError`, `result`, `metadata` | Individual queue entry |
+| `AnvilBackoff` | `initial`, `jitter`, `maxDelay`, `computeDelay` | Backoff strategy config |
 
 ---
 

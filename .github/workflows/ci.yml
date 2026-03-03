@@ -29,6 +29,10 @@ jobs:
         working-directory: packages/titan
         run: dart analyze --fatal-infos
 
+      - name: Analyze titan_basalt
+        working-directory: packages/titan_basalt
+        run: dart analyze --fatal-infos
+
       - name: Analyze titan_bastion
         working-directory: packages/titan_bastion
         run: dart analyze --fatal-infos
@@ -49,6 +53,10 @@ jobs:
         working-directory: packages/titan
         run: flutter test
 
+      - name: Test titan_basalt
+        working-directory: packages/titan_basalt
+        run: dart test
+
       - name: Test titan_bastion
         working-directory: packages/titan_bastion
         run: flutter test
@@ -66,7 +74,7 @@ jobs:
         run: flutter test
 
       - name: Check formatting
-        run: dart format --set-exit-if-changed packages/titan/lib packages/titan_bastion/lib packages/titan_atlas/lib packages/titan_argus/lib packages/titan_colossus/lib
+        run: dart format --set-exit-if-changed packages/titan/lib packages/titan_basalt/lib packages/titan_bastion/lib packages/titan_atlas/lib packages/titan_argus/lib packages/titan_colossus/lib
 
   benchmark:
     runs-on: ubuntu-latest

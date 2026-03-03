@@ -5,6 +5,23 @@ All notable changes to the Titan packages will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - Unreleased
+
+### Added
+- **titan_basalt**: New package — Infrastructure & Resilience Toolkit
+- **titan_basalt**: **Trove** — Reactive in-memory cache with TTL expiry, LRU eviction, O(1) operations, reactive stats, Pillar integration
+- **titan_basalt**: **Moat** — Token-bucket rate limiter with `MoatPool` per-key quotas, `guard()` pattern, reactive state, Pillar integration
+- **titan_basalt**: **Portcullis** — Reactive circuit breaker with three-state lifecycle (closed/open/halfOpen), `protect()` guarded execution, configurable thresholds, `shouldTrip` filter, `PortcullisOpenException`, trip history, Pillar integration
+- **titan_basalt**: **Anvil** — Reactive dead letter & retry queue with configurable backoff (exponential/linear/constant + jitter), dead letter lifecycle, `retryDeadLetters()`, `purge()`, reactive counters, Pillar integration
+- **titan_basalt**: **Pyre** — Priority task queue with concurrency control, backpressure, retry, `PyreResult`, reactive state, Pillar integration
+- **titan**: **Omen** — Reactive async derived with auto-tracking, debounce, stale-while-revalidate, cancellation, Pillar integration
+- **titan**: **Mandate** — Reactive policy engine with declarative `Writ` rules, `MandateStrategy` (allOf/anyOf/majority), sealed `MandateVerdict`, dynamic writ management, Pillar integration
+- **titan**: **Ledger** — State transaction manager with atomic commit/rollback, `capture()` snapshots, `transact()` auto-scope, `LedgerRecord` audit history, reactive counters, Pillar integration
+- **titan**: `Pillar.registerNodes()` — Public API for satellite packages to register lifecycle-managed reactive nodes
+
+### Changed
+- **titan**: Moved Trove, Moat, Portcullis, Anvil, Pyre to `titan_basalt` package (infrastructure/resilience separation)
+
 ## [1.0.2] - 2026-03-03
 
 ### Changed

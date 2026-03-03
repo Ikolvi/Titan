@@ -2,6 +2,8 @@
 
 *In which Kael learns to mine data wisely — fetch once, cache smart, and show stale data while the fresh stuff loads.*
 
+> **Package:** This feature is in `titan_basalt` — add `import 'package:titan_basalt/titan_basalt.dart';` to use it.
+
 ---
 
 The bug report was embarrassing.

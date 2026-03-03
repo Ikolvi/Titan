@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:test/test.dart';
-import 'package:titan/titan.dart';
+import 'package:titan_basalt/titan_basalt.dart';
 
 void main() {
   group('Tether', () {

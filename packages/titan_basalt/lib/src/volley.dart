@@ -34,7 +34,7 @@ library;
 
 import 'dart:async';
 
-import '../core/state.dart';
+import 'package:titan/titan.dart';
 
 /// The status of a [Volley] execution.
 enum VolleyStatus {

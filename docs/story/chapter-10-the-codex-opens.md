@@ -2,6 +2,8 @@
 
 *In which Kael learns to read the ancient pages one at a time, and discovers that infinite lists aren't so infinite after all.*
 
+> **Package:** This feature is in `titan_basalt` — add `import 'package:titan_basalt/titan_basalt.dart';` to use it.
+
 ---
 
 The quest board was growing. What started as a handful of test entries had turned into hundreds of real quests submitted by teams across the company. The list view that loaded everything at once was choking.

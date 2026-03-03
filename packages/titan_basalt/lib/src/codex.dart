@@ -1,5 +1,4 @@
-import '../core/batch.dart';
-import '../core/state.dart';
+import 'package:titan/titan.dart';
 
 // ---------------------------------------------------------------------------
 // Codex — Titan's Pagination Layer

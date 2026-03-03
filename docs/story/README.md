@@ -44,6 +44,14 @@
 | [XXVIII](chapter-28-the-argus-guards.md) | **The Argus Guards** | `Argus`, `guard()`, auth base class, `signIn`/`signOut` contract, `authCores`, titan_argus package |
 | [XXIX](chapter-29-the-rampart-rises.md) | **The Rampart Rises** | `Rampart`, `RampartBreakpoints`, `RampartLayout`, `RampartValue<T>`, `RampartVisibility`, responsive layouts |
 | [XXX](chapter-30-the-cartograph-maps.md) | **The Cartograph Maps** | `Cartograph`, `CartographMatch`, named routes, `buildUrl()`, deep link parsing & handling |
+| [XXXI](chapter-31-the-trove-hoards.md) | **The Trove Hoards** | `Trove`, TTL expiry, LRU eviction, `getOrPut()`, reactive cache stats, `TroveEvictionReason` |
+| [XXXII](chapter-32-the-moat-defends.md) | **The Moat Defends** | `Moat`, token-bucket rate limiting, `MoatPool`, `guard()`, `consume()`, per-key quotas |
+| [XXXIII](chapter-33-the-omen-foretells.md) | **The Omen Foretells** | `Omen`, reactive async derived, auto-tracking, debounce, stale-while-revalidate, `refresh()`, `cancel()` |
+| [XXXIV](chapter-34-the-pyre-burns.md) | **The Pyre Burns** | `Pyre`, priority task queue, concurrency control, backpressure, pause/resume, retry, `PyreResult` |
+| [XXXV](chapter-35-the-mandate-decrees.md) | **The Mandate Decrees** | `Mandate`, `Writ`, `MandateStrategy`, `MandateVerdict`, reactive policy engine, `can()`, dynamic writs |
+| [XXXVI](chapter-36-the-ledger-binds.md) | **The Ledger Binds** | `Ledger`, `LedgerTransaction`, `transact()`, `capture()`, atomic commit/rollback, `LedgerRecord` |
+| [XXXVII](chapter-37-the-portcullis-descends.md) | **The Portcullis Descends** | `Portcullis`, `PortcullisState`, `protect()`, circuit breaker, `shouldTrip`, `PortcullisOpenException` |
+| [XXXVIII](chapter-38-the-anvil-strikes.md) | **The Anvil Strikes** | `Anvil`, `AnvilBackoff`, `AnvilEntry`, `AnvilStatus`, dead letter queue, retry with backoff, `retryDeadLetters()` |
 
 ---
 

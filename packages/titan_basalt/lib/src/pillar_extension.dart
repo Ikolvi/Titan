@@ -1,0 +1,412 @@
+/// Extension methods on [Pillar] for Basalt infrastructure features.
+///
+/// Import `package:titan_basalt/titan_basalt.dart` to make these factory
+/// methods available on any [Pillar] subclass via `late final` initializers:
+///
+/// ```dart
+/// import 'package:titan_basalt/titan_basalt.dart';
+///
+/// class ApiPillar extends Pillar {
+///   late final cache = trove<String, Data>(defaultTtl: Duration(minutes: 5));
+///   late final limiter = moat(maxTokens: 60);
+///   late final breaker = portcullis(failureThreshold: 5);
+///   late final retryQueue = anvil<String>(maxRetries: 3);
+///   late final uploads = pyre<String>(concurrency: 2);
+/// }
+/// ```
+library;
+
+import 'package:meta/meta.dart';
+import 'package:titan/titan.dart';
+
+import 'anvil.dart';
+import 'bulwark.dart';
+import 'codex.dart';
+import 'moat.dart';
+import 'portcullis.dart';
+import 'pyre.dart';
+import 'quarry.dart';
+import 'saga.dart';
+import 'trove.dart';
+import 'volley.dart';
+
+/// Basalt infrastructure extensions on [Pillar].
+///
+/// These methods create lifecycle-managed infrastructure components
+/// that auto-dispose when the Pillar is disposed.
+extension PillarBasaltExtension on Pillar {
+  // ---------------------------------------------------------------------------
+  // Moat — rate limiter
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Moat] (rate limiter) managed by this Pillar.
+  ///
+  /// A Moat uses a token-bucket algorithm to control operation throughput.
+  /// Tokens replenish at a steady rate, and requests that exceed the
+  /// bucket capacity are rejected. All quota state is reactive.
+  ///
+  /// ```dart
+  /// late final apiLimiter = moat(
+  ///   maxTokens: 60,
+  ///   refillRate: Duration(seconds: 1),
+  ///   name: 'api',
+  /// );
+  ///
+  /// Future<void> fetchData() async {
+  ///   if (apiLimiter.tryConsume()) {
+  ///     await api.getData();
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Moat moat({
+    int maxTokens = 10,
+    Duration refillRate = const Duration(seconds: 1),
+    int? initialTokens,
+    void Function()? onReject,
+    String? name,
+  }) {
+    final m = Moat(
+      maxTokens: maxTokens,
+      refillRate: refillRate,
+      initialTokens: initialTokens,
+      onReject: onReject,
+      name: name,
+    );
+    registerNodes(m.managedNodes);
+    return m;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Trove — TTL/LRU in-memory cache
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Trove] (in-memory cache) managed by this Pillar.
+  ///
+  /// A Trove provides a reactive key-value cache with TTL-based expiry,
+  /// optional LRU eviction, and live cache statistics (size, hits, misses).
+  ///
+  /// ```dart
+  /// late final productCache = trove<String, Product>(
+  ///   defaultTtl: Duration(minutes: 10),
+  ///   maxEntries: 200,
+  ///   name: 'products',
+  /// );
+  ///
+  /// Future<Product> getProduct(String id) async {
+  ///   return productCache.getOrPut(id, () => api.fetchProduct(id));
+  /// }
+  /// ```
+  @protected
+  Trove<K, V> trove<K, V>({
+    Duration? defaultTtl,
+    int? maxEntries,
+    void Function(K key, V value, TroveEvictionReason reason)? onEvict,
+    Duration cleanupInterval = const Duration(seconds: 60),
+    String? name,
+  }) {
+    final t = Trove<K, V>(
+      defaultTtl: defaultTtl,
+      maxEntries: maxEntries,
+      onEvict: onEvict,
+      cleanupInterval: cleanupInterval,
+      name: name,
+    );
+    registerNodes(t.managedNodes);
+    return t;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pyre — priority task queue
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Pyre] (priority task queue) managed by this Pillar.
+  ///
+  /// A Pyre processes async tasks in priority order with concurrency
+  /// control, backpressure, and reactive queue metrics.
+  ///
+  /// ```dart
+  /// late final uploads = pyre<String>(
+  ///   concurrency: 2,
+  ///   maxQueueSize: 50,
+  ///   name: 'uploads',
+  /// );
+  /// ```
+  @protected
+  Pyre<T> pyre<T>({
+    int concurrency = 3,
+    int? maxQueueSize,
+    int maxRetries = 0,
+    Duration retryDelay = const Duration(milliseconds: 500),
+    bool autoStart = true,
+    void Function(String taskId, T result)? onTaskComplete,
+    void Function(String taskId, Object error)? onTaskFailed,
+    void Function()? onDrained,
+    String? name,
+  }) {
+    final p = Pyre<T>(
+      concurrency: concurrency,
+      maxQueueSize: maxQueueSize,
+      maxRetries: maxRetries,
+      retryDelay: retryDelay,
+      autoStart: autoStart,
+      onTaskComplete: onTaskComplete,
+      onTaskFailed: onTaskFailed,
+      onDrained: onDrained,
+      name: name,
+    );
+    registerNodes(p.managedNodes);
+    return p;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Portcullis — reactive circuit breaker
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Portcullis] (reactive circuit breaker) managed by this Pillar.
+  ///
+  /// Monitors failure rates and automatically trips when failures exceed
+  /// [failureThreshold], fast-failing requests until recovery.
+  ///
+  /// ```dart
+  /// late final apiBreaker = portcullis(
+  ///   failureThreshold: 5,
+  ///   resetTimeout: Duration(seconds: 30),
+  ///   name: 'api',
+  /// );
+  ///
+  /// Future<Data> fetchData() async {
+  ///   return apiBreaker.protect(() => api.getData());
+  /// }
+  /// ```
+  @protected
+  Portcullis portcullis({
+    int failureThreshold = 5,
+    Duration resetTimeout = const Duration(seconds: 30),
+    int halfOpenMaxProbes = 1,
+    bool Function(Object error, StackTrace stack)? shouldTrip,
+    int maxTripHistory = 20,
+    String? name,
+  }) {
+    final p = Portcullis(
+      failureThreshold: failureThreshold,
+      resetTimeout: resetTimeout,
+      halfOpenMaxProbes: halfOpenMaxProbes,
+      shouldTrip: shouldTrip,
+      maxTripHistory: maxTripHistory,
+      name: name,
+    );
+    registerNodes([...p.managedNodes, ...p.managedStateNodes]);
+    return p;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Anvil — dead letter & retry queue
+  // ---------------------------------------------------------------------------
+
+  /// Creates an [Anvil] (dead letter & retry queue) managed by this Pillar.
+  ///
+  /// Queues failed operations and retries them with configurable backoff.
+  /// Entries that exhaust retries move to a dead-letter state for manual
+  /// inspection and replay.
+  ///
+  /// ```dart
+  /// late final retryQueue = anvil<String>(
+  ///   maxRetries: 5,
+  ///   backoff: AnvilBackoff.exponential(),
+  ///   name: 'order-retry',
+  /// );
+  ///
+  /// Future<void> submitOrder(Order order) async {
+  ///   try {
+  ///     await api.submit(order);
+  ///   } catch (e) {
+  ///     retryQueue.enqueue(
+  ///       () => api.submit(order).then((_) => 'ok'),
+  ///       id: 'order-${order.id}',
+  ///     );
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Anvil<T> anvil<T>({
+    int maxRetries = 3,
+    AnvilBackoff? backoff,
+    int maxDeadLetters = 100,
+    bool autoStart = true,
+    String? name,
+  }) {
+    final a = Anvil<T>(
+      maxRetries: maxRetries,
+      backoff: backoff,
+      maxDeadLetters: maxDeadLetters,
+      autoStart: autoStart,
+      name: name,
+    );
+    registerNodes([...a.managedNodes, ...a.managedStateNodes]);
+    return a;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Codex — paginated data
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Codex] (paginated data manager) managed by this Pillar.
+  ///
+  /// A Codex handles paginated data loading with reactive state for items,
+  /// loading status, errors, and page tracking.
+  ///
+  /// ```dart
+  /// late final quests = codex<Quest>(
+  ///   (request) async {
+  ///     final result = await api.getQuests(
+  ///       page: request.page,
+  ///       limit: request.pageSize,
+  ///     );
+  ///     return CodexPage(items: result.items, hasMore: result.hasMore);
+  ///   },
+  ///   pageSize: 20,
+  /// );
+  /// ```
+  @protected
+  Codex<T> codex<T>(
+    Future<CodexPage<T>> Function(CodexRequest request) fetcher, {
+    int pageSize = 20,
+    String? name,
+  }) {
+    final c = Codex<T>(fetcher: fetcher, pageSize: pageSize, name: name);
+    registerNodes(c.managedNodes);
+    return c;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quarry — data fetching with caching
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Quarry] (data fetching query) managed by this Pillar.
+  ///
+  /// A Quarry manages a single async data resource with reactive state,
+  /// stale-while-revalidate caching, automatic deduplication, and retry.
+  ///
+  /// ```dart
+  /// late final userQuery = quarry<User>(
+  ///   fetcher: () => api.getUser(),
+  ///   staleTime: Duration(minutes: 5),
+  /// );
+  /// ```
+  @protected
+  Quarry<T> quarry<T>({
+    required Future<T> Function() fetcher,
+    Duration? staleTime,
+    QuarryRetry retry = const QuarryRetry(maxAttempts: 0),
+    void Function(T data)? onSuccess,
+    void Function(Object error)? onError,
+    String? name,
+  }) {
+    final q = Quarry<T>(
+      fetcher: fetcher,
+      staleTime: staleTime,
+      retry: retry,
+      onSuccess: onSuccess,
+      onError: onError,
+      name: name,
+    );
+    registerNodes(q.managedNodes);
+    return q;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulwark — circuit breaker
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Bulwark] (circuit breaker) managed by this Pillar.
+  ///
+  /// A Bulwark shields your app from cascading failures by tracking
+  /// error rates and opening the circuit when a threshold is breached.
+  ///
+  /// ```dart
+  /// late final apiBreaker = bulwark<String>(
+  ///   failureThreshold: 3,
+  ///   resetTimeout: Duration(seconds: 30),
+  /// );
+  /// ```
+  @protected
+  Bulwark<T> bulwark<T>({
+    int failureThreshold = 3,
+    Duration resetTimeout = const Duration(seconds: 30),
+    void Function(Object error)? onOpen,
+    void Function()? onClose,
+    void Function()? onHalfOpen,
+    String? name,
+  }) {
+    final b = Bulwark<T>(
+      failureThreshold: failureThreshold,
+      resetTimeout: resetTimeout,
+      onOpen: onOpen,
+      onClose: onClose,
+      onHalfOpen: onHalfOpen,
+      name: name,
+    );
+    registerNodes(b.managedNodes);
+    return b;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Saga — multi-step workflow orchestration
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Saga] (multi-step workflow) managed by this Pillar.
+  ///
+  /// A Saga coordinates a sequence of async steps with automatic
+  /// compensation (rollback) on failure.
+  ///
+  /// ```dart
+  /// late final checkout = saga<Order>(
+  ///   steps: [
+  ///     SagaStep(name: 'validate', execute: (_) async => validate()),
+  ///     SagaStep(
+  ///       name: 'charge',
+  ///       execute: (_) async => chargeCard(),
+  ///       compensate: (_) async => refundCard(),
+  ///     ),
+  ///   ],
+  /// );
+  /// ```
+  @protected
+  Saga<T> saga<T>({
+    required List<SagaStep<T>> steps,
+    void Function(T? result)? onComplete,
+    void Function(Object error, String failedStep)? onError,
+    void Function(String stepName, int index, int total)? onStepComplete,
+    String? name,
+  }) {
+    final s = Saga<T>(
+      steps: steps,
+      onComplete: onComplete,
+      onError: onError,
+      onStepComplete: onStepComplete,
+      name: name,
+    );
+    registerNodes(s.managedNodes);
+    return s;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Volley — batch async operations
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Volley] (batch async executor) managed by this Pillar.
+  ///
+  /// A Volley runs multiple async tasks in parallel with a configurable
+  /// concurrency limit and reactive progress tracking.
+  ///
+  /// ```dart
+  /// late final upload = volley<String>(concurrency: 3);
+  /// ```
+  @protected
+  Volley<T> volley<T>({int concurrency = 5, String? name}) {
+    final v = Volley<T>(concurrency: concurrency, name: name);
+    registerNodes(v.managedNodes);
+    return v;
+  }
+}

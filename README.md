@@ -53,6 +53,14 @@ A uniquely powerful reactive state management architecture for Flutter — struc
 | State Selector | **Prism** | Fine-grained, memoized state projections with structural equality |
 | Reactive Collection | **Nexus** | In-place reactive List, Map, Set with granular change records |
 | Hooks Widget | **Spark** | Hooks-style widget — `useCore`, `useEffect`, `useMemo`, auto-disposal |
+| Reactive Cache | **Trove** | TTL + LRU in-memory cache with O(1) operations and reactive stats |
+| Rate Limiter | **Moat** | Token-bucket rate limiter with per-key quotas (`MoatPool`) |
+| Async Derived | **Omen** | Reactive async computed — auto-tracking, debounce, stale-while-revalidate |
+| Priority Queue | **Pyre** | Priority-ordered async task queue with concurrency control & backpressure |
+| Reactive Policy | **Mandate** | Declarative policy engine with reactive `Writ` rules and sealed verdicts |
+| State Transaction | **Ledger** | Atomic commit/rollback for multi-Core mutations with audit history |
+| Circuit Breaker | **Portcullis** | Reactive circuit breaker with auto-recovery and trip history |
+| Dead Letter Queue | **Anvil** | Reactive retry queue with backoff strategies and dead letter management |
 | Performance Monitor | **Colossus** | Enterprise performance monitoring orchestrator |
 | Frame Monitor | **Pulse** | Frame timing and jank detection |
 | Page Load Monitor | **Stride** | Navigation / page load timing |
@@ -145,6 +153,13 @@ Vestige<CounterPillar>(
 | Reactive collections | ❌ | ❌ | ❌ | ❌ | ✅ Nexus |
 | Hooks-style widgets | ❌ | ❌ | ❌ | ❌ | ✅ Spark |
 | Performance monitoring | ❌ | ❌ | ❌ | ❌ | ✅ Colossus |
+| In-memory caching | ❌ | ❌ | ❌ | ❌ | ✅ Trove (TTL + LRU) |
+| Rate limiting | ❌ | ❌ | ❌ | ❌ | ✅ Moat (token bucket) |
+| Priority task queue | ❌ | ❌ | ❌ | ❌ | ✅ Pyre (concurrency + backpressure) |
+| Policy engine | ❌ | ❌ | ❌ | ❌ | ✅ Mandate (reactive writs + sealed verdicts) |
+| State transactions | ❌ | ❌ | ❌ | ❌ | ✅ Ledger (atomic commit/rollback) |
+| Circuit breaker | ❌ | ❌ | ❌ | ❌ | ✅ Portcullis (auto-trip/recover) |
+| Dead letter queue | ❌ | ❌ | ❌ | ❌ | ✅ Anvil (retry + backoff) |
 
 ### Vs Bloc
 
@@ -419,8 +434,10 @@ Titan's reactive engine is built for speed. Benchmarks run automatically in CI o
 | Package | Description |
 |---------|-------------|
 | [`titan`](packages/titan/) | Core reactive engine (pure Dart) |
+| [`titan_basalt`](packages/titan_basalt/) | Infrastructure & resilience (Trove, Moat, Portcullis, Anvil, Pyre, Codex, Quarry, Bulwark, Saga, Volley, Tether, Annals) |
 | [`titan_bastion`](packages/titan_bastion/) | Flutter widgets & extensions |
 | [`titan_atlas`](packages/titan_atlas/) | Routing & navigation (Atlas) |
+| [`titan_argus`](packages/titan_argus/) | Authentication & authorization |
 | [`titan_colossus`](packages/titan_colossus/) | Enterprise performance monitoring |
 | [`titan_example`](packages/titan_example/) | Example application |
 

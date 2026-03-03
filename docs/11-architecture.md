@@ -412,7 +412,7 @@ abstract final class Titan {
 8. **Sentinel Future** — `Pillar.onInitAsync()` returns a pre-completed `Future.value()` sentinel; `_runInitAsync()` detects it via `identical()` and skips async scheduling entirely for sync-only Pillars
 9. **Notification fast-path** — `ReactiveNode.notifyDependents()` returns immediately when no dependents and no listeners, skipping flag overhead
 10. **Observer fast-path** — `TitanObserver.notifyStateChanged()` returns immediately when no observers are registered, avoiding argument construction
-11. **Pre-allocated results** — Saga pre-allocates `_stepResults` with `List.filled(steps.length, null)` instead of growing a list per step
+11. **Pre-allocated results** — Saga (in `titan_basalt`) pre-allocates `_stepResults` with `List.filled(steps.length, null)` instead of growing a list per step
 
 ### Optimization Impact
 
@@ -422,7 +422,7 @@ Measured via CI benchmarks (see [BENCHMARKS.md](BENCHMARKS.md) for live trends):
 |--------------|--------|--------|-------|--------|
 | Nullable Conduits + Lazy isReady + Sentinel Future | Pillar Lifecycle | 8.46 µs | 4.23 µs | **-50%** |
 | Notification fast-path + Observer fast-path | Diamond Pattern | 0.91 µs | 0.71 µs | **-22%** |
-| Pre-allocated step results | Saga | 3.15 µs | 2.61 µs | **-17%** |
+| Pre-allocated step results | Saga (`titan_basalt`) | 3.15 µs | 2.61 µs | **-17%** |
 
 > **Noise floor**: Sub-100ns metrics (Node Creation, Core.toggle) exhibit 5-8x variance
 > across runs due to GC pauses and CPU cache effects. The benchmark tracker applies a

@@ -1,3 +1,4 @@
+import 'package:titan_basalt/titan_basalt.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 
 import '../data/quest_api.dart';
@@ -425,5 +426,392 @@ class EnterpriseDemoPillar extends Pillar {
         log.warning('Aegis retry $attempt: $error');
       },
     );
+  }
+
+  // --------------- Trove (Reactive Cache) ---------------
+
+  /// Quest cache with 5-minute TTL and 50 entry max.
+  late final questCache = trove<String, Quest>(
+    defaultTtl: const Duration(minutes: 5),
+    maxEntries: 50,
+    onEvict: (key, value, reason) {
+      log.debug('Cache evicted quest $key ($reason)');
+    },
+    name: 'quests',
+  );
+
+  /// Derived: summarised cache status for the UI.
+  late final cacheStatus = derived(
+    () =>
+        '${questCache.size.value} cached, '
+        '${questCache.hitRate.toStringAsFixed(0)}% hit rate',
+  );
+
+  /// Fetch a quest, returning from cache if available.
+  Future<Quest> fetchCached(String questId) async {
+    return await questCache.getOrPut(questId, () async {
+      return await _api.fetchQuest(questId);
+    });
+  }
+
+  /// Force-evict a quest from the cache.
+  void evictQuest(String questId) => questCache.evict(questId);
+
+  /// Clear the entire quest cache.
+  void clearCache() => questCache.clear();
+
+  // --------------- Moat (Rate Limiter) ---------------
+
+  /// API rate limiter: max 5 requests per 2 seconds.
+  late final apiLimiter = moat(
+    maxTokens: 5,
+    refillRate: const Duration(seconds: 2),
+    onReject: () => log.warning('API rate limited!'),
+    name: 'api',
+  );
+
+  /// Derived: remaining quota for the UI.
+  late final quotaStatus = derived(
+    () =>
+        '${apiLimiter.remainingTokens.value}/${apiLimiter.maxTokens} '
+        'tokens (${apiLimiter.rejections.value} rejected)',
+  );
+
+  /// Execute an API call through the rate limiter.
+  Future<Quest?> fetchRateLimited(String questId) async {
+    return await apiLimiter.guard(
+      () => _api.fetchQuest(questId),
+      onLimit: () => log.warning('Rate limited — try again later'),
+    );
+  }
+
+  /// Burn all tokens to demonstrate rate limiting.
+  void exhaustLimiter() {
+    for (var i = 0; i < apiLimiter.maxTokens + 2; i++) {
+      apiLimiter.tryConsume();
+    }
+  }
+
+  // --------------- Omen (Reactive Async Derived) ---------------
+
+  /// Reactive search term for Omen demo.
+  late final omenQuery = core('');
+
+  /// Reactive sort order.
+  late final omenSort = core('name');
+
+  /// Omen that auto-re-fetches when query or sort changes.
+  late final omenResults = omen<List<String>>(
+    () async {
+      final q = omenQuery.value;
+      final s = omenSort.value;
+      // Simulate API call
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final items = [
+        'Quest: Defend the Gate',
+        'Quest: Forge the Blade',
+        'Quest: Scout the Pass',
+        'Quest: Guard the Vault',
+        'Quest: Chart the Deeps',
+      ].where((item) => q.isEmpty || item.toLowerCase().contains(q)).toList();
+      if (s == 'name') {
+        items.sort();
+      } else {
+        items.sort((a, b) => b.compareTo(a));
+      }
+      return items;
+    },
+    debounce: const Duration(milliseconds: 300),
+    name: 'quest-search',
+  );
+
+  /// Derived: How many times the Omen has executed.
+  late final omenExecStatus = derived(
+    () => 'Executions: ${omenResults.executionCount.value}',
+  );
+
+  /// Change the search query.
+  void updateOmenQuery(String q) => omenQuery.value = q;
+
+  /// Toggle sort order.
+  void toggleOmenSort() {
+    omenSort.value = omenSort.value == 'name' ? 'reverse' : 'name';
+  }
+
+  // --------------- Pyre (Priority Task Queue) ---------------
+
+  /// Priority task queue for background quest processing.
+  late final taskQueue = pyre<String>(
+    concurrency: 2,
+    maxQueueSize: 20,
+    maxRetries: 1,
+    onTaskComplete: (taskId, result) => log.info('Task $taskId done: $result'),
+    onTaskFailed: (taskId, error) => log.warning('Task $taskId failed: $error'),
+    onDrained: () => log.info('All tasks drained'),
+  );
+
+  /// Derived: Progress display string.
+  late final pyreProgressText = derived(() {
+    final done = taskQueue.completedCount;
+    final total = taskQueue.totalEnqueued;
+    final pct = (taskQueue.progress * 100).toInt();
+    return total == 0 ? 'No tasks' : '$done/$total ($pct%)';
+  });
+
+  /// Enqueue a simulated quest processing task.
+  void enqueueQuestTask(String questName, {PyrePriority? priority}) {
+    taskQueue.enqueue(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      return 'Processed: $questName';
+    }, priority: priority ?? PyrePriority.normal);
+  }
+
+  /// Enqueue a batch of sample tasks at various priorities.
+  void enqueueSampleTasks() {
+    enqueueQuestTask('Defend the Gate', priority: PyrePriority.critical);
+    enqueueQuestTask('Forge the Blade', priority: PyrePriority.high);
+    enqueueQuestTask('Scout the Pass', priority: PyrePriority.normal);
+    enqueueQuestTask('Chart the Deeps', priority: PyrePriority.low);
+    enqueueQuestTask('Guard the Vault', priority: PyrePriority.high);
+  }
+
+  // --------------- Mandate (Reactive Policy Engine) ---------------
+
+  /// User role for permission checks.
+  late final userRole = core('viewer');
+
+  /// Whether the user is verified.
+  late final isVerified = core(false);
+
+  /// Whether editing is enabled (feature flag).
+  late final editingEnabled = core(true);
+
+  /// Edit access — all conditions must pass (allOf strategy).
+  late final editAccess = mandate(
+    name: 'editAccess',
+    writs: [
+      Writ(
+        name: 'has-role',
+        evaluate: () => userRole.value == 'editor' || userRole.value == 'admin',
+        reason: 'Editor or admin role required',
+      ),
+      Writ(
+        name: 'is-verified',
+        evaluate: () => isVerified.value,
+        reason: 'Email verification required',
+      ),
+      Writ(
+        name: 'editing-on',
+        evaluate: () => editingEnabled.value,
+        reason: 'Editing is disabled',
+      ),
+    ],
+  );
+
+  /// View access — any condition passes (anyOf strategy).
+  late final viewAccess = mandate(
+    name: 'viewAccess',
+    strategy: MandateStrategy.anyOf,
+    writs: [
+      Writ(
+        name: 'is-public',
+        evaluate: () => true, // simulated public quest
+        reason: 'Quest is not public',
+      ),
+      Writ(
+        name: 'is-member',
+        evaluate: () => userRole.value != 'viewer',
+        reason: 'Must be a member',
+      ),
+    ],
+  );
+
+  /// Derived: verdict summary text.
+  late final editVerdictText = derived(() {
+    final v = editAccess.verdict.value;
+    switch (v) {
+      case MandateGrant():
+        return 'Access GRANTED';
+      case MandateDenial(:final violations):
+        final reasons = violations
+            .map((v) => v.reason ?? v.writName)
+            .join(', ');
+        return 'DENIED: $reasons';
+    }
+  });
+
+  /// Change the user's role.
+  void setUserRole(String role) => userRole.value = role;
+
+  /// Toggle email verification.
+  void toggleVerification() => isVerified.value = !isVerified.value;
+
+  /// Toggle editing feature flag.
+  void toggleEditing() => editingEnabled.value = !editingEnabled.value;
+
+  // --------------- Ledger (State Transactions) ---------------
+
+  /// Gold balance for demo.
+  late final goldBalance = core(1000);
+
+  /// Item inventory for demo.
+  late final itemCount = core(50);
+
+  /// Last transaction result message.
+  late final txResultMessage = core('No transactions yet');
+
+  /// Transaction manager.
+  late final txManager = ledger(maxHistory: 20, name: 'demo');
+
+  /// Purchase items — atomic commit.
+  void purchaseItems(int qty, int pricePerItem) {
+    final totalCost = qty * pricePerItem;
+    txManager.transactSync((tx) {
+      tx.capture(goldBalance);
+      tx.capture(itemCount);
+      goldBalance.value -= totalCost;
+      itemCount.value += qty;
+      if (goldBalance.value < 0) {
+        throw StateError('Insufficient gold');
+      }
+    }, name: 'purchase');
+    txResultMessage.value =
+        'Purchased $qty items for $totalCost gold (committed)';
+  }
+
+  /// Force a failed transaction to demo rollback.
+  void failedPurchase() {
+    try {
+      txManager.transactSync((tx) {
+        tx.capture(goldBalance);
+        tx.capture(itemCount);
+        goldBalance.value -= 99999;
+        itemCount.value += 100;
+        throw StateError('Payment declined');
+      }, name: 'failed-purchase');
+    } catch (_) {
+      txResultMessage.value =
+          'Transaction rolled back — gold: ${goldBalance.value}, items: ${itemCount.value}';
+    }
+  }
+
+  /// Reset gold and items.
+  void resetLedgerDemo() {
+    goldBalance.value = 1000;
+    itemCount.value = 50;
+    txResultMessage.value = 'Reset complete';
+  }
+
+  // --------------- Portcullis (Circuit Breaker) ---------------
+
+  /// Circuit breaker for external API calls.
+  late final circuitBreaker = portcullis(
+    failureThreshold: 3,
+    resetTimeout: const Duration(seconds: 10),
+    halfOpenMaxProbes: 1,
+    name: 'quest-api',
+  );
+
+  /// Simulated call counter.
+  late final callResult = core('No calls yet');
+
+  /// Simulate a successful API call.
+  Future<void> simulateSuccess() async {
+    try {
+      await circuitBreaker.protect(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        return 'ok';
+      });
+      callResult.value = 'Call succeeded!';
+    } on PortcullisOpenException catch (e) {
+      callResult.value =
+          'BLOCKED: circuit open'
+          '${e.remainingTimeout != null ? ' (resets in ${e.remainingTimeout!.inSeconds}s)' : ''}';
+    }
+  }
+
+  /// Simulate a failing API call.
+  Future<void> simulateFailure() async {
+    try {
+      await circuitBreaker.protect(() async {
+        throw Exception('Service unavailable');
+      });
+    } on PortcullisOpenException catch (e) {
+      callResult.value =
+          'BLOCKED: circuit open'
+          '${e.remainingTimeout != null ? ' (resets in ${e.remainingTimeout!.inSeconds}s)' : ''}';
+    } catch (e) {
+      callResult.value = 'Call failed: $e';
+    }
+  }
+
+  /// Manually trip the breaker.
+  void tripBreaker() {
+    circuitBreaker.trip();
+    callResult.value = 'Circuit manually tripped';
+  }
+
+  /// Manually reset the breaker.
+  void resetBreaker() {
+    circuitBreaker.reset();
+    callResult.value = 'Circuit manually reset';
+  }
+
+  // --------------- Anvil (Dead Letter & Retry Queue) ---------------
+
+  /// The dead letter & retry queue.
+  late final retryQueue = anvil<String>(
+    maxRetries: 3,
+    backoff: AnvilBackoff.exponential(
+      initial: const Duration(milliseconds: 500),
+      multiplier: 2.0,
+    ),
+    name: 'quest-retry',
+  );
+
+  /// Result message for UI display.
+  late final anvilResult = core('Tap a button to test the retry queue');
+
+  /// Simulate a successful operation being enqueued.
+  void enqueueSuccess() {
+    retryQueue.enqueue(
+      () async => 'Quest completed!',
+      id: 'success-${DateTime.now().millisecondsSinceEpoch}',
+      onSuccess: (result) {
+        anvilResult.value = 'Succeeded: $result';
+      },
+    );
+    anvilResult.value = 'Enqueued a successful operation...';
+  }
+
+  /// Simulate a failing operation that will be dead-lettered.
+  void enqueueFailure() {
+    retryQueue.enqueue(
+      () async => throw Exception('Quest failed!'),
+      id: 'fail-${DateTime.now().millisecondsSinceEpoch}',
+      onDeadLetter: (entry) {
+        anvilResult.value =
+            'Dead lettered: ${entry.id} after ${entry.attempts} attempts';
+      },
+    );
+    anvilResult.value = 'Enqueued a failing operation...';
+  }
+
+  /// Retry all dead-lettered entries.
+  void retryDead() {
+    final count = retryQueue.retryDeadLetters();
+    anvilResult.value = 'Re-enqueued $count dead letters';
+  }
+
+  /// Purge all dead letters.
+  void purgeDead() {
+    final count = retryQueue.purge();
+    anvilResult.value = 'Purged $count dead letters';
+  }
+
+  /// Clear all entries.
+  void clearQueue() {
+    retryQueue.clear();
+    anvilResult.value = 'Queue cleared';
   }
 }

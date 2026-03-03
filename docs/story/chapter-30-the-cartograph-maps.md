@@ -216,4 +216,4 @@ The match result contains everything needed:
 
 ---
 
-[← Chapter XXIX: The Rampart Rises](chapter-29-the-rampart-rises.md)
+[← Chapter XXIX: The Rampart Rises](chapter-29-the-rampart-rises.md) | [Chapter XXXI: The Trove Hoards →](chapter-31-the-trove-hoards.md)

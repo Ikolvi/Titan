@@ -2,6 +2,8 @@
 
 *In which Kael builds an audit trail, orchestrates workflows, and bridges Pillars with channels that answer back.*
 
+> **Package:** Annals, Saga, Volley, and Tether are in `titan_basalt` — add `import 'package:titan_basalt/titan_basalt.dart';` to use them.
+
 ---
 
 The CTO's email was two sentences: "We're pursuing SOC 2 compliance. I need a full audit trail of every state mutation by Friday."

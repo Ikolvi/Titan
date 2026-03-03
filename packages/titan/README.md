@@ -43,12 +43,13 @@ A signal-based reactive state management engine for Dart & Flutter — fine-grai
 | Async Data | **Ether** | Loading / error / data wrapper |
 | Form Field | **Scroll** | Reactive form field with validation |
 | Form Group | **ScrollGroup** | Aggregate form state |
-| Pagination | **Codex** | Paginated data with reactive state |
-| Data Query | **Quarry** | Cached data fetching (SWR) |
 | Middleware | **Conduit** | Core-level pipeline — transform, validate, reject |
 | State Selector | **Prism** | Fine-grained, memoized state projections |
 | Reactive Collection | **Nexus** | In-place reactive List, Map, Set with change records |
 | Hooks Widget | **Spark** | Hooks-style widget — `useCore`, `useEffect`, auto-lifecycle |
+| Async Derived | **Omen** | Reactive async computed with auto-tracking & debounce |
+| Reactive Policy | **Mandate** | Declarative policy engine with reactive writ rules |
+| State Transaction | **Ledger** | Atomic commit/rollback for multi-Core mutations |
 
 ---
 
@@ -357,38 +358,6 @@ class LoginPillar extends Pillar {
 }
 ```
 
-### Codex — Pagination
-
-```dart
-class ItemListPillar extends Pillar {
-  late final items = codex<Item>(
-    (req) async {
-      final result = await api.getItems(page: req.page, limit: req.pageSize);
-      return CodexPage(items: result.items, hasMore: result.hasMore);
-    },
-    pageSize: 20,
-  );
-
-  @override
-  void onInit() => items.loadFirst();
-}
-```
-
-### Quarry — Data Fetching
-
-```dart
-class ProfilePillar extends Pillar {
-  late final profile = quarry<User>(
-    fetcher: () => api.getProfile(),
-    staleTime: Duration(minutes: 5),
-    retry: QuarryRetry(maxAttempts: 3),
-  );
-
-  @override
-  void onInit() => profile.fetch();
-}
-```
-
 ### Nexus — Reactive Collections
 
 ```dart
@@ -405,6 +374,88 @@ class InventoryPillar extends Pillar {
 ```
 
 In-place mutations, no copy-on-write. Granular `NexusChange` records for pattern matching.
+
+### Omen — Reactive Async Derived
+
+```dart
+class DashboardPillar extends Pillar {
+  late final userId = core('user-42');
+  late final includeArchived = core(false);
+
+  late final stats = omen<DashboardStats>(
+    () async => api.fetchStats(
+      userId.value,
+      archived: includeArchived.value,
+    ),
+    debounce: Duration(milliseconds: 500),
+  );
+}
+```
+
+Reactive async computed — auto-tracks Core reads, re-executes on changes. AsyncValue lifecycle with stale-while-revalidate, debounce, and cancellation.
+
+### Mandate — Reactive Policy Engine
+
+```dart
+class DocumentPillar extends Pillar {
+  late final role = core('viewer');
+  late final isVerified = core(false);
+
+  late final editAccess = mandate(
+    writs: [
+      Writ(
+        name: 'is-editor',
+        evaluate: () => role.value == 'editor' || role.value == 'admin',
+        reason: 'Editor or admin role required',
+      ),
+      Writ(
+        name: 'verified',
+        evaluate: () => isVerified.value,
+        reason: 'Email verification required',
+      ),
+    ],
+  );
+}
+
+// Reactive — auto-updates when role or isVerified change
+switch (pillar.editAccess.verdict.value) {
+  case MandateGrant():
+    return EditButton();
+  case MandateDenial(:final violations):
+    return DeniedBanner(violations);
+}
+```
+
+Declarative reactive policy engine with named writs, sealed verdicts, weighted majority strategy, dynamic writ management, and per-writ `can()` queries.
+
+### Ledger — State Transactions
+
+```dart
+class CheckoutPillar extends Pillar {
+  late final inventory = core(100);
+  late final balance = core(500.0);
+  late final txManager = ledger(name: 'checkout');
+
+  Future<void> placeOrder(int qty, double price) async {
+    await txManager.transact((tx) async {
+      tx.capture(inventory);
+      tx.capture(balance);
+      inventory.value -= qty;
+      balance.value -= price;
+      await api.charge(price); // throws → auto-rollback
+    }, name: 'order');
+  }
+}
+
+// Reactive counters
+print(txManager.commitCount);  // 1
+print(txManager.hasActive);    // false
+print(txManager.lastRecord);   // LedgerRecord(#0, committed, cores: 2)
+```
+
+Atomic state transactions with `capture()` snapshots, auto-commit/rollback, reactive counters, and `LedgerRecord` audit history.
+
+> **Infrastructure features** — Codex, Quarry, Trove, Moat, Pyre, Portcullis, Anvil, Bulwark, Saga, Volley, Tether, and Annals are in the [`titan_basalt`](https://pub.dev/packages/titan_basalt) package. Add `import 'package:titan_basalt/titan_basalt.dart';` to use them.
 
 ---
 
@@ -426,7 +477,12 @@ In-place mutations, no copy-on-write. Granular `NexusChange` records for pattern
 | Pagination | ❌ | ❌ | ❌ | ❌ | ✅ |
 | SWR data fetching | ❌ | ❌ | ❌ | ❌ | ✅ |
 | State middleware | ❌ | ❌ | ❌ | ❌ | ✅ |
+| State transactions | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Circuit breaker | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Dead letter queue | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Reactive collections | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Reactive async derived | ❌ | ❌ | ⚠️ | ❌ | ✅ |
+| Priority task queue | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
@@ -452,8 +508,11 @@ test('counter pillar works', () {
 | Package | Description |
 |---------|-------------|
 | **`titan`** | Core reactive engine — pure Dart (this package) |
+| [`titan_basalt`](https://pub.dev/packages/titan_basalt) | Infrastructure & resilience (Trove, Moat, Portcullis, Anvil, Pyre, Codex, Quarry, Bulwark, Saga, Volley, Tether, Annals) |
 | [`titan_bastion`](https://pub.dev/packages/titan_bastion) | Flutter widgets (Vestige, Beacon) |
 | [`titan_atlas`](https://pub.dev/packages/titan_atlas) | Routing & navigation (Atlas) |
+| [`titan_argus`](https://pub.dev/packages/titan_argus) | Authentication & authorization |
+| [`titan_colossus`](https://pub.dev/packages/titan_colossus) | Enterprise performance monitoring |
 
 ## Documentation
 

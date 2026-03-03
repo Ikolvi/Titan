@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:titan/titan.dart';
+import 'package:titan_basalt/titan_basalt.dart';
 
 // =============================================================================
 // Titan Benchmark Tracker
@@ -1035,6 +1036,213 @@ Future<void> _runEnterpriseBenchmarks() async {
     );
     state2.removeListener(simulateRefresh);
     state2.dispose();
+  }
+
+  // 32. Trove — TTL/LRU in-memory cache
+  {
+    // a) Put throughput
+    {
+      const count = 100000;
+      final cache = Trove<int, int>(name: 'bench-put');
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < count; i++) {
+        cache.put(i, i);
+      }
+      sw.stop();
+      _record(
+        'Trove Put (100K)',
+        sw.elapsedMicroseconds / count,
+        'µs/op',
+        'enterprise',
+      );
+      cache.dispose();
+    }
+
+    // b) Get throughput (all hits)
+    {
+      const count = 100000;
+      final cache = Trove<int, int>(name: 'bench-get');
+      for (var i = 0; i < count; i++) {
+        cache.put(i, i);
+      }
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < count; i++) {
+        cache.get(i);
+      }
+      sw.stop();
+      _record(
+        'Trove Get Hit (100K)',
+        sw.elapsedMicroseconds / count,
+        'µs/op',
+        'enterprise',
+      );
+      cache.dispose();
+    }
+
+    // c) LRU eviction throughput
+    {
+      const maxEntries = 1000;
+      const insertions = 10000;
+      final cache = Trove<int, int>(maxEntries: maxEntries, name: 'bench-lru');
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < insertions; i++) {
+        cache.put(i, i);
+      }
+      sw.stop();
+      _record(
+        'Trove LRU Evict (cap=1K)',
+        sw.elapsedMicroseconds / insertions,
+        'µs/op',
+        'enterprise',
+      );
+      cache.dispose();
+    }
+  }
+
+  // 33. Moat — rate limiter throughput
+  {
+    const count = 100000;
+    final limiter = Moat(
+      maxTokens: count,
+      refillRate: const Duration(seconds: 60),
+    );
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      limiter.tryConsume();
+    }
+    sw.stop();
+    _record(
+      'Moat tryConsume (100K)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'enterprise',
+    );
+    limiter.dispose();
+  }
+
+  // 34. Omen — reactive async derived creation throughput
+  {
+    const count = 10000;
+    final sw = Stopwatch()..start();
+    final omens = <Omen<int>>[];
+    for (var i = 0; i < count; i++) {
+      omens.add(Omen<int>(() async => i, name: 'track-$i'));
+    }
+    sw.stop();
+    _record(
+      'Omen create eager (10K)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'enterprise',
+    );
+    for (final o in omens) {
+      o.dispose();
+    }
+  }
+
+  // 35. Pyre — priority task queue enqueue throughput
+  {
+    const count = 10000;
+    final q = Pyre<int>(concurrency: 5, autoStart: false, name: 'track');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      q.enqueue(() async => i);
+    }
+    sw.stop();
+    _record(
+      'Pyre enqueue (10K)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'enterprise',
+    );
+    q.dispose();
+  }
+
+  // 36. Mandate — reactive policy engine evaluation
+  {
+    const count = 10000;
+    final flag = TitanState<bool>(true);
+    final m = Mandate(
+      writs: [
+        Writ(name: 'flag', evaluate: () => flag.value),
+        Writ(name: 'ok', evaluate: () => true),
+      ],
+    );
+    m.verdict.value; // prime
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      flag.value = i.isEven;
+      m.verdict.value;
+    }
+    sw.stop();
+    _record(
+      'Mandate re-eval (10K)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'enterprise',
+    );
+    m.dispose();
+  }
+
+  // 37. Ledger — state transaction rollback overhead
+  {
+    const count = 10000;
+    final a = TitanState<int>(0);
+    final b = TitanState<int>(0);
+    final l = Ledger();
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      final tx = l.begin();
+      tx.capture(a);
+      tx.capture(b);
+      a.value = i + 100;
+      b.value = i + 200;
+      tx.rollback();
+    }
+    sw.stop();
+    _record(
+      'Ledger rollback (10K)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'enterprise',
+    );
+    l.dispose();
+  }
+
+  // 38. Portcullis — circuit breaker protectSync throughput
+  {
+    const count = 10000;
+    final p = Portcullis(failureThreshold: count + 1);
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      p.protectSync(() => i);
+    }
+    sw.stop();
+    _record(
+      'Portcullis protectSync (10K)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'enterprise',
+    );
+    p.dispose();
+  }
+
+  // 39. Anvil — enqueue throughput (no-start, sync only)
+  {
+    const count = 10000;
+    final a = Anvil<String>(autoStart: false, name: 'track');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      a.enqueue(() async => 'ok', id: 'job-$i');
+    }
+    sw.stop();
+    _record(
+      'Anvil enqueue (10K, no-start)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'enterprise',
+    );
+    a.dispose();
   }
 }
 

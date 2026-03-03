@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import '../core/state.dart';
+import 'package:titan/titan.dart';
 
 // ---------------------------------------------------------------------------
 // Quarry — Titan's Data Fetching Layer
