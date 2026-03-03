@@ -13,11 +13,13 @@
 /// ## Usage
 ///
 /// ```dart
-/// // Provider Pillar registers a tether
+/// // Instance-based with Pillar integration
 /// class AuthPillar extends Pillar {
+///   late final rpc = tether(name: 'auth');
+///
 ///   @override
 ///   void onInit() {
-///     Tether.register<String, User>('getUser', (userId) async {
+///     rpc.register<String, User>('getUser', (userId) async {
 ///       return await fetchUser(userId);
 ///     });
 ///   }
@@ -26,14 +28,26 @@
 /// // Consumer Pillar calls the tether
 /// class ProfilePillar extends Pillar {
 ///   Future<void> loadProfile(String userId) async {
-///     final user = await Tether.call<String, User>('getUser', userId);
+///     final user = await Tether.global.call<String, User>('getUser', userId);
 ///     profile.value = user;
 ///   }
 /// }
 /// ```
+///
+/// ## Static convenience API
+///
+/// The static methods on [Tether] delegate to [Tether.global] for
+/// backward compatibility:
+///
+/// ```dart
+/// Tether.registerGlobal<String, User>('getUser', handler);
+/// final user = await Tether.callGlobal<String, User>('getUser', 'id');
+/// ```
 library;
 
 import 'dart:async';
+
+import 'package:titan/titan.dart';
 
 /// A registered tether handler entry.
 class _TetherEntry {
@@ -49,20 +63,81 @@ class _TetherEntry {
 /// named, typed channels. One Pillar registers a handler, and other
 /// Pillars invoke it by name.
 ///
-/// ```dart
-/// // Register
-/// Tether.register<String, int>('getAge', (name) async {
-///   return await lookupAge(name);
-/// });
+/// Supports both instance-based (with reactive state and Pillar
+/// integration) and static global usage.
 ///
-/// // Call
-/// final age = await Tether.call<String, int>('getAge', 'Alice');
+/// ```dart
+/// // Instance-based (preferred)
+/// final rpc = Tether(name: 'myService');
+/// rpc.register<String, int>('getAge', (name) async => lookupAge(name));
+/// final age = await rpc.call<String, int>('getAge', 'Alice');
+///
+/// // Static global (convenience)
+/// Tether.registerGlobal<String, int>('getAge', (n) async => lookupAge(n));
+/// final age = await Tether.callGlobal<String, int>('getAge', 'Alice');
 /// ```
 class Tether {
-  Tether._();
+  /// The global shared Tether instance.
+  ///
+  /// Use for simple cross-Pillar communication without instance management.
+  static final Tether global = Tether._internal(name: 'global');
 
   /// Internal registry of tether handlers.
-  static final Map<String, _TetherEntry> _handlers = {};
+  final Map<String, _TetherEntry> _handlers = {};
+
+  // Reactive state
+  final TitanState<int> _registeredCount;
+  final TitanState<int> _callCount;
+  final TitanState<DateTime?> _lastCallTime;
+  final TitanState<int> _errorCount;
+
+  final String? _name;
+  bool _isDisposed = false;
+
+  /// Creates a new Tether instance with reactive state.
+  ///
+  /// - [name] — Debug name prefix for internal Cores.
+  ///
+  /// ```dart
+  /// final rpc = Tether(name: 'authRpc');
+  /// rpc.register<String, User>('getUser', handler);
+  /// ```
+  Tether({String? name}) : this._internal(name: name);
+
+  Tether._internal({String? name})
+    : _name = name,
+      _registeredCount = TitanState<int>(
+        0,
+        name: '${name ?? 'tether'}_registeredCount',
+      ),
+      _callCount = TitanState<int>(0, name: '${name ?? 'tether'}_callCount'),
+      _lastCallTime = TitanState<DateTime?>(
+        null,
+        name: '${name ?? 'tether'}_lastCallTime',
+      ),
+      _errorCount = TitanState<int>(0, name: '${name ?? 'tether'}_errorCount');
+
+  // ---------------------------------------------------------------------------
+  // Reactive state
+  // ---------------------------------------------------------------------------
+
+  /// Number of registered handlers (reactive).
+  int get registeredCount => _registeredCount.value;
+
+  /// Total number of calls made (reactive).
+  int get callCount => _callCount.value;
+
+  /// Timestamp of the last call (reactive).
+  DateTime? get lastCallTime => _lastCallTime.value;
+
+  /// Total number of errors during calls (reactive).
+  int get errorCount => _errorCount.value;
+
+  /// Whether this Tether has been disposed.
+  bool get isDisposed => _isDisposed;
+
+  /// Debug name.
+  String? get name => _name;
 
   // ---------------------------------------------------------------------------
   // Registration
@@ -74,34 +149,45 @@ class Tether {
   /// replaces the previous handler.
   ///
   /// - [name] — Unique identifier for this tether.
-  /// - [handler] — Async function that processes the request and returns a response.
+  /// - [handler] — Async function that processes the request and returns
+  ///   a response.
   /// - [timeout] — Optional per-tether timeout for calls.
   ///
   /// ```dart
-  /// Tether.register<String, User>('getUser', (userId) async {
+  /// tether.register<String, User>('getUser', (userId) async {
   ///   return await userRepository.find(userId);
   /// });
   /// ```
-  static void register<Req, Res>(
+  void register<Req, Res>(
     String name,
     Future<Res> Function(Req request) handler, {
     Duration? timeout,
   }) {
+    _assertNotDisposed();
+    final isNew = !_handlers.containsKey(name);
     _handlers[name] = _TetherEntry(handler: handler, timeout: timeout);
+    if (isNew) {
+      _registeredCount.value = _handlers.length;
+    }
   }
 
   /// Unregister a tether handler.
   ///
   /// Returns `true` if the handler existed and was removed.
-  static bool unregister(String name) {
-    return _handlers.remove(name) != null;
+  bool unregister(String name) {
+    _assertNotDisposed();
+    final removed = _handlers.remove(name) != null;
+    if (removed) {
+      _registeredCount.value = _handlers.length;
+    }
+    return removed;
   }
 
   /// Whether a tether with the given name is registered.
-  static bool has(String name) => _handlers.containsKey(name);
+  bool has(String name) => _handlers.containsKey(name);
 
   /// The names of all registered tethers.
-  static Set<String> get names => Set.unmodifiable(_handlers.keys.toSet());
+  Set<String> get names => Set.unmodifiable(_handlers.keys.toSet());
 
   // ---------------------------------------------------------------------------
   // Invocation
@@ -117,13 +203,14 @@ class Tether {
   /// - [timeout] — Override the tether's default timeout.
   ///
   /// ```dart
-  /// final user = await Tether.call<String, User>('getUser', 'user_123');
+  /// final user = await tether.call<String, User>('getUser', 'user_123');
   /// ```
-  static Future<Res> call<Req, Res>(
+  Future<Res> call<Req, Res>(
     String name,
     Req request, {
     Duration? timeout,
   }) async {
+    _assertNotDisposed();
     final entry = _handlers[name];
     if (entry == null) {
       throw StateError('Tether "$name" is not registered.');
@@ -132,17 +219,25 @@ class Tether {
     final handler = entry.handler as Future<Res> Function(Req);
     final effectiveTimeout = timeout ?? entry.timeout;
 
-    if (effectiveTimeout != null) {
-      return await handler(request).timeout(
-        effectiveTimeout,
-        onTimeout: () => throw TimeoutException(
-          'Tether "$name" timed out after ${effectiveTimeout.inMilliseconds}ms',
-          effectiveTimeout,
-        ),
-      );
-    }
+    _callCount.value++;
+    _lastCallTime.value = DateTime.now();
 
-    return await handler(request);
+    try {
+      if (effectiveTimeout != null) {
+        return await handler(request).timeout(
+          effectiveTimeout,
+          onTimeout: () => throw TimeoutException(
+            'Tether "$name" timed out after '
+            '${effectiveTimeout.inMilliseconds}ms',
+            effectiveTimeout,
+          ),
+        );
+      }
+      return await handler(request);
+    } catch (e) {
+      _errorCount.value++;
+      rethrow;
+    }
   }
 
   /// Try to call a tether, returning null if not registered.
@@ -151,10 +246,10 @@ class Tether {
   /// Still throws on handler errors or timeouts.
   ///
   /// ```dart
-  /// final user = await Tether.tryCall<String, User>('getUser', 'user_123');
+  /// final user = await tether.tryCall<String, User>('getUser', 'user_123');
   /// if (user != null) { /* use user */ }
   /// ```
-  static Future<Res?> tryCall<Req, Res>(
+  Future<Res?> tryCall<Req, Res>(
     String name,
     Req request, {
     Duration? timeout,
@@ -167,10 +262,91 @@ class Tether {
   // Management
   // ---------------------------------------------------------------------------
 
-  /// Clear all registered tethers.
-  ///
-  /// Call in test teardown or app shutdown.
-  static void reset() {
+  /// Clear all registered tethers and reset reactive state.
+  void reset() {
     _handlers.clear();
+    _registeredCount.value = 0;
+    _callCount.value = 0;
+    _lastCallTime.value = null;
+    _errorCount.value = 0;
   }
+
+  /// All managed reactive nodes (for Pillar disposal).
+  List<TitanState<dynamic>> get managedNodes => [
+    _registeredCount,
+    _callCount,
+    _lastCallTime,
+    _errorCount,
+  ];
+
+  /// Dispose the Tether and all reactive state.
+  void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
+    _handlers.clear();
+    _registeredCount.dispose();
+    _callCount.dispose();
+    _lastCallTime.dispose();
+    _errorCount.dispose();
+  }
+
+  void _assertNotDisposed() {
+    if (_isDisposed) {
+      throw StateError(
+        'Cannot use a disposed Tether${_name != null ? ' ($_name)' : ''}',
+      );
+    }
+  }
+
+  @override
+  String toString() =>
+      'Tether(${_name ?? 'unnamed'}, '
+      'handlers: ${_handlers.length}, '
+      'calls: ${_callCount.peek()}, '
+      'errors: ${_errorCount.peek()})';
+
+  // ---------------------------------------------------------------------------
+  // Static convenience API — delegates to Tether.global
+  // ---------------------------------------------------------------------------
+
+  /// Register a handler on the global Tether.
+  ///
+  /// Convenience for `Tether.global.register(...)`.
+  static void registerGlobal<Req, Res>(
+    String name,
+    Future<Res> Function(Req request) handler, {
+    Duration? timeout,
+  }) {
+    global.register<Req, Res>(name, handler, timeout: timeout);
+  }
+
+  /// Unregister a handler from the global Tether.
+  static bool unregisterGlobal(String name) => global.unregister(name);
+
+  /// Whether the global Tether has a handler for [name].
+  static bool hasGlobal(String name) => global.has(name);
+
+  /// All registered names on the global Tether.
+  static Set<String> get globalNames => global.names;
+
+  /// Call a handler on the global Tether.
+  static Future<Res> callGlobal<Req, Res>(
+    String name,
+    Req request, {
+    Duration? timeout,
+  }) {
+    return global.call<Req, Res>(name, request, timeout: timeout);
+  }
+
+  /// Try to call a handler on the global Tether.
+  static Future<Res?> tryCallGlobal<Req, Res>(
+    String name,
+    Req request, {
+    Duration? timeout,
+  }) {
+    return global.tryCall<Req, Res>(name, request, timeout: timeout);
+  }
+
+  /// Reset the global Tether (clear all handlers).
+  static void resetGlobal() => global.reset();
 }

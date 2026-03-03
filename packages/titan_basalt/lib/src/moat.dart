@@ -97,6 +97,9 @@ class Moat {
   /// Internal fractional token accumulator for sub-second precision.
   double _fractionalTokens;
 
+  /// Pending token waiters (Completer-based, no polling).
+  final List<_MoatWaiter> _waiters = [];
+
   // ---------------------------------------------------------------------------
   // Reactive state
   // ---------------------------------------------------------------------------
@@ -217,23 +220,25 @@ class Moat {
     assert(tokens > 0, 'tokens must be positive');
     if (tryConsume(tokens)) return true;
 
-    final deadline = timeout != null ? DateTime.now().add(timeout) : null;
-    // Poll at a fraction of refillRate for responsiveness, min 10ms
-    final pollInterval = Duration(
-      milliseconds: (refillRate.inMilliseconds ~/ 4).clamp(10, 1000),
-    );
+    final completer = Completer<bool>();
+    Timer? timer;
+    final waiter = _MoatWaiter(tokens: tokens, completer: completer);
+    _waiters.add(waiter);
 
-    while (true) {
-      await Future<void>.delayed(pollInterval);
-
-      if (deadline != null && DateTime.now().isAfter(deadline)) {
-        _rejections.value++;
-        onReject?.call();
-        return false;
-      }
-
-      if (tryConsume(tokens)) return true;
+    if (timeout != null) {
+      timer = Timer(timeout, () {
+        if (!completer.isCompleted) {
+          _waiters.remove(waiter);
+          _rejections.value++;
+          onReject?.call();
+          completer.complete(false);
+        }
+      });
     }
+
+    final result = await completer.future;
+    timer?.cancel();
+    return result;
   }
 
   /// Execute an action if a token is available, otherwise call [onLimit].
@@ -271,6 +276,13 @@ class Moat {
   void dispose() {
     _refillTimer?.cancel();
     _refillTimer = null;
+    // Reject all pending waiters.
+    for (final waiter in _waiters) {
+      if (!waiter.completer.isCompleted) {
+        waiter.completer.complete(false);
+      }
+    }
+    _waiters.clear();
     _remaining.dispose();
     _rejections.dispose();
     _consumed.dispose();
@@ -294,6 +306,7 @@ class Moat {
     if (_remaining.value >= maxTokens) {
       _lastRefill = DateTime.now();
       _fractionalTokens = 0.0;
+      _fulfillWaiters();
       return;
     }
 
@@ -308,6 +321,29 @@ class Moat {
       _remaining.value = newValue > maxTokens ? maxTokens : newValue;
       _lastRefill = now;
       _fractionalTokens = tokensToAdd - wholeTokens;
+      _fulfillWaiters();
+    }
+  }
+
+  /// Attempt to fulfill pending waiters with available tokens.
+  void _fulfillWaiters() {
+    if (_waiters.isEmpty) return;
+
+    final fulfilled = <_MoatWaiter>[];
+    for (final waiter in _waiters) {
+      if (waiter.completer.isCompleted) {
+        fulfilled.add(waiter);
+        continue;
+      }
+      if (_remaining.value >= waiter.tokens) {
+        _remaining.value -= waiter.tokens;
+        _consumed.value += waiter.tokens;
+        waiter.completer.complete(true);
+        fulfilled.add(waiter);
+      }
+    }
+    for (final w in fulfilled) {
+      _waiters.remove(w);
     }
   }
 
@@ -416,4 +452,12 @@ class MoatPool {
     }
     _limiters.clear();
   }
+}
+
+/// Internal waiter record for Completer-based token consumption.
+class _MoatWaiter {
+  final int tokens;
+  final Completer<bool> completer;
+
+  const _MoatWaiter({required this.tokens, required this.completer});
 }

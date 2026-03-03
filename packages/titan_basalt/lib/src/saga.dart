@@ -140,18 +140,42 @@ class Saga<T> {
   /// Optional callback on each step completion.
   final void Function(String stepName, int index, int total)? onStepComplete;
 
+  /// Optional callback when a compensation step fails.
+  ///
+  /// If provided, compensation errors are reported through this callback
+  /// instead of being silently swallowed. The callback receives the error,
+  /// the stack trace, and the name of the step whose compensation failed.
+  final void Function(Object error, StackTrace stackTrace, String stepName)?
+  onCompensationError;
+
+  /// Errors from compensation steps that failed during rollback.
+  ///
+  /// Populated during [_compensate] if any compensation step throws.
+  /// Cleared on each [run] and [reset].
+  final List<({Object error, StackTrace stackTrace, String stepName})>
+  _compensationErrors = [];
+
+  /// Errors from compensation steps that failed during rollback.
+  ///
+  /// Returns an unmodifiable view. Empty when no compensation errors
+  /// have occurred.
+  List<({Object error, StackTrace stackTrace, String stepName})>
+  get compensationErrors => List.unmodifiable(_compensationErrors);
+
   /// Creates a Saga workflow.
   ///
   /// - [steps] — The ordered list of workflow steps.
   /// - [onComplete] — Called when all steps succeed.
   /// - [onError] — Called when a step fails (after compensation).
   /// - [onStepComplete] — Called after each successful step.
+  /// - [onCompensationError] — Called when a compensation step fails.
   /// - [name] — Debug name prefix for internal Cores.
   Saga({
     required this.steps,
     this.onComplete,
     this.onError,
     this.onStepComplete,
+    this.onCompensationError,
     String? name,
   }) : _status = TitanState<SagaStatus>(
          SagaStatus.idle,
@@ -229,6 +253,7 @@ class Saga<T> {
     _status.value = SagaStatus.running;
     _error.value = null;
     _result.value = null;
+    _compensationErrors.clear();
     _stepResultCount = 0;
 
     T? previousResult;
@@ -270,9 +295,14 @@ class Saga<T> {
 
       try {
         await step.compensate?.call(result);
-      } catch (_) {
-        // Compensation failures are swallowed — best effort.
-        // In production, these would be logged via Vigil.
+      } catch (e, st) {
+        // Track compensation failure for debugging/logging.
+        _compensationErrors.add((
+          error: e,
+          stackTrace: st,
+          stepName: step.name,
+        ));
+        onCompensationError?.call(e, st, step.name);
       }
     }
   }
@@ -285,6 +315,7 @@ class Saga<T> {
     _currentStep.value = -1;
     _error.value = null;
     _result.value = null;
+    _compensationErrors.clear();
     _stepResults.fillRange(0, _stepResultCount, null);
     _stepResultCount = 0;
   }

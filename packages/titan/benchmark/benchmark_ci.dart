@@ -424,19 +424,19 @@ void _benchAnnalsRecord() {
 // 14. Tether Call Throughput
 // ---------------------------------------------------------------------------
 void _benchTetherCall() {
-  Tether.reset();
-  Tether.register<int, int>('multiply', (req) async => req * 2);
+  Tether.resetGlobal();
+  Tether.registerGlobal<int, int>('multiply', (req) async => req * 2);
 
   const calls = 10000;
   final sw = Stopwatch()..start();
   for (var i = 0; i < calls; i++) {
-    Tether.call<int, int>('multiply', i);
+    Tether.callGlobal<int, int>('multiply', i);
   }
   sw.stop();
 
   final throughput = calls / sw.elapsedMicroseconds * 1e6;
   _record('Tether Call (10K)', 'calls/sec', throughput);
-  Tether.reset();
+  Tether.resetGlobal();
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.12.1
+
+### Improved
+
+- **Pyre** — O(1) enqueue/dequeue via per-priority `Queue` buckets (was O(n) sorted list insert + removeAt(0)).
+- **Volley** — Added `maxRetries`, `retryDelay`, `taskTimeout`, per-task `VolleyTask.timeout`, `onTaskComplete`/`onTaskFailed` callbacks, separate `successCount`/`failedCount` tracking, `isDisposed` guard.
+- **Tether** — Rewritten as instance-based with reactive state (`registeredCount`, `callCount`, `lastCallTime`, `errorCount`), `managedNodes`, `dispose()`. Added `Tether.global` singleton with static convenience API. Added `tether()` Pillar factory.
+- **Annals** — Fixed `StreamController` leak (lazy creation + `dispose()`). Optimized `query()` with limit to avoid materializing full list. Changed backing store from `Queue` to `List`.
+- **Saga** — Compensation errors now tracked in `compensationErrors` list instead of silently swallowed. Added `onCompensationError` callback.
+- **Moat** — `consume()` now uses Completer-based wakeup instead of polling loop, eliminating unnecessary CPU cycles.
+- **Trove** — `_purgeExpired()` optimized to single-pass (avoids redundant map re-lookup).
+
+### Deprecated
+
+- **Bulwark** — Deprecated in favor of `Portcullis` (superset). Will be removed in v2.0.
+
 ## 1.12.0
 
 ### Added

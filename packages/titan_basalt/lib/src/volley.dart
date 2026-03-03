@@ -57,6 +57,7 @@ enum VolleyStatus {
 /// VolleyTask(
 ///   name: 'upload-photo',
 ///   execute: () async => await uploadPhoto(photo),
+///   timeout: Duration(seconds: 30),
 /// )
 /// ```
 class VolleyTask<T> {
@@ -66,8 +67,11 @@ class VolleyTask<T> {
   /// The async operation to execute.
   final Future<T> Function() execute;
 
+  /// Optional per-task timeout. Overrides [Volley.taskTimeout] if set.
+  final Duration? timeout;
+
   /// Creates a volley task.
-  const VolleyTask({required this.name, required this.execute});
+  const VolleyTask({required this.name, required this.execute, this.timeout});
 }
 
 /// The result of a single [VolleyTask].
@@ -135,8 +139,21 @@ class VolleyFailure<T> extends VolleyResult<T> {
 /// Executes multiple [VolleyTask]s in parallel with a configurable
 /// concurrency limit. All progress is reactive via [Core] state nodes.
 ///
+/// ## Features
+///
+/// - **Concurrency control** — configurable max parallel workers
+/// - **Per-task timeout** — individual or global task timeout
+/// - **Retry with backoff** — configurable retries with exponential delay
+/// - **Reactive state** — progress, success/failure counts, status
+/// - **Callbacks** — `onTaskComplete` and `onTaskFailed` hooks
+/// - **Cancellation** — cancel remaining tasks mid-execution
+///
 /// ```dart
-/// final volley = Volley<String>(concurrency: 3);
+/// final volley = Volley<String>(
+///   concurrency: 3,
+///   maxRetries: 2,
+///   retryDelay: Duration(milliseconds: 100),
+/// );
 ///
 /// final results = await volley.execute([
 ///   VolleyTask(name: 'a', execute: () async => 'result-a'),
@@ -144,12 +161,28 @@ class VolleyFailure<T> extends VolleyResult<T> {
 ///   VolleyTask(name: 'c', execute: () async => 'result-c'),
 /// ]);
 ///
-/// print(volley.status); // VolleyStatus.done
+/// print(volley.status);       // VolleyStatus.done
 /// print(volley.successCount); // 3
+/// print(volley.failedCount);  // 0
 /// ```
 class Volley<T> {
   /// Maximum number of concurrent tasks.
   final int concurrency;
+
+  /// Maximum retries per task (default: 0 = no retries).
+  final int maxRetries;
+
+  /// Base delay between retries (multiplied by attempt number).
+  final Duration retryDelay;
+
+  /// Default timeout for all tasks. Overridden by [VolleyTask.timeout].
+  final Duration? taskTimeout;
+
+  /// Callback when a task completes successfully.
+  final void Function(String taskName, T result)? onTaskComplete;
+
+  /// Callback when a task fails after exhausting retries.
+  final void Function(String taskName, Object error)? onTaskFailed;
 
   /// Reactive status.
   final TitanState<VolleyStatus> _status;
@@ -157,8 +190,14 @@ class Volley<T> {
   /// Reactive progress (0.0 to 1.0).
   final TitanState<double> _progress;
 
-  /// Reactive completed count.
+  /// Reactive completed count (successes + failures).
   final TitanState<int> _completedCount;
+
+  /// Reactive success count.
+  final TitanState<int> _successCount;
+
+  /// Reactive failed count.
+  final TitanState<int> _failedCount;
 
   /// Reactive total count.
   final TitanState<int> _totalCount;
@@ -166,27 +205,53 @@ class Volley<T> {
   /// Whether cancellation has been requested.
   bool _cancelRequested = false;
 
+  /// Whether the Volley has been disposed.
+  bool _isDisposed = false;
+
   /// Creates a Volley executor.
   ///
   /// - [concurrency] — Max parallel tasks (default: 5).
+  /// - [maxRetries] — Retries per failed task (default: 0).
+  /// - [retryDelay] — Base delay between retries (default: 100ms).
+  /// - [taskTimeout] — Default timeout for all tasks.
+  /// - [onTaskComplete] — Called on each task success.
+  /// - [onTaskFailed] — Called on each task failure.
   /// - [name] — Debug name prefix for internal Cores.
-  Volley({this.concurrency = 5, String? name})
-    : _status = TitanState<VolleyStatus>(
-        VolleyStatus.idle,
-        name: name != null ? '${name}_status' : null,
-      ),
-      _progress = TitanState<double>(
-        0.0,
-        name: name != null ? '${name}_progress' : null,
-      ),
-      _completedCount = TitanState<int>(
-        0,
-        name: name != null ? '${name}_completed' : null,
-      ),
-      _totalCount = TitanState<int>(
-        0,
-        name: name != null ? '${name}_total' : null,
-      );
+  Volley({
+    this.concurrency = 5,
+    this.maxRetries = 0,
+    this.retryDelay = const Duration(milliseconds: 100),
+    this.taskTimeout,
+    this.onTaskComplete,
+    this.onTaskFailed,
+    String? name,
+  }) : _status = TitanState<VolleyStatus>(
+         VolleyStatus.idle,
+         name: name != null ? '${name}_status' : null,
+       ),
+       _progress = TitanState<double>(
+         0.0,
+         name: name != null ? '${name}_progress' : null,
+       ),
+       _completedCount = TitanState<int>(
+         0,
+         name: name != null ? '${name}_completed' : null,
+       ),
+       _successCount = TitanState<int>(
+         0,
+         name: name != null ? '${name}_success' : null,
+       ),
+       _failedCount = TitanState<int>(
+         0,
+         name: name != null ? '${name}_failed' : null,
+       ),
+       _totalCount = TitanState<int>(
+         0,
+         name: name != null ? '${name}_total' : null,
+       ) {
+    assert(concurrency > 0, 'concurrency must be > 0');
+    assert(maxRetries >= 0, 'maxRetries must be >= 0');
+  }
 
   /// Current status (reactive).
   VolleyStatus get status => _status.value;
@@ -200,8 +265,14 @@ class Volley<T> {
   /// The underlying reactive progress Core.
   TitanState<double> get progressCore => _progress;
 
-  /// Number of completed tasks (reactive).
+  /// Number of completed tasks — successes + failures (reactive).
   int get completedCount => _completedCount.value;
+
+  /// Number of successful tasks (reactive).
+  int get successCount => _successCount.value;
+
+  /// Number of failed tasks (reactive).
+  int get failedCount => _failedCount.value;
 
   /// Total number of tasks (reactive).
   int get totalCount => _totalCount.value;
@@ -209,8 +280,8 @@ class Volley<T> {
   /// Whether the volley is currently running.
   bool get isRunning => _status.peek() == VolleyStatus.running;
 
-  /// Number of successful results.
-  int get successCount => _completedCount.peek();
+  /// Whether the Volley has been disposed.
+  bool get isDisposed => _isDisposed;
 
   /// Execute a batch of tasks with concurrency control.
   ///
@@ -225,6 +296,7 @@ class Volley<T> {
   /// }
   /// ```
   Future<List<VolleyResult<T>>> execute(List<VolleyTask<T>> tasks) async {
+    _assertNotDisposed();
     if (_status.peek() == VolleyStatus.running) {
       throw StateError('Volley is already running.');
     }
@@ -233,6 +305,8 @@ class Volley<T> {
     _status.value = VolleyStatus.running;
     _totalCount.value = tasks.length;
     _completedCount.value = 0;
+    _successCount.value = 0;
+    _failedCount.value = 0;
     _progress.value = 0.0;
 
     if (tasks.isEmpty) {
@@ -278,16 +352,8 @@ class Volley<T> {
         if (index >= total) break;
 
         final task = tasks[index];
-        try {
-          final value = await task.execute();
-          results[index] = VolleySuccess(taskName: task.name, value: value);
-        } catch (e, s) {
-          results[index] = VolleyFailure(
-            taskName: task.name,
-            error: e,
-            stackTrace: s,
-          );
-        }
+        final result = await _executeWithRetry(task);
+        results[index] = result;
 
         completed++;
         _completedCount.value = completed;
@@ -301,6 +367,43 @@ class Volley<T> {
     await Future.wait(workers);
   }
 
+  /// Execute a single task with optional retries and timeout.
+  Future<VolleyResult<T>> _executeWithRetry(VolleyTask<T> task) async {
+    final maxAttempts = maxRetries + 1;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final effectiveTimeout = task.timeout ?? taskTimeout;
+        T value;
+        if (effectiveTimeout != null) {
+          value = await task.execute().timeout(effectiveTimeout);
+        } else {
+          value = await task.execute();
+        }
+
+        _successCount.value++;
+        onTaskComplete?.call(task.name, value);
+        return VolleySuccess(taskName: task.name, value: value);
+      } catch (e, s) {
+        if (attempt >= maxAttempts) {
+          _failedCount.value++;
+          onTaskFailed?.call(task.name, e);
+          return VolleyFailure(taskName: task.name, error: e, stackTrace: s);
+        }
+        // Wait before retry with exponential backoff
+        await Future<void>.delayed(retryDelay * attempt);
+      }
+    }
+
+    // Should not reach here, but satisfy the type system
+    _failedCount.value++;
+    return VolleyFailure(
+      taskName: task.name,
+      error: StateError('Exhausted retries'),
+      stackTrace: StackTrace.current,
+    );
+  }
+
   /// Request cancellation of the current execution.
   ///
   /// Already-running tasks will complete, but no new tasks will be started.
@@ -310,9 +413,12 @@ class Volley<T> {
 
   /// Reset the volley to idle state.
   void reset() {
+    _assertNotDisposed();
     _status.value = VolleyStatus.idle;
     _progress.value = 0.0;
     _completedCount.value = 0;
+    _successCount.value = 0;
+    _failedCount.value = 0;
     _totalCount.value = 0;
     _cancelRequested = false;
   }
@@ -322,18 +428,33 @@ class Volley<T> {
     _status,
     _progress,
     _completedCount,
+    _successCount,
+    _failedCount,
     _totalCount,
   ];
 
   /// Dispose all internal state.
   void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
     _status.dispose();
     _progress.dispose();
     _completedCount.dispose();
+    _successCount.dispose();
+    _failedCount.dispose();
     _totalCount.dispose();
+  }
+
+  void _assertNotDisposed() {
+    if (_isDisposed) {
+      throw StateError('Cannot use a disposed Volley');
+    }
   }
 
   @override
   String toString() =>
-      'Volley(status: ${_status.peek()}, ${_completedCount.peek()}/${_totalCount.peek()})';
+      'Volley(status: ${_status.peek()}, '
+      'success: ${_successCount.peek()}, '
+      'failed: ${_failedCount.peek()}, '
+      'total: ${_totalCount.peek()})';
 }

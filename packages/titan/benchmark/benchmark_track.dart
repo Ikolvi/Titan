@@ -646,6 +646,7 @@ Future<void> _runEnterpriseBenchmarks() async {
 
   // 18. Bulwark success call
   {
+    // ignore: deprecated_member_use
     final bulwark = Bulwark<int>(failureThreshold: 5);
     const calls = 10000;
     final sw = Stopwatch()..start();
@@ -727,12 +728,12 @@ Future<void> _runEnterpriseBenchmarks() async {
 
   // 22. Tether call
   {
-    Tether.reset();
-    Tether.register<int, int>('mul', (r) async => r * 2);
+    Tether.resetGlobal();
+    Tether.registerGlobal<int, int>('mul', (r) async => r * 2);
     const calls = 10000;
     final sw = Stopwatch()..start();
     for (var i = 0; i < calls; i++) {
-      await Tether.call<int, int>('mul', i);
+      await Tether.callGlobal<int, int>('mul', i);
     }
     sw.stop();
     _record(
@@ -741,7 +742,7 @@ Future<void> _runEnterpriseBenchmarks() async {
       'µs/call',
       'enterprise',
     );
-    Tether.reset();
+    Tether.resetGlobal();
   }
 
   // 23. Aegis success

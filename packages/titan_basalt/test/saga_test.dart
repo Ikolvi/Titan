@@ -353,6 +353,135 @@ void main() {
 
       pillar.dispose();
     });
+
+    test('tracks compensation errors via compensationErrors list', () async {
+      final saga = Saga<String>(
+        steps: [
+          SagaStep(
+            name: 'step1',
+            execute: (_) async => 'one',
+            compensate: (_) async => throw Exception('comp1 failed'),
+          ),
+          SagaStep(
+            name: 'step2',
+            execute: (_) async => throw Exception('step2 failed'),
+          ),
+        ],
+      );
+
+      await saga.run();
+      expect(saga.status, SagaStatus.failed);
+      expect(saga.compensationErrors, hasLength(1));
+      expect(saga.compensationErrors.first.stepName, 'step1');
+      expect(
+        saga.compensationErrors.first.error.toString(),
+        contains('comp1 failed'),
+      );
+    });
+
+    test(
+      'calls onCompensationError callback on compensation failure',
+      () async {
+        final errors = <(Object, String)>[];
+        final saga = Saga<String>(
+          steps: [
+            SagaStep(
+              name: 'a',
+              execute: (_) async => 'a',
+              compensate: (_) async => throw StateError('a-comp'),
+            ),
+            SagaStep(
+              name: 'b',
+              execute: (_) async => 'b',
+              compensate: (_) async => throw StateError('b-comp'),
+            ),
+            SagaStep(
+              name: 'c',
+              execute: (_) async => throw Exception('c fails'),
+            ),
+          ],
+          onCompensationError: (error, _, stepName) {
+            errors.add((error, stepName));
+          },
+        );
+
+        await saga.run();
+        expect(errors, hasLength(2));
+        // Compensation runs in reverse: b first, then a
+        expect(errors[0].$2, 'b');
+        expect(errors[1].$2, 'a');
+      },
+    );
+
+    test('compensationErrors cleared on reset and re-run', () async {
+      final saga = Saga<String>(
+        steps: [
+          SagaStep(
+            name: 'step1',
+            execute: (_) async => 'ok',
+            compensate: (_) async => throw Exception('fail'),
+          ),
+          SagaStep(
+            name: 'step2',
+            execute: (_) async => throw Exception('boom'),
+          ),
+        ],
+      );
+
+      await saga.run();
+      expect(saga.compensationErrors, hasLength(1));
+
+      saga.reset();
+      expect(saga.compensationErrors, isEmpty);
+    });
+
+    test('compensationErrors cleared on subsequent run', () async {
+      var shouldFail = true;
+      final saga = Saga<String>(
+        steps: [
+          SagaStep(
+            name: 'step1',
+            execute: (_) async => 'ok',
+            compensate: (_) async => throw Exception('fail'),
+          ),
+          SagaStep(
+            name: 'step2',
+            execute: (_) async {
+              if (shouldFail) throw Exception('boom');
+              return 'done';
+            },
+          ),
+        ],
+      );
+
+      await saga.run();
+      expect(saga.compensationErrors, hasLength(1));
+
+      shouldFail = false;
+      await saga.run();
+      expect(saga.compensationErrors, isEmpty);
+      expect(saga.status, SagaStatus.completed);
+    });
+
+    test('no compensation errors when compensation succeeds', () async {
+      final saga = Saga<String>(
+        steps: [
+          SagaStep(
+            name: 'step1',
+            execute: (_) async => 'ok',
+            compensate: (_) async {}, // succeeds
+          ),
+          SagaStep(
+            name: 'step2',
+            execute: (_) async => throw Exception('fail'),
+          ),
+        ],
+      );
+
+      await saga.run();
+      expect(saga.compensationErrors, isEmpty);
+      expect(saga.status, SagaStatus.failed);
+    });
   });
 }
 

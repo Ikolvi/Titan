@@ -4,11 +4,11 @@ import 'package:titan_basalt/titan_basalt.dart';
 void main() {
   group('Annals', () {
     setUp(() {
-      Annals.reset();
+      Annals.dispose();
     });
 
     tearDown(() {
-      Annals.reset();
+      Annals.dispose();
     });
 
     test('starts disabled', () {
@@ -421,6 +421,128 @@ void main() {
       final results2 = Annals.query(pillarType: 'AuthPillar', userId: 'user1');
       expect(results2.length, 1);
       expect(results2.first.coreName, 'count');
+    });
+
+    test('dispose closes stream and clears entries', () {
+      Annals.enable();
+      Annals.record(
+        AnnalEntry(
+          coreName: 'test',
+          pillarType: 'P',
+          oldValue: 0,
+          newValue: 1,
+          action: 'set',
+        ),
+      );
+
+      Annals.dispose();
+      expect(Annals.length, 0);
+      expect(Annals.isEnabled, isFalse);
+    });
+
+    test('stream works after dispose and re-enable', () async {
+      Annals.enable();
+      Annals.dispose();
+
+      // Re-enable after dispose
+      Annals.enable();
+      final entries = <AnnalEntry>[];
+      final sub = Annals.stream.listen(entries.add);
+
+      Annals.record(
+        AnnalEntry(
+          coreName: 'after',
+          pillarType: 'P',
+          oldValue: 0,
+          newValue: 1,
+          action: 'set',
+        ),
+      );
+
+      await Future<void>.delayed(Duration.zero);
+      expect(entries.length, 1);
+      expect(entries.first.coreName, 'after');
+
+      await sub.cancel();
+    });
+
+    test('export with pillarType filter', () {
+      Annals.enable();
+      Annals.record(
+        AnnalEntry(
+          coreName: 'a',
+          pillarType: 'AuthPillar',
+          oldValue: 0,
+          newValue: 1,
+          action: 'login',
+        ),
+      );
+      Annals.record(
+        AnnalEntry(
+          coreName: 'b',
+          pillarType: 'CartPillar',
+          oldValue: 0,
+          newValue: 2,
+          action: 'add',
+        ),
+      );
+
+      final exported = Annals.export(pillarType: 'CartPillar');
+      expect(exported.length, 1);
+      expect(exported.first['coreName'], 'b');
+    });
+
+    test('AnnalEntry toString format', () {
+      final entry = AnnalEntry(
+        coreName: 'count',
+        pillarType: 'P',
+        oldValue: 0,
+        newValue: 1,
+        action: 'set',
+      );
+      expect(entry.toString(), contains('count'));
+      expect(entry.toString(), contains('[set]'));
+    });
+
+    test('AnnalEntry without optional fields', () {
+      final entry = AnnalEntry(coreName: 'count', oldValue: 0, newValue: 1);
+      expect(entry.pillarType, isNull);
+      expect(entry.action, isNull);
+      expect(entry.userId, isNull);
+      expect(entry.metadata, isNull);
+
+      final map = entry.toMap();
+      expect(map.containsKey('pillarType'), isFalse);
+      expect(map.containsKey('action'), isFalse);
+      expect(map.containsKey('userId'), isFalse);
+      expect(map.containsKey('metadata'), isFalse);
+    });
+
+    test('query with limit returns most recent matches', () {
+      Annals.enable();
+      for (var i = 0; i < 10; i++) {
+        Annals.record(
+          AnnalEntry(
+            coreName: 'item$i',
+            pillarType: 'P',
+            oldValue: null,
+            newValue: i,
+            action: 'set',
+          ),
+        );
+      }
+
+      final results = Annals.query(limit: 3);
+      expect(results.length, 3);
+      // Should be the last 3 entries
+      expect(results[0].coreName, 'item7');
+      expect(results[1].coreName, 'item8');
+      expect(results[2].coreName, 'item9');
+    });
+
+    test('maxEntries getter returns configured value', () {
+      Annals.enable(maxEntries: 500);
+      expect(Annals.maxEntries, 500);
     });
   });
 }

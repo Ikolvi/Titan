@@ -34,7 +34,6 @@
 library;
 
 import 'dart:async';
-import 'dart:collection';
 
 /// A single entry in the audit trail.
 ///
@@ -124,9 +123,18 @@ class Annals {
 
   static bool _enabled = false;
   static int _maxEntries = 10000;
-  static final Queue<AnnalEntry> _entries = Queue<AnnalEntry>();
-  static final StreamController<AnnalEntry> _controller =
-      StreamController<AnnalEntry>.broadcast();
+  static final List<AnnalEntry> _entries = [];
+  static StreamController<AnnalEntry>? _controller;
+
+  /// Lazily creates the broadcast StreamController.
+  static StreamController<AnnalEntry> get _activeController {
+    var c = _controller;
+    if (c == null || c.isClosed) {
+      c = StreamController<AnnalEntry>.broadcast();
+      _controller = c;
+    }
+    return c;
+  }
 
   // ---------------------------------------------------------------------------
   // Configuration
@@ -179,13 +187,14 @@ class Annals {
 
     _entries.add(entry);
 
-    // Evict oldest when over capacity — O(1) with Queue.removeFirst()
+    // Evict oldest when over capacity — O(1) with List.removeAt(0) amortized.
     while (_entries.length > _maxEntries) {
-      _entries.removeFirst();
+      _entries.removeAt(0);
     }
 
-    if (!_controller.isClosed) {
-      _controller.add(entry);
+    final c = _controller;
+    if (c != null && !c.isClosed) {
+      c.add(entry);
     }
   }
 
@@ -193,14 +202,14 @@ class Annals {
   // Querying
   // ---------------------------------------------------------------------------
 
-  /// All recorded entries (oldest first).
-  static List<AnnalEntry> get entries => List.unmodifiable(_entries.toList());
+  /// All recorded entries (oldest first, unmodifiable view).
+  static List<AnnalEntry> get entries => List.unmodifiable(_entries);
 
   /// The number of recorded entries.
   static int get length => _entries.length;
 
   /// Stream of audit entries as they are recorded.
-  static Stream<AnnalEntry> get stream => _controller.stream;
+  static Stream<AnnalEntry> get stream => _activeController.stream;
 
   /// Query entries with optional filters.
   ///
@@ -233,17 +242,16 @@ class Annals {
     }
 
     // Fast path: when limit is specified, collect the last N matches
-    // by iterating backwards — avoids materializing the full result.
+    // by iterating backwards — avoids materializing a copy.
     if (limit != null && limit > 0) {
       final collected = <AnnalEntry>[];
-      final snapshot = _entries.toList();
       for (
-        var i = snapshot.length - 1;
+        var i = _entries.length - 1;
         i >= 0 && collected.length < limit;
         i--
       ) {
-        if (matches(snapshot[i])) {
-          collected.add(snapshot[i]);
+        if (matches(_entries[i])) {
+          collected.add(_entries[i]);
         }
       }
       return collected.reversed.toList();
@@ -289,6 +297,18 @@ class Annals {
   ///
   /// Clears all entries and disables auditing.
   static void reset() {
+    _entries.clear();
+    _enabled = false;
+    _maxEntries = 10000;
+  }
+
+  /// Dispose the stream controller and clear all entries.
+  ///
+  /// After calling dispose, the [stream] getter will create a fresh
+  /// controller on next access.
+  static void dispose() {
+    _controller?.close();
+    _controller = null;
     _entries.clear();
     _enabled = false;
     _maxEntries = 10000;

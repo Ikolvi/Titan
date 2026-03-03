@@ -51,6 +51,7 @@
 library;
 
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:titan/titan.dart';
 
@@ -280,8 +281,13 @@ class Pyre<T> {
   final TitanState<int> _failedCountCore;
   final TitanState<int> _totalEnqueuedCore;
 
-  // Internal queue (sorted by priority + sequence)
-  final List<_PyreEntry<T>> _queue = [];
+  // Per-priority FIFO buckets — O(1) enqueue/dequeue.
+  // Indexed by PyrePriority.rank (0=critical, 1=high, 2=normal, 3=low).
+  final List<Queue<_PyreEntry<T>>> _buckets = List.generate(
+    PyrePriority.values.length,
+    (_) => Queue<_PyreEntry<T>>(),
+  );
+  int _totalQueued = 0;
   int _sequence = 0;
 
   // Active workers
@@ -384,7 +390,7 @@ class Pyre<T> {
   }
 
   /// Whether the queue has pending tasks.
-  bool get hasPending => _queue.isNotEmpty;
+  bool get hasPending => _totalQueued > 0;
 
   /// Whether the queue is actively processing.
   bool get isProcessing => _statusCore.value == PyreStatus.processing;
@@ -441,10 +447,10 @@ class Pyre<T> {
 
     // Backpressure check
     final max = _maxQueueSize;
-    if (max != null && _queue.length >= max) {
+    if (max != null && _totalQueued >= max) {
       throw PyreBackpressureException(
         maxQueueSize: max,
-        currentSize: _queue.length,
+        currentSize: _totalQueued,
       );
     }
 
@@ -459,8 +465,8 @@ class Pyre<T> {
       sequence: _sequence++,
     );
 
-    _insertSorted(entry);
-    _queueLengthCore.value = _queue.length;
+    _enqueue(entry);
+    _queueLengthCore.value = _totalQueued;
     _totalEnqueuedCore.value++;
 
     if (_autoStart && _statusCore.value == PyreStatus.idle) {
@@ -500,7 +506,7 @@ class Pyre<T> {
     if (_statusCore.value == PyreStatus.stopped) {
       throw StateError('Pyre is stopped — cannot restart');
     }
-    if (_statusCore.value != PyreStatus.processing && _queue.isNotEmpty) {
+    if (_statusCore.value != PyreStatus.processing && _totalQueued > 0) {
       _statusCore.value = PyreStatus.processing;
       _scheduleWorkers();
     }
@@ -529,34 +535,45 @@ class Pyre<T> {
   /// Returns `true` if the task was found and cancelled.
   /// Running tasks cannot be cancelled (returns `false`).
   bool cancel(String taskId) {
-    final index = _queue.indexWhere((e) => e.id == taskId);
-    if (index == -1) return false;
-
-    final entry = _queue.removeAt(index);
-    entry.completer.completeError(
-      StateError('Task cancelled: ${entry.id}'),
-      StackTrace.current,
-    );
-    // Prevent unhandled async error when no one awaits the cancelled future
-    entry.completer.future.ignore();
-    _queueLengthCore.value = _queue.length;
-    return true;
+    for (final bucket in _buckets) {
+      final entries = bucket.toList();
+      final index = entries.indexWhere((e) => e.id == taskId);
+      if (index != -1) {
+        // Rebuild bucket without the cancelled entry
+        final entry = entries.removeAt(index);
+        bucket.clear();
+        bucket.addAll(entries);
+        entry.completer.completeError(
+          StateError('Task cancelled: ${entry.id}'),
+          StackTrace.current,
+        );
+        // Prevent unhandled async error when no one awaits the cancelled future
+        entry.completer.future.ignore();
+        _totalQueued--;
+        _queueLengthCore.value = _totalQueued;
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Cancel all pending (not-yet-running) tasks.
   ///
   /// Returns the number of tasks cancelled.
   int cancelAll() {
-    final count = _queue.length;
-    for (final entry in _queue) {
-      entry.completer.completeError(
-        StateError('Task cancelled: ${entry.id}'),
-        StackTrace.current,
-      );
-      // Prevent unhandled async error when no one awaits the cancelled future
-      entry.completer.future.ignore();
+    final count = _totalQueued;
+    for (final bucket in _buckets) {
+      for (final entry in bucket) {
+        entry.completer.completeError(
+          StateError('Task cancelled: ${entry.id}'),
+          StackTrace.current,
+        );
+        // Prevent unhandled async error when no one awaits the cancelled future
+        entry.completer.future.ignore();
+      }
+      bucket.clear();
     }
-    _queue.clear();
+    _totalQueued = 0;
     _queueLengthCore.value = 0;
     return count;
   }
@@ -614,8 +631,10 @@ class Pyre<T> {
   ///
   /// Returns `null` if the queue is empty.
   String? peek() {
-    if (_queue.isEmpty) return null;
-    return _queue.first.id;
+    for (final bucket in _buckets) {
+      if (bucket.isNotEmpty) return bucket.first.id;
+    }
+    return null;
   }
 
   /// Dispose all internal state.
@@ -635,31 +654,32 @@ class Pyre<T> {
   // Internal
   // ---------------------------------------------------------------------------
 
-  /// Insert entry in sorted position (priority then sequence).
-  void _insertSorted(_PyreEntry<T> entry) {
-    // Binary search for insertion point
-    var lo = 0;
-    var hi = _queue.length;
-    while (lo < hi) {
-      final mid = (lo + hi) >> 1;
-      if (_queue[mid]._compareTo(entry) <= 0) {
-        lo = mid + 1;
-      } else {
-        hi = mid;
+  /// Enqueue entry into the appropriate priority bucket — O(1).
+  void _enqueue(_PyreEntry<T> entry) {
+    _buckets[entry.priority.rank].add(entry);
+    _totalQueued++;
+  }
+
+  /// Dequeue the highest-priority entry — O(k) where k = number of priorities.
+  _PyreEntry<T> _dequeue() {
+    for (final bucket in _buckets) {
+      if (bucket.isNotEmpty) {
+        _totalQueued--;
+        return bucket.removeFirst();
       }
     }
-    _queue.insert(lo, entry);
+    throw StateError('Cannot dequeue from empty Pyre');
   }
 
   /// Schedule workers to process the queue.
   void _scheduleWorkers() {
     while (_activeWorkers < _concurrency &&
-        _queue.isNotEmpty &&
+        _totalQueued > 0 &&
         _statusCore.value == PyreStatus.processing) {
       _activeWorkers++;
       _runningCountCore.value = _activeWorkers;
-      final entry = _queue.removeFirst();
-      _queueLengthCore.value = _queue.length;
+      final entry = _dequeue();
+      _queueLengthCore.value = _totalQueued;
       _runTask(entry);
     }
   }
@@ -706,9 +726,9 @@ class Pyre<T> {
     _activeWorkers--;
     _runningCountCore.value = _activeWorkers;
 
-    if (_queue.isNotEmpty && _statusCore.value == PyreStatus.processing) {
+    if (_totalQueued > 0 && _statusCore.value == PyreStatus.processing) {
       _scheduleWorkers();
-    } else if (_activeWorkers == 0 && _queue.isEmpty) {
+    } else if (_activeWorkers == 0 && _totalQueued == 0) {
       if (_statusCore.value != PyreStatus.stopped) {
         _statusCore.value = PyreStatus.idle;
       }
@@ -728,7 +748,7 @@ class Pyre<T> {
   String toString() {
     return 'Pyre<$T>(${_name ?? 'unnamed'}, '
         'status: ${_statusCore.value}, '
-        'queue: ${_queue.length}, '
+        'queue: $_totalQueued, '
         'running: $_activeWorkers, '
         'completed: ${_completedCountCore.value}, '
         'failed: ${_failedCountCore.value})';
@@ -752,20 +772,4 @@ class _PyreEntry<T> {
     required this.completer,
     required this.sequence,
   });
-
-  /// Compare by priority first, then by sequence (FIFO within same priority).
-  int _compareTo(_PyreEntry<T> other) {
-    final cmp = priority.rank.compareTo(other.priority.rank);
-    if (cmp != 0) return cmp;
-    return sequence.compareTo(other.sequence);
-  }
-}
-
-/// Extension for efficient queue removal.
-extension _ListRemoveFirst<E> on List<E> {
-  E removeFirst() {
-    final item = this[0];
-    removeAt(0);
-    return item;
-  }
 }

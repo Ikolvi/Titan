@@ -551,17 +551,12 @@ class Trove<K, V> {
 
   /// Purge all expired entries.
   void _purgeExpired() {
-    final expiredKeys = <K>[];
-    for (final entry in _store.entries) {
-      if (entry.value.isExpired) {
-        expiredKeys.add(entry.key);
-      }
+    final expired = <_LruNode<K, V>>[];
+    for (final node in _store.values) {
+      if (node.isExpired) expired.add(node);
     }
-    for (final key in expiredKeys) {
-      final node = _store[key];
-      if (node != null) {
-        _removeNode(node, TroveEvictionReason.expired);
-      }
+    for (final node in expired) {
+      _removeNode(node, TroveEvictionReason.expired);
     }
   }
 

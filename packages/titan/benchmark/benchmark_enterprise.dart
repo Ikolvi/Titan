@@ -268,6 +268,7 @@ Future<void> _benchBulwark() async {
 
   // a) Successful call throughput (closed circuit)
   {
+    // ignore: deprecated_member_use
     final bulwark = Bulwark<int>(failureThreshold: 5);
 
     const calls = 10000;
@@ -288,6 +289,7 @@ Future<void> _benchBulwark() async {
 
   // b) Trip → open → BulwarkOpenException path
   {
+    // ignore: deprecated_member_use
     final bulwark = Bulwark<int>(
       failureThreshold: 3,
       resetTimeout: const Duration(hours: 1),
@@ -306,6 +308,7 @@ Future<void> _benchBulwark() async {
     for (var i = 0; i < calls; i++) {
       try {
         await bulwark.call(() async => i);
+        // ignore: deprecated_member_use
       } on BulwarkOpenException catch (_) {
         // expected
       }
@@ -326,6 +329,7 @@ Future<void> _benchBulwark() async {
     const cycles = 1000;
     final sw = Stopwatch()..start();
     for (var i = 0; i < cycles; i++) {
+      // ignore: deprecated_member_use
       final b = Bulwark<int>(failureThreshold: 3);
       await b.call(() async => i);
       b.reset();
@@ -594,12 +598,12 @@ Future<void> _benchTether() async {
 
   // a) Registration throughput
   {
-    Tether.reset();
+    Tether.resetGlobal();
 
     const count = 10000;
     final sw = Stopwatch()..start();
     for (var i = 0; i < count; i++) {
-      Tether.register<int, int>('handler_$i', (req) async => req * 2);
+      Tether.registerGlobal<int, int>('handler_$i', (req) async => req * 2);
     }
     sw.stop();
 
@@ -609,18 +613,18 @@ Future<void> _benchTether() async {
       '${_ms(sw)}  ($perReg µs/register)',
     );
 
-    Tether.reset();
+    Tether.resetGlobal();
   }
 
   // b) Call throughput
   {
-    Tether.reset();
-    Tether.register<int, int>('multiply', (req) async => req * 2);
+    Tether.resetGlobal();
+    Tether.registerGlobal<int, int>('multiply', (req) async => req * 2);
 
     const calls = 10000;
     final sw = Stopwatch()..start();
     for (var i = 0; i < calls; i++) {
-      await Tether.call<int, int>('multiply', i);
+      await Tether.callGlobal<int, int>('multiply', i);
     }
     sw.stop();
 
@@ -636,7 +640,7 @@ Future<void> _benchTether() async {
     const calls = 100000;
     final sw = Stopwatch()..start();
     for (var i = 0; i < calls; i++) {
-      await Tether.tryCall<int, int>('nonexistent', i);
+      await Tether.tryCallGlobal<int, int>('nonexistent', i);
     }
     sw.stop();
 
@@ -652,13 +656,13 @@ Future<void> _benchTether() async {
     const lookups = 1000000;
     final swHit = Stopwatch()..start();
     for (var i = 0; i < lookups; i++) {
-      Tether.has('multiply');
+      Tether.hasGlobal('multiply');
     }
     swHit.stop();
 
     final swMiss = Stopwatch()..start();
     for (var i = 0; i < lookups; i++) {
-      Tether.has('nonexistent');
+      Tether.hasGlobal('nonexistent');
     }
     swMiss.stop();
 
@@ -674,7 +678,7 @@ Future<void> _benchTether() async {
     );
   }
 
-  Tether.reset();
+  Tether.resetGlobal();
   print('└───────────────────────────────────────────────────────');
   print('');
 }

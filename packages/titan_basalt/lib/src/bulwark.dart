@@ -1,19 +1,24 @@
 /// Bulwark — A reactive circuit breaker for resilient async operations.
 ///
+/// **Deprecated**: Use [Portcullis] instead, which provides all Bulwark
+/// capabilities plus configurable half-open probes, trip history,
+/// `shouldTrip` filters, disposed guards, and `protectSync()`.
+///
 /// A Bulwark shields your application from cascading failures by
 /// tracking error rates and automatically opening the circuit when
 /// a failure threshold is breached.
 ///
-/// ## Why "Bulwark"?
+/// ## Migration
 ///
-/// A bulwark is a defensive wall. The Bulwark defends your app
-/// against cascading failures from unreliable services.
+/// ```dart
+/// // Before (Bulwark)
+/// late final breaker = bulwark<String>(failureThreshold: 3);
+/// final result = await breaker.call(() => api.getData());
 ///
-/// ## States
-///
-/// - **Closed** — Normal operation. Requests pass through.
-/// - **Open** — Circuit tripped. Requests fail immediately.
-/// - **Half-Open** — Testing recovery. One request allowed through.
+/// // After (Portcullis)
+/// late final breaker = portcullis(failureThreshold: 3);
+/// final result = await breaker.protect(() => api.getData());
+/// ```
 ///
 /// ## Usage
 ///
@@ -36,6 +41,7 @@ import 'dart:async';
 import 'package:titan/titan.dart';
 
 /// The three states of a circuit breaker.
+@Deprecated('Use PortcullisState instead. Will be removed in v2.0.')
 enum BulwarkState {
   /// Normal operation — requests pass through.
   closed,
@@ -71,6 +77,7 @@ enum BulwarkState {
 ///   showError('Service unavailable, try later');
 /// }
 /// ```
+@Deprecated('Use Portcullis instead. Bulwark will be removed in v2.0.')
 class Bulwark<T> {
   /// Reactive circuit state.
   final TitanState<BulwarkState> _state;
@@ -295,6 +302,7 @@ class Bulwark<T> {
 ///
 /// Indicates the target service is considered unavailable. The circuit
 /// will automatically transition to half-open after the reset timeout.
+@Deprecated('Use PortcullisOpenException instead. Will be removed in v2.0.')
 class BulwarkOpenException implements Exception {
   /// The number of consecutive failures that triggered the circuit.
   final int failureCount;

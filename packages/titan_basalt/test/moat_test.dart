@@ -227,6 +227,49 @@ void main() {
         expect(result, isFalse);
         verySlowLimiter.dispose();
       });
+
+      test('dispose completes pending consume with false', () async {
+        final disposable = Moat(
+          maxTokens: 1,
+          refillRate: const Duration(seconds: 60),
+          name: 'disposable',
+        );
+        disposable.tryConsume(); // exhaust tokens
+
+        final future = disposable.consume();
+        disposable.dispose();
+
+        expect(await future, isFalse);
+      });
+
+      test('multiple consume requests fulfilled in order', () async {
+        final fastLimiter = Moat(
+          maxTokens: 2,
+          refillRate: const Duration(milliseconds: 50),
+          name: 'fast',
+        );
+        // Exhaust both tokens
+        fastLimiter.tryConsume();
+        fastLimiter.tryConsume();
+
+        final results = <int>[];
+        final f1 = fastLimiter
+            .consume(timeout: const Duration(seconds: 2))
+            .then((ok) {
+              if (ok) results.add(1);
+              return ok;
+            });
+        final f2 = fastLimiter
+            .consume(timeout: const Duration(seconds: 2))
+            .then((ok) {
+              if (ok) results.add(2);
+              return ok;
+            });
+
+        await Future.wait([f1, f2]);
+        expect(results, [1, 2]);
+        fastLimiter.dispose();
+      });
     });
 
     // -----------------------------------------------------------------------

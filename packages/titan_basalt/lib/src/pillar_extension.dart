@@ -37,6 +37,7 @@ import 'saga.dart';
 import 'sieve.dart';
 import 'sluice.dart';
 import 'tapestry.dart';
+import 'tether.dart';
 import 'tithe.dart';
 import 'trove.dart';
 import 'volley.dart';
@@ -328,21 +329,22 @@ extension PillarBasaltExtension on Pillar {
   }
 
   // ---------------------------------------------------------------------------
-  // Bulwark — circuit breaker
+  // Bulwark — circuit breaker (DEPRECATED — use portcullis instead)
   // ---------------------------------------------------------------------------
 
   /// Creates a [Bulwark] (circuit breaker) managed by this Pillar.
   ///
-  /// A Bulwark shields your app from cascading failures by tracking
-  /// error rates and opening the circuit when a threshold is breached.
+  /// **Deprecated**: Use [portcullis] instead, which provides all Bulwark
+  /// capabilities plus configurable half-open probes, trip history,
+  /// `shouldTrip` filters, disposed guards, and `protectSync()`.
   ///
   /// ```dart
-  /// late final apiBreaker = bulwark<String>(
-  ///   failureThreshold: 3,
-  ///   resetTimeout: Duration(seconds: 30),
-  /// );
+  /// // Migrate to:
+  /// late final breaker = portcullis(failureThreshold: 3);
   /// ```
   @protected
+  @Deprecated('Use portcullis() instead. Will be removed in v2.0.')
+  // ignore: deprecated_member_use_from_same_package
   Bulwark<T> bulwark<T>({
     int failureThreshold = 3,
     Duration resetTimeout = const Duration(seconds: 30),
@@ -817,6 +819,34 @@ extension PillarBasaltExtension on Pillar {
   @protected
   Tapestry<E> tapestry<E>({String? name, int? maxEvents}) {
     final t = Tapestry<E>(name: name, maxEvents: maxEvents);
+    registerNodes(t.managedNodes);
+    return t;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tether — RPC channels
+  // ---------------------------------------------------------------------------
+
+  /// Creates a [Tether] (typed RPC channel registry) managed by this Pillar.
+  ///
+  /// Enables typed request-response communication between Pillars.
+  /// All reactive nodes auto-dispose on Pillar disposal.
+  ///
+  /// ```dart
+  /// class AuthPillar extends Pillar {
+  ///   late final rpc = tether(name: 'auth');
+  ///
+  ///   @override
+  ///   void onInit() {
+  ///     rpc.register<String, User>('getUser', (userId) async {
+  ///       return await fetchUser(userId);
+  ///     });
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Tether tether({String? name}) {
+    final t = Tether(name: name);
     registerNodes(t.managedNodes);
     return t;
   }

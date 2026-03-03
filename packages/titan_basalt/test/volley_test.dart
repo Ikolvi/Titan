@@ -148,6 +148,8 @@ void main() {
       expect(volley.status, VolleyStatus.idle);
       expect(volley.progress, 0.0);
       expect(volley.completedCount, 0);
+      expect(volley.successCount, 0);
+      expect(volley.failedCount, 0);
       expect(volley.totalCount, 0);
 
       volley.dispose();
@@ -209,7 +211,332 @@ void main() {
 
       final nodes = volley.managedNodes;
       expect(nodes, isNotEmpty);
-      expect(nodes.length, 4);
+      expect(nodes.length, 6);
+
+      volley.dispose();
+    });
+
+    // ---- New tests below ----
+
+    test('separates successCount and failedCount', () async {
+      final volley = Volley<int>();
+
+      final tasks = [
+        VolleyTask<int>(name: 'ok', execute: () async => 1),
+        VolleyTask<int>(
+          name: 'fail',
+          execute: () async => throw Exception('err'),
+        ),
+        VolleyTask<int>(name: 'ok2', execute: () async => 3),
+      ];
+
+      await volley.execute(tasks);
+
+      expect(volley.successCount, 2);
+      expect(volley.failedCount, 1);
+      expect(volley.completedCount, 3);
+
+      volley.dispose();
+    });
+
+    test('retries failed tasks', () async {
+      var attempts = 0;
+
+      final volley = Volley<int>(
+        maxRetries: 2,
+        retryDelay: const Duration(milliseconds: 10),
+      );
+
+      final tasks = [
+        VolleyTask<int>(
+          name: 'flaky',
+          execute: () async {
+            attempts++;
+            if (attempts < 3) throw Exception('not yet');
+            return 42;
+          },
+        ),
+      ];
+
+      final results = await volley.execute(tasks);
+
+      expect(results[0].isSuccess, isTrue);
+      expect(results[0].valueOrNull, 42);
+      expect(attempts, 3);
+      expect(volley.successCount, 1);
+
+      volley.dispose();
+    });
+
+    test('retries exhaust and fail', () async {
+      var attempts = 0;
+
+      final volley = Volley<int>(
+        maxRetries: 1,
+        retryDelay: const Duration(milliseconds: 10),
+      );
+
+      final tasks = [
+        VolleyTask<int>(
+          name: 'alwaysFails',
+          execute: () async {
+            attempts++;
+            throw Exception('boom');
+          },
+        ),
+      ];
+
+      final results = await volley.execute(tasks);
+
+      expect(results[0].isFailure, isTrue);
+      expect(attempts, 2); // 1 original + 1 retry
+      expect(volley.failedCount, 1);
+
+      volley.dispose();
+    });
+
+    test('per-task timeout', () async {
+      final volley = Volley<int>();
+
+      final tasks = [
+        VolleyTask<int>(
+          name: 'slow',
+          timeout: const Duration(milliseconds: 10),
+          execute: () async {
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+            return 1;
+          },
+        ),
+      ];
+
+      final results = await volley.execute(tasks);
+
+      expect(results[0].isFailure, isTrue);
+      expect(volley.failedCount, 1);
+
+      volley.dispose();
+    });
+
+    test('global taskTimeout', () async {
+      final volley = Volley<int>(taskTimeout: const Duration(milliseconds: 10));
+
+      final tasks = [
+        VolleyTask<int>(
+          name: 'slow',
+          execute: () async {
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+            return 1;
+          },
+        ),
+      ];
+
+      final results = await volley.execute(tasks);
+
+      expect(results[0].isFailure, isTrue);
+
+      volley.dispose();
+    });
+
+    test('per-task timeout overrides global', () async {
+      final volley = Volley<int>(taskTimeout: const Duration(milliseconds: 10));
+
+      final tasks = [
+        VolleyTask<int>(
+          name: 'withOverride',
+          timeout: const Duration(seconds: 5),
+          execute: () async => 42,
+        ),
+      ];
+
+      final results = await volley.execute(tasks);
+
+      expect(results[0].isSuccess, isTrue);
+
+      volley.dispose();
+    });
+
+    test('onTaskComplete callback fires', () async {
+      final completed = <String>[];
+
+      final volley = Volley<int>(
+        onTaskComplete: (name, result) => completed.add('$name:$result'),
+      );
+
+      final tasks = [
+        VolleyTask<int>(name: 'a', execute: () async => 1),
+        VolleyTask<int>(name: 'b', execute: () async => 2),
+      ];
+
+      await volley.execute(tasks);
+
+      expect(completed, containsAll(['a:1', 'b:2']));
+
+      volley.dispose();
+    });
+
+    test('onTaskFailed callback fires', () async {
+      final failures = <String>[];
+
+      final volley = Volley<int>(
+        onTaskFailed: (name, error) => failures.add(name),
+      );
+
+      final tasks = [
+        VolleyTask<int>(
+          name: 'fail1',
+          execute: () async => throw Exception('err'),
+        ),
+      ];
+
+      await volley.execute(tasks);
+
+      expect(failures, ['fail1']);
+
+      volley.dispose();
+    });
+
+    test('throws when executed while running', () async {
+      final volley = Volley<int>(concurrency: 1);
+
+      final tasks = [
+        VolleyTask<int>(
+          name: 'slow',
+          execute: () async {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            return 1;
+          },
+        ),
+      ];
+
+      final future = volley.execute(tasks);
+
+      expect(() => volley.execute(tasks), throwsA(isA<StateError>()));
+
+      await future;
+      volley.dispose();
+    });
+
+    test('throws when using disposed Volley', () {
+      final volley = Volley<int>();
+      volley.dispose();
+
+      expect(volley.isDisposed, isTrue);
+      expect(() => volley.execute([]), throwsA(isA<StateError>()));
+      expect(() => volley.reset(), throwsA(isA<StateError>()));
+    });
+
+    test('dispose is idempotent', () {
+      final volley = Volley<int>();
+      volley.dispose();
+      volley.dispose(); // no throw
+      expect(volley.isDisposed, isTrue);
+    });
+
+    test('toString reflects state', () async {
+      final volley = Volley<int>();
+      expect(volley.toString(), contains('idle'));
+
+      await volley.execute([
+        VolleyTask<int>(name: 'a', execute: () async => 1),
+      ]);
+      expect(volley.toString(), contains('success: 1'));
+
+      volley.dispose();
+    });
+
+    test('VolleyResult toString formats correctly', () {
+      final success = VolleySuccess<int>(taskName: 'test', value: 42);
+      expect(success.toString(), contains('test'));
+      expect(success.toString(), contains('42'));
+
+      final failure = VolleyFailure<int>(
+        taskName: 'bad',
+        error: Exception('err'),
+        stackTrace: StackTrace.current,
+      );
+      expect(failure.toString(), contains('bad'));
+    });
+
+    test('VolleyTask timeout property', () {
+      final task = VolleyTask<int>(
+        name: 'test',
+        execute: () async => 1,
+        timeout: const Duration(seconds: 5),
+      );
+      expect(task.timeout, const Duration(seconds: 5));
+      expect(task.name, 'test');
+    });
+
+    test('retry with timeout combination', () async {
+      var attempts = 0;
+
+      final volley = Volley<int>(
+        maxRetries: 2,
+        retryDelay: const Duration(milliseconds: 10),
+      );
+
+      final tasks = [
+        VolleyTask<int>(
+          name: 'retryTimeout',
+          timeout: const Duration(milliseconds: 5),
+          execute: () async {
+            attempts++;
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            return 1;
+          },
+        ),
+      ];
+
+      final results = await volley.execute(tasks);
+
+      expect(results[0].isFailure, isTrue);
+      expect(attempts, 3); // original + 2 retries, all timeout
+
+      volley.dispose();
+    });
+
+    test('mixed success and failure with retries', () async {
+      var failAttempts = 0;
+
+      final volley = Volley<String>(
+        concurrency: 2,
+        maxRetries: 1,
+        retryDelay: const Duration(milliseconds: 10),
+      );
+
+      final tasks = [
+        VolleyTask<String>(name: 'ok', execute: () async => 'pass'),
+        VolleyTask<String>(
+          name: 'flaky',
+          execute: () async {
+            failAttempts++;
+            if (failAttempts == 1) throw Exception('first try');
+            return 'recovered';
+          },
+        ),
+      ];
+
+      final results = await volley.execute(tasks);
+
+      expect(results[0].isSuccess, isTrue);
+      expect(results[1].isSuccess, isTrue);
+      expect(results[1].valueOrNull, 'recovered');
+
+      volley.dispose();
+    });
+
+    test('can run execute multiple times after completion', () async {
+      final volley = Volley<int>();
+
+      final r1 = await volley.execute([
+        VolleyTask<int>(name: 'a', execute: () async => 1),
+      ]);
+      expect(r1[0].valueOrNull, 1);
+
+      final r2 = await volley.execute([
+        VolleyTask<int>(name: 'b', execute: () async => 2),
+      ]);
+      expect(r2[0].valueOrNull, 2);
 
       volley.dispose();
     });
