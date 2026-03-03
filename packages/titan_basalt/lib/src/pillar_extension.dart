@@ -23,6 +23,7 @@ import 'anvil.dart';
 import 'banner.dart';
 import 'bulwark.dart';
 import 'codex.dart';
+import 'lattice.dart';
 import 'moat.dart';
 import 'portcullis.dart';
 import 'pyre.dart';
@@ -489,5 +490,32 @@ extension PillarBasaltExtension on Pillar {
     final s = Sieve<T>(items: items, textFields: textFields, name: name);
     registerNodes(s.managedNodes);
     return s;
+  }
+
+  /// Creates a Pillar-managed [Lattice] — reactive DAG task executor.
+  ///
+  /// All reactive nodes are registered for automatic disposal.
+  ///
+  /// ```dart
+  /// class AppPillar extends Pillar {
+  ///   late final startup = lattice(name: 'startup');
+  ///
+  ///   @override
+  ///   void onInit() {
+  ///     startup
+  ///       ..node('config', (_) => loadConfig())
+  ///       ..node('auth', (r) => login(r['config']),
+  ///           dependsOn: ['config'])
+  ///       ..node('data', (r) => fetchData(r['auth']),
+  ///           dependsOn: ['auth']);
+  ///     startup.execute();
+  ///   }
+  /// }
+  /// ```
+  @protected
+  Lattice lattice({String? name}) {
+    final l = Lattice(name: name);
+    registerNodes(l.managedNodes);
+    return l;
   }
 }

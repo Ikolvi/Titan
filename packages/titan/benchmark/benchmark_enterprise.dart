@@ -35,6 +35,7 @@ import 'package:titan_basalt/titan_basalt.dart';
 //  38. Anvil — Dead letter & retry queue
 //  39. Banner — Reactive feature flags
 //  40. Sieve — Reactive search/filter/sort
+//  41. Lattice — Reactive DAG task executor
 // =============================================================================
 
 void main() async {
@@ -69,6 +70,7 @@ void main() async {
   await _benchAnvil();
   await _benchBanner();
   await _benchSieve();
+  await _benchLattice();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -2736,6 +2738,116 @@ Future<void> _benchSieve() async {
     final us = sw.elapsedMicroseconds / 10000;
     print(
       '40. Sieve       | Create(10 items)         '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  print('');
+}
+
+// ---------------------------------------------------------------------------
+// 41. Lattice — Reactive DAG Task Executor
+// ---------------------------------------------------------------------------
+
+Future<void> _benchLattice() async {
+  print('┌─ 41. Lattice (DAG Task Executor) ──────────────────');
+
+  // 41a. Linear chain execution
+  {
+    for (final count in [10, 50, 100]) {
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < 100; i++) {
+        final l = Lattice();
+        l.node('n0', (_) async => 0);
+        for (var j = 1; j < count; j++) {
+          l.node(
+            'n$j',
+            (r) async => (r['n${j - 1}'] as int) + 1,
+            dependsOn: ['n${j - 1}'],
+          );
+        }
+        await l.execute();
+      }
+      sw.stop();
+      final us = sw.elapsedMicroseconds / 100;
+      print(
+        '41. Lattice     | Chain($count nodes)       '
+        '| ${_pad(100)} × ${us.toStringAsFixed(1)} µs/op = ${_ms(sw)}',
+      );
+    }
+  }
+
+  // 41b. Wide (parallel) execution
+  {
+    for (final count in [10, 50, 100]) {
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < 100; i++) {
+        final l = Lattice();
+        for (var j = 0; j < count; j++) {
+          l.node('n$j', (_) async => j);
+        }
+        await l.execute();
+      }
+      sw.stop();
+      final us = sw.elapsedMicroseconds / 100;
+      print(
+        '41. Lattice     | Wide($count nodes)        '
+        '| ${_pad(100)} × ${us.toStringAsFixed(1)} µs/op = ${_ms(sw)}',
+      );
+    }
+  }
+
+  // 41c. Diamond pattern
+  {
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 1000; i++) {
+      final l = Lattice();
+      l.node('root', (_) async => 0);
+      l.node('a', (_) async => 1, dependsOn: ['root']);
+      l.node('b', (_) async => 2, dependsOn: ['root']);
+      l.node('join', (_) async => 3, dependsOn: ['a', 'b']);
+      await l.execute();
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 1000;
+    print(
+      '41. Lattice     | Diamond(4 nodes)         '
+      '| ${_pad(1000)} × ${us.toStringAsFixed(1)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // 41d. Create + register overhead
+  {
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      final l = Lattice();
+      l.node('a', (_) async => 1);
+      l.node('b', (_) async => 2, dependsOn: ['a']);
+      l.node('c', (_) async => 3, dependsOn: ['a']);
+      l.node('d', (_) async => 4, dependsOn: ['b', 'c']);
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '41. Lattice     | Create(4 nodes)          '
+      '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+  }
+
+  // 41e. Cycle detection
+  {
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < 10000; i++) {
+      final l = Lattice();
+      for (var j = 0; j < 10; j++) {
+        l.node('n$j', (_) async => j, dependsOn: [if (j > 0) 'n${j - 1}']);
+      }
+      l.hasCycle;
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / 10000;
+    print(
+      '41. Lattice     | CycleCheck(10 nodes)     '
       '| ${_pad(10000)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
   }

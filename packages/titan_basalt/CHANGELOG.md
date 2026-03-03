@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+
+- **Lattice** — Reactive DAG (directed acyclic graph) task executor with dependency resolution, automatic parallelism via Kahn's algorithm, fail-fast error handling, reactive progress/status tracking, and upstream result passing.
+
 ## 1.2.0
 
 ### Added

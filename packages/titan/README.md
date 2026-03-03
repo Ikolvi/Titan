@@ -508,7 +508,7 @@ test('counter pillar works', () {
 | Package | Description |
 |---------|-------------|
 | **`titan`** | Core reactive engine — pure Dart (this package) |
-| [`titan_basalt`](https://pub.dev/packages/titan_basalt) | Infrastructure & resilience (Trove, Moat, Portcullis, Anvil, Pyre, Codex, Quarry, Bulwark, Saga, Volley, Tether, Annals, Banner, Sieve) |
+| [`titan_basalt`](https://pub.dev/packages/titan_basalt) | Infrastructure & resilience (Trove, Moat, Portcullis, Anvil, Pyre, Codex, Quarry, Bulwark, Saga, Volley, Tether, Annals, Banner, Sieve, Lattice) |
 | [`titan_bastion`](https://pub.dev/packages/titan_bastion) | Flutter widgets (Vestige, Beacon) |
 | [`titan_atlas`](https://pub.dev/packages/titan_atlas) | Routing & navigation (Atlas) |
 | [`titan_argus`](https://pub.dev/packages/titan_argus) | Authentication & authorization |

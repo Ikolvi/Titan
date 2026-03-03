@@ -25,6 +25,7 @@ lifecycle. All components auto-dispose when their owning Pillar is disposed.
 | Audit Trail | **Annals** | Capped, queryable append-only audit log |
 | Feature Flags | **Banner** | Reactive feature flags with rollout, rules, overrides, expiry |
 | Search/Filter | **Sieve** | Reactive search, filter & sort engine for collections |
+| DAG Executor | **Lattice** | Reactive DAG task executor with dependency resolution & parallelism |
 
 ## Installation
 
@@ -187,7 +188,7 @@ print('Completed: ${taskQueue.completed}');
 
 Basalt features integrate with Pillar via **extension methods**. When you
 import `titan_basalt`, factory methods like `trove()`, `moat()`,
-`portcullis()`, `anvil()`, `pyre()`, `banner()`, and `sieve()` become available on any Pillar
+`portcullis()`, `anvil()`, `pyre()`, `banner()`, `sieve()`, and `lattice()` become available on any Pillar
 subclass. These methods use `Pillar.registerNodes()` to ensure all
 reactive nodes are auto-disposed with the Pillar lifecycle.
 

@@ -2780,4 +2780,65 @@ class MyPillar extends Pillar {
 
 ---
 
+## Lattice — Reactive DAG Task Executor
+
+> **Package:** `titan_basalt`
+
+### Lattice Constructor
+
+```dart
+Lattice({String? name})
+```
+
+### Lattice Methods
+
+| Method | Return | Description |
+|--------|--------|-------------|
+| `node(id, task, {dependsOn})` | `void` | Register a named task with dependencies |
+| `execute()` | `Future<LatticeResult>` | Execute all tasks in dependency order |
+| `reset()` | `void` | Reset to idle state for re-execution |
+| `dependenciesOf(id)` | `List<String>` | Get dependencies of a node |
+
+### Lattice Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `status` | `Core<LatticeStatus>` | Current execution status (reactive) |
+| `completedCount` | `Core<int>` | Number of completed tasks (reactive) |
+| `progress` | `Derived<double>` | Completion ratio 0.0–1.0 (reactive) |
+| `nodeCount` | `int` | Total number of registered nodes |
+| `nodeIds` | `List<String>` | List of all registered node IDs |
+| `hasCycle` | `bool` | Whether the graph has circular dependencies |
+| `name` | `String?` | Debug name |
+| `managedNodes` | `Iterable<ReactiveNode>` | Lifecycle nodes for Pillar |
+
+### LatticeResult
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `values` | `Map<String, dynamic>` | Successful node results |
+| `errors` | `Map<String, Object>` | Failed node errors |
+| `elapsed` | `Duration` | Total wall-clock time |
+| `executionOrder` | `List<String>` | Order nodes completed |
+| `succeeded` | `bool` | `true` if no errors |
+
+### LatticeStatus
+
+| Value | Description |
+|-------|-------------|
+| `idle` | Not yet executed |
+| `running` | Execution in progress |
+| `completed` | All nodes finished successfully |
+| `failed` | One or more nodes failed |
+
+### Pillar Extension
+
+```dart
+class AppPillar extends Pillar {
+  late final startup = lattice(name: 'startup');
+}
+```
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

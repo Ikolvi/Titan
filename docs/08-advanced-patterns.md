@@ -2874,4 +2874,83 @@ search.filterCount;         // 2
 
 ---
 
+## Lattice — Reactive DAG Task Executor
+
+> **Package:** `titan_basalt`
+
+A **Lattice** is a reactive directed acyclic graph (DAG) task executor that resolves task dependencies and maximizes parallelism. Ideal for application startup sequences, initialization graphs, and dependency-ordered workloads.
+
+### Setup
+
+```dart
+class AppPillar extends Pillar {
+  late final startup = lattice(name: 'startup');
+}
+```
+
+### Registering Nodes
+
+Each node has an ID, an async task, and optional dependencies:
+
+```dart
+startup
+  ..node('config', (_) => loadConfig())
+  ..node('auth', (r) => authenticate(r['config']), dependsOn: ['config'])
+  ..node('flags', (r) => loadFlags(r['config']), dependsOn: ['config'])
+  ..node('data', (r) => loadUserData(r['auth']), dependsOn: ['auth'])
+  ..node('quests', (r) => fetchQuests(r['auth'], r['flags']),
+      dependsOn: ['auth', 'flags']);
+```
+
+Tasks receive an `upstream` map containing the return values of completed dependencies.
+
+### Execution
+
+```dart
+final result = await startup.execute();
+if (result.succeeded) {
+  final config = result.values['config'];
+}
+```
+
+The Lattice uses Kahn's algorithm to find the optimal execution order, running independent nodes in parallel via `Future.wait`.
+
+### Error Handling
+
+Fail-fast: if any node throws, downstream dependents never execute.
+
+```dart
+if (!result.succeeded) {
+  for (final e in result.errors.entries) {
+    print('${e.key} failed: ${e.value}');
+  }
+}
+```
+
+### Reactive State
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `status` | `Core<LatticeStatus>` | idle → running → completed/failed |
+| `completedCount` | `Core<int>` | Number of finished tasks |
+| `progress` | `Derived<double>` | 0.0 to 1.0 completion ratio |
+
+### Graph Inspection
+
+```dart
+startup.nodeIds;               // ['config', 'auth', 'flags', ...]
+startup.nodeCount;             // 5
+startup.dependenciesOf('auth'); // ['config']
+startup.hasCycle;              // false
+```
+
+### Re-Execution
+
+```dart
+startup.reset();
+final result = await startup.execute();
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)

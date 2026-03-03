@@ -16,7 +16,7 @@ import 'package:titan_basalt/titan_basalt.dart';
 
 final _results = <Map<String, dynamic>>[];
 
-void main() {
+void main() async {
   _benchReactiveCreation();
   _benchStateNotification();
   _benchBatchSpeedup();
@@ -37,6 +37,7 @@ void main() {
   _benchRefreshCycle();
   _benchBannerLookup();
   _benchSieveFilter();
+  await _benchLatticeDiamond();
 
   // Output JSON
   print(
@@ -587,4 +588,24 @@ void _benchSieveFilter() {
   sw.stop();
   final usPerFilter = sw.elapsedMicroseconds / 1000;
   _record('Sieve Filter (10K items, 1K)', 'µs/op', usPerFilter);
+}
+
+// ---------------------------------------------------------------------------
+// Lattice — DAG execution
+// ---------------------------------------------------------------------------
+
+Future<void> _benchLatticeDiamond() async {
+  const n = 1000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    final l = Lattice();
+    l.node('root', (_) async => 0);
+    l.node('a', (_) async => 1, dependsOn: ['root']);
+    l.node('b', (_) async => 2, dependsOn: ['root']);
+    l.node('join', (_) async => 3, dependsOn: ['a', 'b']);
+    await l.execute();
+  }
+  sw.stop();
+  final usPerExec = sw.elapsedMicroseconds / n;
+  _record('Lattice Diamond (4 nodes, 1K)', 'µs/op', usPerExec);
 }

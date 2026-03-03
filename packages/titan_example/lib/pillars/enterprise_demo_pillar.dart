@@ -25,6 +25,7 @@ enum QuestAction { claim, start, complete, fail, reset }
 ///   Volley     — Batch async operations
 ///   Sigil      — Feature flags\n///   Banner     — Reactive feature flags with rollout & rules
 ///   Sieve      — Reactive search, filter & sort
+///   Lattice    — Reactive DAG task executor
 ///   Aegis      — Retry with backoff
 ///   Annals     — Audit trail
 ///   Tether     — Request-response channels
@@ -262,6 +263,46 @@ class EnterpriseDemoPillar extends Pillar {
         );
       }
     });
+  }
+
+  // --------------- Lattice (Reactive DAG Task Executor) ---------------
+
+  /// Reactive DAG task executor for startup initialization.
+  late final startupGraph = lattice(name: 'startupGraph');
+
+  /// Configure and execute the startup dependency graph.
+  Future<void> runStartupGraph() async {
+    startupGraph
+      ..node('config', (_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        return {'apiUrl': 'https://api.questboard.dev', 'version': '2.1'};
+      })
+      ..node(
+        'auth',
+        (r) async {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          return {'userId': 'kael-42', 'token': 'bearer-xyz'};
+        },
+        dependsOn: ['config'],
+      )
+      ..node(
+        'flags',
+        (r) async {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          return {'darkMode': true, 'betaFeatures': false};
+        },
+        dependsOn: ['config'],
+      )
+      ..node(
+        'userData',
+        (r) async {
+          await Future<void>.delayed(const Duration(milliseconds: 40));
+          return {'name': 'Kael', 'level': 10, 'guild': 'Ironclad'};
+        },
+        dependsOn: ['auth'],
+      );
+
+    await startupGraph.execute();
   }
 
   // --------------- Prism (Fine-Grained State Projections) ---------------

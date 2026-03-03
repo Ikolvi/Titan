@@ -7,7 +7,7 @@ import '../pillars/enterprise_demo_pillar.dart';
 /// Enterprise Demo Screen — showcases enterprise features.
 ///
 /// Demonstrates: Loom, Bulwark, Saga, Volley, Sigil, Aegis, Annals, Banner, Sieve,
-/// Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
+/// Lattice, Tether, Core extensions, onInitAsync, VestigeWhen, VestigeSelector.
 class EnterpriseDemoScreen extends StatelessWidget {
   const EnterpriseDemoScreen({super.key});
 
@@ -1200,6 +1200,56 @@ class _ToolkitTab extends StatelessWidget {
                             '(${q['region']})',
                           ),
                         ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Lattice (Reactive DAG Task Executor)
+              _SectionHeader('Lattice (DAG Executor)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Status: ${pillar.startupGraph.status.value.name}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: pillar.startupGraph.progress.value,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${pillar.startupGraph.completedCount.value}'
+                        ' / ${pillar.startupGraph.nodeCount} nodes',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.tonal(
+                        onPressed: pillar.startupGraph.status.value ==
+                                LatticeStatus.idle
+                            ? () => pillar.runStartupGraph()
+                            : pillar.startupGraph.status.value !=
+                                    LatticeStatus.running
+                                ? () {
+                                    pillar.startupGraph.reset();
+                                  }
+                                : null,
+                        child: Text(
+                          pillar.startupGraph.status.value ==
+                                  LatticeStatus.idle
+                              ? 'Run Startup Graph'
+                              : pillar.startupGraph.status.value ==
+                                      LatticeStatus.running
+                                  ? 'Running...'
+                                  : 'Reset',
+                        ),
+                      ),
                     ],
                   ),
                 ),

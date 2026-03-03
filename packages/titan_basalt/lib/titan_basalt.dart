@@ -37,6 +37,7 @@ export 'src/anvil.dart';
 export 'src/banner.dart';
 export 'src/bulwark.dart';
 export 'src/codex.dart';
+export 'src/lattice.dart';
 export 'src/moat.dart';
 export 'src/portcullis.dart';
 export 'src/pyre.dart';
