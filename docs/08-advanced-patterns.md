@@ -3386,4 +3386,89 @@ pipeline.stage('charge').queued.value     // Waiting
 
 ---
 
+## Clarion — Reactive Job Scheduler
+
+`Clarion` manages recurring and one-shot async jobs with configurable intervals, concurrency policies, and per-job reactive observability.
+
+### Basic Usage
+
+```dart
+final scheduler = Clarion(name: 'app');
+
+// Recurring job with skip-if-running policy.
+scheduler.schedule(
+  'refresh-token',
+  const Duration(minutes: 25),
+  () async => await authService.refreshToken(),
+  policy: ClarionPolicy.skipIfRunning,
+);
+
+// One-shot delayed job (auto-removes after execution).
+scheduler.scheduleOnce(
+  'welcome',
+  const Duration(seconds: 30),
+  () async => await showWelcomeBanner(),
+);
+
+// Manual trigger.
+scheduler.trigger('refresh-token');
+
+// Pause / resume.
+scheduler.pause('refresh-token'); // Pause one job.
+scheduler.pause();                // Pause all.
+scheduler.resume();               // Resume all.
+
+scheduler.dispose();
+```
+
+### Concurrency Policies
+
+| Policy | Behavior |
+|---|---|
+| `skipIfRunning` | Skips execution if the previous run is still in progress |
+| `allowOverlap` | Allows concurrent executions of the same job |
+
+### Reactive State
+
+| Property | Type | Description |
+|---|---|---|
+| `status` | `Core<ClarionStatus>` | Scheduler lifecycle (`idle`/`running`/`paused`/`disposed`) |
+| `activeCount` | `Core<int>` | Jobs currently executing |
+| `totalRuns` | `Core<int>` | Lifetime execution count |
+| `totalErrors` | `Core<int>` | Lifetime failure count |
+| `successRate` | `Derived<double>` | Success ratio (0.0–1.0) |
+| `isIdle` | `Derived<bool>` | No jobs currently executing |
+| `jobCount` | `Core<int>` | Number of registered jobs |
+
+### Per-Job State
+
+Access via `scheduler.job('name')`:
+
+| Property | Type | Description |
+|---|---|---|
+| `isRunning` | `Core<bool>` | Whether the job is currently executing |
+| `runCount` | `Core<int>` | Total executions |
+| `errorCount` | `Core<int>` | Total failures |
+| `lastRun` | `Core<ClarionRun?>` | Most recent execution record |
+| `nextRun` | `Core<DateTime?>` | Next scheduled execution time |
+
+### ClarionRun
+
+| Property | Type | Description |
+|---|---|---|
+| `startedAt` | `DateTime` | When the execution started |
+| `duration` | `Duration` | How long it took |
+| `error` | `Object?` | Error if failed, `null` if succeeded |
+| `succeeded` | `bool` | Convenience getter |
+
+### Pillar Integration
+
+```dart
+class SyncPillar extends Pillar {
+  late final scheduler = clarion(name: 'sync');
+}
+```
+
+---
+
 [← Testing](07-testing.md) · [API Reference →](09-api-reference.md)

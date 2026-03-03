@@ -37,6 +37,7 @@ export 'src/anvil.dart';
 export 'src/arbiter.dart';
 export 'src/banner.dart';
 export 'src/census.dart';
+export 'src/clarion.dart';
 export 'src/bulwark.dart';
 export 'src/codex.dart';
 export 'src/embargo.dart';

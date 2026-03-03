@@ -24,6 +24,7 @@ import 'arbiter.dart';
 import 'banner.dart';
 import 'bulwark.dart';
 import 'census.dart';
+import 'clarion.dart';
 import 'codex.dart';
 import 'embargo.dart';
 import 'lattice.dart';
@@ -779,5 +780,22 @@ extension PillarBasaltExtension on Pillar {
     );
     registerNodes(s.managedNodes);
     return s;
+  }
+
+  /// Creates a [Clarion] job scheduler managed by this Pillar.
+  ///
+  /// Schedule recurring or one-shot async jobs with reactive
+  /// observability. All timers auto-cancel on Pillar disposal.
+  ///
+  /// ```dart
+  /// class SyncPillar extends Pillar {
+  ///   late final scheduler = clarion(name: 'sync');
+  /// }
+  /// ```
+  @protected
+  Clarion clarion({String? name}) {
+    final c = Clarion(name: name);
+    registerNodes(c.managedNodes);
+    return c;
   }
 }

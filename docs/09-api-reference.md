@@ -3300,4 +3300,76 @@ class OrderPillar extends Pillar {
 
 ---
 
+## Clarion API
+
+### `Clarion`
+
+```dart
+Clarion({String? name})
+```
+
+| Method | Returns | Description |
+|---|---|---|
+| `schedule(name, interval, handler, {policy, immediate})` | `void` | Register a recurring job |
+| `scheduleOnce(name, delay, handler)` | `void` | Register a one-shot delayed job |
+| `unschedule(name)` | `void` | Cancel and remove a job |
+| `trigger(name)` | `void` | Manually fire a job |
+| `pause([name])` | `void` | Pause a job or all jobs |
+| `resume([name])` | `void` | Resume a job or all jobs |
+| `job(name)` | `ClarionJobState` | Per-job reactive state |
+| `jobNames` | `List<String>` | All registered job names |
+| `dispose()` | `void` | Cancel all timers |
+| `managedNodes` | `List<ReactiveNode>` | Nodes for `Pillar.registerNodes` |
+
+| Reactive Property | Type |
+|---|---|
+| `status` | `Core<ClarionStatus>` |
+| `activeCount` | `Core<int>` |
+| `totalRuns` | `Core<int>` |
+| `totalErrors` | `Core<int>` |
+| `successRate` | `Derived<double>` |
+| `isIdle` | `Derived<bool>` |
+| `jobCount` | `Core<int>` |
+
+### `ClarionJobState`
+
+| Property | Type |
+|---|---|
+| `isRunning` | `Core<bool>` |
+| `runCount` | `Core<int>` |
+| `errorCount` | `Core<int>` |
+| `lastRun` | `Core<ClarionRun?>` |
+| `nextRun` | `Core<DateTime?>` |
+
+### `ClarionRun`
+
+```dart
+ClarionRun({required DateTime startedAt, required Duration duration, Object? error})
+```
+
+| Property | Type |
+|---|---|
+| `startedAt` | `DateTime` |
+| `duration` | `Duration` |
+| `error` | `Object?` |
+| `succeeded` | `bool` |
+
+### `ClarionStatus`
+
+`idle` · `running` · `paused` · `disposed`
+
+### `ClarionPolicy`
+
+`skipIfRunning` · `allowOverlap`
+
+### Pillar Extension
+
+```dart
+extension PillarBasaltExtension on Pillar {
+  Clarion clarion({String? name}) { ... }
+}
+```
+
+---
+
 [← Advanced Patterns](08-advanced-patterns.md) · [Migration Guide →](10-migration-guide.md)

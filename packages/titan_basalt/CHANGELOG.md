@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.0
+
+### Added
+
+- **Clarion** — Reactive job scheduler. Manages recurring and one-shot async jobs with configurable intervals, concurrency policies (`skipIfRunning`, `allowOverlap`), per-job reactive observability (`isRunning`, `runCount`, `errorCount`, `lastRun`, `nextRun`), aggregate reactive state (`status`, `activeCount`, `totalRuns`, `totalErrors`, `successRate`, `isIdle`, `jobCount`), pause/resume per-job or globally, manual `trigger()`, and `ClarionRun` execution records.
+
 ## 1.10.0
 
 ### Added

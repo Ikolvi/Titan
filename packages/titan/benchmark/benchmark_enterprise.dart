@@ -78,6 +78,7 @@ void main() async {
   await _benchLode();
   _benchTithe();
   await _benchSluice();
+  await _benchClarion();
 
   print('');
   print('═══════════════════════════════════════════════════════');
@@ -3378,12 +3379,7 @@ Future<void> _benchSluice() async {
   // Benchmark 3: Feed with filter (50% filtered out).
   {
     final s = Sluice<int>(
-      stages: [
-        SluiceStage(
-          name: 'even',
-          process: (n) => n.isEven ? n : null,
-        ),
-      ],
+      stages: [SluiceStage(name: 'even', process: (n) => n.isEven ? n : null)],
       bufferSize: ops + 1,
     );
     final sw = Stopwatch()..start();
@@ -3398,6 +3394,67 @@ Future<void> _benchSluice() async {
       '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
     );
     s.dispose();
+  }
+
+  print('');
+}
+
+Future<void> _benchClarion() async {
+  print('\n─── 49. Clarion (Job Scheduler) ───');
+
+  // Benchmark 1: Schedule registration throughput.
+  {
+    const ops = 100000;
+    final c = Clarion(name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      c.schedule('job_$i', const Duration(hours: 1), () async {});
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '49. Clarion     | schedule(100K)             '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    c.dispose();
+  }
+
+  // Benchmark 2: Trigger + await (no-op handler) throughput.
+  {
+    const ops = 100000;
+    final c = Clarion(name: 'bench');
+    c.schedule('noop', const Duration(hours: 1), () async {});
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      c.trigger('noop');
+    }
+    // Let all microtask completions settle.
+    await Future<void>.delayed(Duration.zero);
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '49. Clarion     | trigger(100K)              '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    c.dispose();
+  }
+
+  // Benchmark 3: Schedule + unschedule churn.
+  {
+    const ops = 100000;
+    final c = Clarion(name: 'bench');
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < ops; i++) {
+      c.schedule('tmp', const Duration(hours: 1), () async {});
+      c.unschedule('tmp');
+    }
+    sw.stop();
+    final us = sw.elapsedMicroseconds / ops;
+    print(
+      '49. Clarion     | sched+unsched(100K)        '
+      '| ${_pad(ops)} × ${us.toStringAsFixed(3)} µs/op = ${_ms(sw)}',
+    );
+    c.dispose();
   }
 
   print('');

@@ -33,6 +33,7 @@ lifecycle. All components auto-dispose when their owning Pillar is disposed.
 | Resource Pool | **Lode** | Reactive resource pool with lease management, warmup, drain, and utilization tracking |
 | Quota & Budget | **Tithe** | Reactive quota tracking with per-key breakdown, threshold alerts, and auto-reset |
 | Data Pipeline | **Sluice** | Reactive multi-stage data pipeline with per-stage metrics, retry, timeout, and overflow strategies |
+| Job Scheduler | **Clarion** | Reactive job scheduler with recurring/one-shot jobs, concurrency policies, and per-job observability |
 
 ## Installation
 
@@ -195,7 +196,7 @@ print('Completed: ${taskQueue.completed}');
 
 Basalt features integrate with Pillar via **extension methods**. When you
 import `titan_basalt`, factory methods like `trove()`, `moat()`,
-`portcullis()`, `anvil()`, `pyre()`, `banner()`, `sieve()`, `lattice()`, `embargo()`, `census()`, `warden()`, `arbiter()`, `lode()`, `tithe()`, and `sluice()` become available on any Pillar
+`portcullis()`, `anvil()`, `pyre()`, `banner()`, `sieve()`, `lattice()`, `embargo()`, `census()`, `warden()`, `arbiter()`, `lode()`, `tithe()`, `sluice()`, and `clarion()` become available on any Pillar
 subclass. These methods use `Pillar.registerNodes()` to ensure all
 reactive nodes are auto-disposed with the Pillar lifecycle.
 

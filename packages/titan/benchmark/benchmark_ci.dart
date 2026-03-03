@@ -45,6 +45,7 @@ void main() async {
   await _benchLodeAcquireRelease();
   _benchTitheConsume();
   await _benchSluiceFeedFlush();
+  await _benchClarionTrigger();
 
   // Output JSON
   print(
@@ -742,4 +743,19 @@ Future<void> _benchSluiceFeedFlush() async {
   s.dispose();
   final usPerOp = sw.elapsedMicroseconds / n;
   _record('Sluice Feed+Flush 1-stage (100K)', 'µs/op', usPerOp);
+}
+
+Future<void> _benchClarionTrigger() async {
+  final c = Clarion(name: 'bench');
+  c.schedule('noop', const Duration(hours: 1), () async {});
+  const n = 100000;
+  final sw = Stopwatch()..start();
+  for (var i = 0; i < n; i++) {
+    c.trigger('noop');
+  }
+  await Future<void>.delayed(Duration.zero);
+  sw.stop();
+  c.dispose();
+  final usPerOp = sw.elapsedMicroseconds / n;
+  _record('Clarion Trigger (100K)', 'µs/op', usPerOp);
 }

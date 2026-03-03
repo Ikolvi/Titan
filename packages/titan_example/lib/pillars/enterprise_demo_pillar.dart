@@ -465,6 +465,33 @@ class EnterpriseDemoPillar extends Pillar {
     await questPipeline.flush();
   }
 
+  // --------------- Clarion (Job Scheduler) ---------------
+
+  /// Maintenance scheduler — runs recurring background tasks.
+  late final scheduler = clarion(name: 'maintenance');
+
+  /// Start scheduled maintenance jobs.
+  void startScheduler() {
+    scheduler.schedule(
+      'refresh-quests',
+      const Duration(minutes: 10),
+      () async {
+        // Simulate quest refresh.
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      },
+      policy: ClarionPolicy.skipIfRunning,
+    );
+    scheduler.schedule('flush-analytics', const Duration(minutes: 1), () async {
+      // Simulate analytics flush.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+  }
+
+  /// Manually trigger a scheduled job.
+  void triggerJob(String name) {
+    scheduler.trigger(name);
+  }
+
   // --------------- Prism (Fine-Grained State Projections) ---------------
 
   /// Hero profile — a complex object stored in a single Core.

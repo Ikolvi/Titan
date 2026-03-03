@@ -1581,6 +1581,57 @@ class _ToolkitTab extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
+              // Clarion (Job Scheduler)
+              _SectionHeader('Clarion (Job Scheduler)'),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Status: ${pillar.scheduler.status.value.name} '
+                        '| Jobs: ${pillar.scheduler.jobCount.value} '
+                        '| Active: ${pillar.scheduler.activeCount.value}',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Total runs: ${pillar.scheduler.totalRuns.value} '
+                        '| Errors: ${pillar.scheduler.totalErrors.value} '
+                        '| Success: ${(pillar.scheduler.successRate.value * 100).toStringAsFixed(0)}%',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          FilledButton.tonal(
+                            onPressed: () => pillar.startScheduler(),
+                            child: const Text('Start Jobs'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: pillar.scheduler.jobCount.value > 0
+                                ? () => pillar.triggerJob('refresh-quests')
+                                : null,
+                            child: const Text('Trigger Refresh'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: pillar.scheduler.jobCount.value > 0
+                                ? () => pillar.triggerJob('flush-analytics')
+                                : null,
+                            child: const Text('Trigger Analytics'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Annals Audit Trail
               _SectionHeader('Annals (Audit Trail)'),
               const SizedBox(height: 8),
