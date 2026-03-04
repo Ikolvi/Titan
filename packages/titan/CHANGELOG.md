@@ -5,6 +5,19 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-03-04
+
+### Changed
+- **Assert → Runtime Errors**: All debug-only `assert` statements converted to runtime errors that fire in release builds:
+  - `ClampConduit`: `ArgumentError` for invalid min/max range
+  - `Pillar._assertNotDisposed()`: `StateError` for use-after-dispose
+  - `TitanStore._assertNotDisposed()`: `StateError` for use-after-dispose
+  - `TitanContainer._assertNotDisposed()`: `StateError` for use-after-dispose
+  - `Relic._assertNotDisposed()`: `StateError` for use-after-dispose
+  - `Aegis.run()`: `ArgumentError` for `maxAttempts <= 0`
+  - `Aegis.runWithConfig()`: `ArgumentError` for `config.maxAttempts <= 0`
+  - `Herald`: `StateError` for emit-after-dispose
+
 ## [1.1.0] - 2026-03-04
 
 ### Added
@@ -41,15 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Moved to `titan_basalt`**: Trove, Moat, Portcullis, Anvil, Pyre, Codex, Quarry, Bulwark, Saga, Volley, Tether, Annals (infrastructure/resilience features)
-- **Assert → Runtime Errors**: All debug-only `assert` statements converted to runtime errors that fire in release builds:
-  - `ClampConduit`: `ArgumentError` for invalid min/max range
-  - `Pillar._assertNotDisposed()`: `StateError` for use-after-dispose
-  - `TitanStore._assertNotDisposed()`: `StateError` for use-after-dispose
-  - `TitanContainer._assertNotDisposed()`: `StateError` for use-after-dispose
-  - `Relic._assertNotDisposed()`: `StateError` for use-after-dispose
-  - `Aegis.run()`: `ArgumentError` for `maxAttempts <= 0`
-  - `Aegis.runWithConfig()`: `ArgumentError` for `config.maxAttempts <= 0`
-  - `Herald`: `StateError` for emit-after-dispose
 
 ## [1.0.2] - 2026-03-03
 
