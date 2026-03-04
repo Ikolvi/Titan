@@ -263,6 +263,7 @@ lib/
 
 ## Next Steps
 
+- [Onboarding Guide](15-onboarding-guide.md) — Quick reference card, Rosetta Stone (BLoC/Provider/Riverpod → Titan), learning path
 - [Core Concepts](03-core-concepts.md) — Deep dive into Core, Derived, Strike
 - [Pillars](04-pillars.md) — Structured state management
 - [Flutter Integration](05-flutter-integration.md) — Vestige, Beacon, extensions

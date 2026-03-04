@@ -65,6 +65,7 @@
 | [XLIX](chapter-49-the-clarion-sounds.md) | **The Clarion Sounds** | `Clarion`, `ClarionRun`, `ClarionPolicy`, reactive job scheduler, per-job state, schedule/trigger/pause |
 | [L](chapter-50-the-tapestry-unfolds.md) | **The Tapestry Unfolds** | `Tapestry`, `TapestryStrand`, `TapestryWeave`, `TapestryFrame`, event sourcing, CQRS projections, temporal queries |
 | [LI](chapter-51-the-veil-conceals.md) | **The Veil Conceals** | `ReadCore<T>`, read-only state views, private Core convention, compile-time type narrowing, mutation methods |
+| [LII](chapter-52-the-cartographers-table.md) | **The Cartographer's Table** | Rosetta Stone (BLoC/Provider/Riverpod/GetX → Titan), Three Circles learning path, onboarding metrics, quick reference card |
 
 ---
 

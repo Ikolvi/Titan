@@ -270,4 +270,4 @@ ReadCore is a *convention*, not a requirement. The reactive engine doesn't care 
 
 ---
 
-| [← Chapter L: The Tapestry Unfolds](chapter-50-the-tapestry-unfolds.md) |
+| [← Chapter L: The Tapestry Unfolds](chapter-50-the-tapestry-unfolds.md) | [Chapter LII: The Cartographer's Table →](chapter-52-the-cartographers-table.md) |
