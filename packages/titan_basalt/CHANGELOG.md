@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.2
+
+### Fixed
+
+- **Dependency**: Updated minimum `titan` constraint to `^1.1.0` (requires `Pillar.registerNodes()` API).
+- **Example**: Added `example/example.dart` for pub.dev documentation score.
+
 ## 1.12.1
 
 ### Improved
