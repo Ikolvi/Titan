@@ -166,93 +166,6 @@ test('saga compensates correctly on failure', () async {
 
 ---
 
-## The Bulwark — Circuit Breaker
-
-> ⚠️ **Deprecated:** Bulwark has been superseded by **Portcullis** ([Chapter XXXVII](chapter-37-the-portcullis-descends.md)), which provides a superset of Bulwark's functionality including `shouldTrip` predicates, `protect()` for function wrapping, and more granular state control. New code should use `portcullis()` instead.
-
-> *A bulwark is a defensive wall. Titan's Bulwark protects your app from cascading failures.*
-
-When an API endpoint fails repeatedly, you don't want to keep hammering it. The Bulwark implements the circuit breaker pattern:
-
-```dart
-class QuestApiPillar extends Pillar {
-  late final apiBulwark = bulwark<List<Quest>>(
-    failureThreshold: 3,
-    resetTimeout: const Duration(seconds: 30),
-    onOpen: (error) => log.error('API circuit opened: $error'),
-    onClose: () => log.info('API circuit recovered'),
-    onHalfOpen: () => log.info('Testing API recovery...'),
-    name: 'quest-api',
-  );
-
-  Future<void> fetchQuests() async {
-    try {
-      final quests = await apiBulwark.call(() => api.getQuests());
-      questList.value = quests;
-    } on BulwarkOpenException catch (e) {
-      // Circuit is open — don't even try
-      log.warning(
-        'API unavailable after ${e.failureCount} failures. '
-        'Retry in 30 seconds.',
-      );
-    }
-  }
-}
-```
-
-### The Three States
-
-```
-     ┌────────┐     failure count       ┌──────┐
-     │ Closed │ ──────>──────────────> │ Open │
-     └───┬────┘  >= failureThreshold   └──┬───┘
-         │                                 │
-     success                          resetTimeout
-         │                                 │
-         │         ┌──────────┐            │
-         └────<────│ Half-Open│ <──────────┘
-                   └──────────┘
-                    │         │
-                 success    failure
-                    │         │
-                    ▼         ▼
-                 Closed      Open
-```
-
-- **Closed**: Normal operation. Failures are counted. At `failureThreshold`, the circuit opens.
-- **Open**: All calls throw `BulwarkOpenException` immediately. After `resetTimeout`, transitions to half-open.
-- **Half-Open**: One call is allowed through. If it succeeds, the circuit closes. If it fails, it re-opens.
-
-### Reactive State in the UI
-
-Because the Bulwark's state is reactive, you can show circuit status:
-
-```dart
-Vestige<QuestApiPillar>(
-  builder: (context, pillar) {
-    if (pillar.apiBulwark.isOpen) {
-      return const Banner(
-        message: 'Server temporarily unavailable',
-        icon: Icons.cloud_off,
-      );
-    }
-    return const QuestListView();
-  },
-)
-```
-
-### Manual Controls
-
-```dart
-// Manually trip the circuit (e.g., during maintenance)
-apiBulwark.trip();
-
-// Manually reset (e.g., when service recovery is confirmed)
-apiBulwark.reset();
-```
-
----
-
 ## PillarScope — Scoped Overrides
 
 > *Override Pillars for a subtree — perfect for testing, feature flags, and scoped DI.*
@@ -273,9 +186,11 @@ Any `Vestige<QuestListPillar>` inside the subtree will receive `mockQuestPillar`
 
 ## What Kael Learned
 
-The Crucible caught three bugs in the first test run. The Snapshot comparison proved that the Saga rollback was incomplete — one Core was leaking state. The Bulwark prevented 847 redundant API calls in the first hour of deployment.
+The Crucible caught three bugs in the first test run. The Snapshot comparison proved that the Saga rollback was incomplete — one Core was leaking state. PillarScope made integration testing effortless — swapping in mock Pillars for an entire subtree.
 
 "Tests aren't overhead," Kael wrote in the team wiki. "They're the Crucible that proves your architecture holds under fire."
+
+> **Need circuit breakers?** See [Chapter XXXVII — The Portcullis Descends](chapter-37-the-portcullis-descends.md) for Titan's circuit breaker pattern.
 
 But the CTO had a new requirement: "We need a full audit trail. Every state change, timestamped, with the user who caused it. Compliance needs it by Friday."
 
