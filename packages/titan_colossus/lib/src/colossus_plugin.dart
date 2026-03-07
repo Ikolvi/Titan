@@ -1,8 +1,11 @@
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
+import 'package:titan_atlas/titan_atlas.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 
 import 'colossus.dart';
+import 'export/blueprint_export.dart';
+import 'integration/colossus_atlas_observer.dart';
 import 'integration/lens.dart';
 import 'widgets/shade_listener.dart';
 import 'alerts/tremor.dart';
@@ -135,6 +138,52 @@ class ColossusPlugin extends TitanPlugin {
   /// a saved Shade session if configured via [Colossus.setAutoReplay].
   final bool autoReplayOnStartup;
 
+  /// Whether to enable Tableau capture on Shade.
+  ///
+  /// When `true` (default for ColossusPlugin), Shade records DOM-like
+  /// snapshots of each screen, enabling Scout to discover routes and
+  /// interactive elements automatically. Required for Blueprint
+  /// features to work.
+  ///
+  /// Defaults to `true` in ColossusPlugin (vs `false` in
+  /// `Colossus.init()` for backward compatibility).
+  final bool enableTableauCapture;
+
+  /// Whether to auto-feed Shade sessions into Scout.
+  ///
+  /// When `true` (default), completed Shade recordings are
+  /// automatically passed to `learnFromSession()`, populating
+  /// the Terrain flow graph without any manual wiring.
+  final bool autoLearnSessions;
+
+  /// Whether to auto-integrate with Atlas routing.
+  ///
+  /// When `true` (default), ColossusPlugin will:
+  /// - Register [ColossusAtlasObserver] for page-load timing
+  /// - Pre-seed [RouteParameterizer] with Atlas route patterns
+  /// - Auto-wire `getCurrentRoute` for route-aware recording
+  ///
+  /// Gracefully degrades if Atlas is not initialized or not
+  /// in the dependency graph. No error if Atlas is absent.
+  final bool autoAtlasIntegration;
+
+  /// Directory for auto-exporting Blueprint data on shutdown.
+  ///
+  /// When non-null, ColossusPlugin will automatically export the
+  /// current [BlueprintExport] (Terrain graph, Gauntlet Stratagems,
+  /// and AI prompt) to this directory when the plugin detaches.
+  ///
+  /// This bridges runtime Blueprint data to AI assistants:
+  /// the exported `.titan/blueprint.json` can be read by Copilot
+  /// to understand the app's navigation and generate targeted tests.
+  ///
+  /// ```dart
+  /// ColossusPlugin(
+  ///   blueprintExportDirectory: '.titan',
+  /// )
+  /// ```
+  final String? blueprintExportDirectory;
+
   /// Creates a ColossusPlugin with the given configuration.
   ///
   /// All parameters mirror [Colossus.init] options. The plugin
@@ -153,6 +202,10 @@ class ColossusPlugin extends TitanPlugin {
     this.onExport,
     this.getCurrentRoute,
     this.autoReplayOnStartup = false,
+    this.enableTableauCapture = true,
+    this.autoLearnSessions = true,
+    this.autoAtlasIntegration = true,
+    this.blueprintExportDirectory,
   });
 
   @override
@@ -167,6 +220,8 @@ class ColossusPlugin extends TitanPlugin {
       enableChronicle: enableChronicle,
       shadeStoragePath: shadeStoragePath,
       exportDirectory: exportDirectory,
+      enableTableauCapture: enableTableauCapture,
+      autoLearnSessions: autoLearnSessions,
     );
 
     final instance = Colossus.instance;
@@ -185,6 +240,14 @@ class ColossusPlugin extends TitanPlugin {
     if (autoReplayOnStartup) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         instance.checkAutoReplay();
+      });
+    }
+
+    // Auto-integrate with Atlas routing (graceful — no error if Atlas
+    // is not available or not yet initialized).
+    if (autoAtlasIntegration) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _tryAtlasIntegration(instance);
       });
     }
   }
@@ -208,7 +271,90 @@ class ColossusPlugin extends TitanPlugin {
 
   @override
   void onDetach() {
+    // Auto-export Blueprint data before shutdown
+    if (blueprintExportDirectory != null) {
+      _tryBlueprintExport();
+    }
+
+    // Remove Atlas observer before shutdown
+    if (autoAtlasIntegration) {
+      _tryAtlasCleanup();
+    }
     Colossus.shutdown();
+  }
+
+  /// Attempt Atlas integration — gracefully skipped if Atlas
+  /// is not available or not yet initialized.
+  void _tryAtlasIntegration(Colossus instance) {
+    try {
+      if (!Atlas.isActive) return;
+
+      // 1. Auto-register page-load observer
+      if (instance.autoAtlasObserver == null) {
+        final observer = const ColossusAtlasObserver();
+        Atlas.addObserver(observer);
+        instance.autoAtlasObserver = observer;
+      }
+
+      // 2. Pre-seed RouteParameterizer with declared Atlas patterns.
+      // This gives Scout a head start — it knows the app's route
+      // structure before any sessions are recorded.
+      final patterns = Atlas.registeredPatterns;
+      for (final pattern in patterns) {
+        instance.scout.parameterizer.registerPattern(pattern);
+      }
+
+      // 3. Auto-wire getCurrentRoute if not user-provided.
+      // This enables route-aware Shade recording automatically.
+      instance.shade.getCurrentRoute ??= () {
+        try {
+          return Atlas.current.path;
+        } catch (_) {
+          return null;
+        }
+      };
+    } catch (_) {
+      // Atlas not available or not initialized — graceful degradation.
+      // Blueprint features will work but with manual terrain building.
+    }
+  }
+
+  /// Export Blueprint data to disk before shutdown.
+  void _tryBlueprintExport() {
+    try {
+      final instance = Colossus.instance;
+      final export = BlueprintExport.fromScout(
+        scout: instance.scout,
+        metadata: {
+          'source': 'auto-export',
+          'plugin': 'ColossusPlugin',
+        },
+      );
+
+      // Fire-and-forget — don't block shutdown on file I/O.
+      // Uses unawaited Future intentionally.
+      BlueprintExportIO.saveAll(
+        export,
+        directory: blueprintExportDirectory,
+      );
+    } catch (_) {
+      // Export failed — don't block shutdown.
+    }
+  }
+
+  /// Clean up Atlas integration on shutdown.
+  void _tryAtlasCleanup() {
+    try {
+      if (!Atlas.isActive) return;
+
+      final instance = Colossus.instance;
+      if (instance.autoAtlasObserver != null) {
+        Atlas.removeObserver(instance.autoAtlasObserver!);
+        instance.autoAtlasObserver = null;
+      }
+    } catch (_) {
+      // Atlas already shut down or not available — no cleanup needed.
+    }
   }
 
   @override

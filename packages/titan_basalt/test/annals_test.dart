@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:test/test.dart';
 import 'package:titan_basalt/titan_basalt.dart';
 
@@ -543,6 +545,205 @@ void main() {
     test('maxEntries getter returns configured value', () {
       Annals.enable(maxEntries: 500);
       expect(Annals.maxEntries, 500);
+    });
+
+    group('indexed mode', () {
+      test('isIndexed defaults to false', () {
+        Annals.enable();
+        expect(Annals.isIndexed, isFalse);
+      });
+
+      test('enable with indexed: true sets isIndexed', () {
+        Annals.enable(indexed: true);
+        expect(Annals.isIndexed, isTrue);
+      });
+
+      test('indexed query by pillarType returns correct entries', () {
+        Annals.enable(indexed: true);
+
+        for (var i = 0; i < 10; i++) {
+          Annals.record(AnnalEntry(
+            coreName: 'item$i',
+            pillarType: i.isEven ? 'EvenPillar' : 'OddPillar',
+            oldValue: i,
+            newValue: i + 1,
+          ));
+        }
+
+        final evens = Annals.query(pillarType: 'EvenPillar');
+        expect(evens, hasLength(5));
+        expect(evens.every((e) => e.pillarType == 'EvenPillar'), isTrue);
+
+        final odds = Annals.query(pillarType: 'OddPillar');
+        expect(odds, hasLength(5));
+      });
+
+      test('indexed query with limit returns most recent', () {
+        Annals.enable(indexed: true);
+
+        for (var i = 0; i < 20; i++) {
+          Annals.record(AnnalEntry(
+            coreName: 'item$i',
+            pillarType: 'TestPillar',
+            oldValue: i,
+            newValue: i + 1,
+          ));
+        }
+
+        final result = Annals.query(pillarType: 'TestPillar', limit: 3);
+        expect(result, hasLength(3));
+        expect(result[0].coreName, 'item17');
+        expect(result[2].coreName, 'item19');
+      });
+
+      test('indexed query with additional filters uses index-assisted path',
+          () {
+        Annals.enable(indexed: true);
+
+        for (var i = 0; i < 10; i++) {
+          Annals.record(AnnalEntry(
+            coreName: 'item$i',
+            pillarType: 'TestPillar',
+            oldValue: i,
+            newValue: i + 1,
+            action: i.isEven ? 'update' : 'delete',
+          ));
+        }
+
+        final result =
+            Annals.query(pillarType: 'TestPillar', action: 'update');
+        expect(result, hasLength(5));
+        expect(result.every((e) => e.action == 'update'), isTrue);
+      });
+
+      test('indexed query returns empty for unknown pillarType', () {
+        Annals.enable(indexed: true);
+
+        Annals.record(AnnalEntry(
+          coreName: 'x',
+          pillarType: 'Known',
+          oldValue: 0,
+          newValue: 1,
+        ));
+
+        final result = Annals.query(pillarType: 'Unknown');
+        expect(result, isEmpty);
+      });
+
+      test('index handles eviction correctly', () {
+        Annals.enable(maxEntries: 5, indexed: true);
+
+        for (var i = 0; i < 10; i++) {
+          Annals.record(AnnalEntry(
+            coreName: 'item$i',
+            pillarType: 'TestPillar',
+            oldValue: i,
+            newValue: i + 1,
+          ));
+        }
+
+        // Only last 5 should remain
+        expect(Annals.length, 5);
+        final result = Annals.query(pillarType: 'TestPillar');
+        expect(result, hasLength(5));
+        expect(result.first.coreName, 'item5');
+      });
+
+      test('reset clears index and disables indexed mode', () {
+        Annals.enable(indexed: true);
+        Annals.record(AnnalEntry(
+          coreName: 'x',
+          pillarType: 'Pillar',
+          oldValue: 0,
+          newValue: 1,
+        ));
+
+        Annals.reset();
+
+        expect(Annals.isIndexed, isFalse);
+        Annals.enable(indexed: true);
+        final result = Annals.query(pillarType: 'Pillar');
+        expect(result, isEmpty);
+      });
+    });
+
+    group('exportToBuffer', () {
+      test('writes valid JSON array', () {
+        Annals.enable();
+        Annals.record(AnnalEntry(
+          coreName: 'balance',
+          oldValue: 100,
+          newValue: 200,
+          action: 'deposit',
+        ));
+        Annals.record(AnnalEntry(
+          coreName: 'name',
+          oldValue: 'Alice',
+          newValue: 'Bob',
+        ));
+
+        final buffer = StringBuffer();
+        Annals.exportToBuffer(buffer);
+        final json = buffer.toString();
+
+        // Must be valid JSON
+        final parsed = jsonDecode(json) as List;
+        expect(parsed, hasLength(2));
+        expect(parsed[0]['coreName'], 'balance');
+        expect(parsed[1]['coreName'], 'name');
+      });
+
+      test('writes empty array when no entries', () {
+        Annals.enable();
+        final buffer = StringBuffer();
+        Annals.exportToBuffer(buffer);
+        expect(buffer.toString(), '[]');
+      });
+
+      test('exportToBuffer with pillarType filter', () {
+        Annals.enable();
+        for (var i = 0; i < 5; i++) {
+          Annals.record(AnnalEntry(
+            coreName: 'item$i',
+            pillarType: i.isEven ? 'Alpha' : 'Beta',
+            oldValue: i,
+            newValue: i + 1,
+          ));
+        }
+
+        final buffer = StringBuffer();
+        Annals.exportToBuffer(buffer, pillarType: 'Alpha');
+        final parsed = jsonDecode(buffer.toString()) as List;
+        expect(parsed, hasLength(3));
+        expect(
+          parsed.every(
+            (e) => (e as Map<String, dynamic>)['pillarType'] == 'Alpha',
+          ),
+          isTrue,
+        );
+      });
+
+      test('handles special characters in values', () {
+        Annals.enable();
+        Annals.record(AnnalEntry(
+          coreName: 'test',
+          oldValue: 'line1\nline2',
+          newValue: 'has "quotes"',
+        ));
+
+        final buffer = StringBuffer();
+        Annals.exportToBuffer(buffer);
+        final json = buffer.toString();
+
+        // Must be valid JSON
+        final parsed = jsonDecode(json) as List;
+        expect(parsed, hasLength(1));
+
+        // jsonDecode unescapes the content — verify round-trip integrity
+        expect(parsed[0]['oldValue'], contains('line1'));
+        expect(parsed[0]['oldValue'], contains('line2'));
+        expect(parsed[0]['newValue'], contains('quotes'));
+      });
     });
   });
 }

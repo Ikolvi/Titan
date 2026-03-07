@@ -2,10 +2,13 @@ import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:titan/titan.dart';
 
 import '../widgets/shade_text_controller.dart';
 import 'imprint.dart';
+import 'tableau.dart';
+import 'tableau_capture.dart';
 
 // ---------------------------------------------------------------------------
 // Shade — Gesture Recording Controller
@@ -57,6 +60,7 @@ import 'imprint.dart';
 /// ```
 class Shade {
   final List<Imprint> _imprints = [];
+  final List<Tableau> _tableaux = [];
   DateTime? _recordingStart;
   String? _sessionName;
   String? _sessionDescription;
@@ -67,6 +71,13 @@ class Shade {
   double _screenHeight = 0;
   double _devicePixelRatio = 1;
   String? _startRoute;
+
+  // Tableau capture configuration
+  bool _enableTableauCapture = false;
+  bool _enableScreenCapture = false;
+  double _screenCapturePixelRatio = 0.5;
+  int _currentTableauIndex = -1;
+  bool _isCapturingTableau = false;
 
   /// Reactive [Core] tracking the recording state.
   ///
@@ -119,6 +130,21 @@ class Shade {
   /// shade.getCurrentRoute = () => Atlas.instance.currentRoute;
   /// ```
   String? Function()? getCurrentRoute;
+
+  /// Whether Tableau capture is enabled for current/next session.
+  bool get enableTableauCapture => _enableTableauCapture;
+  set enableTableauCapture(bool value) => _enableTableauCapture = value;
+
+  /// Whether to capture screenshots (Fresco) with each Tableau.
+  bool get enableScreenCapture => _enableScreenCapture;
+  set enableScreenCapture(bool value) => _enableScreenCapture = value;
+
+  /// Pixel ratio for screenshots (lower = smaller file size).
+  double get screenCapturePixelRatio => _screenCapturePixelRatio;
+  set screenCapturePixelRatio(double value) => _screenCapturePixelRatio = value;
+
+  /// The Tableaux captured in the current recording session.
+  List<Tableau> get tableaux => List.unmodifiable(_tableaux);
 
   // -----------------------------------------------------------------------
   // Text controller registry
@@ -182,6 +208,8 @@ class Shade {
     _sessionName = name ?? 'session_$_sessionCounter';
     _sessionDescription = description;
     _imprints.clear();
+    _tableaux.clear();
+    _currentTableauIndex = -1;
     _recordingStart = DateTime.now();
     isRecordingCore.value = true;
 
@@ -197,6 +225,11 @@ class Shade {
     _startRoute = getCurrentRoute?.call();
 
     onRecordingStarted?.call();
+
+    // Capture initial Tableau (screen state at recording start)
+    if (_enableTableauCapture) {
+      _captureTableau(triggerImprintIndex: -1);
+    }
   }
 
   /// Stop recording and return the completed [ShadeSession].
@@ -216,6 +249,11 @@ class Shade {
     isRecordingCore.value = false;
     final duration = DateTime.now().difference(_recordingStart!);
 
+    // Capture final Tableau (screen state at recording end)
+    if (_enableTableauCapture) {
+      _captureTableau(triggerImprintIndex: _imprints.length - 1);
+    }
+
     final session = ShadeSession(
       id: '${_sessionName}_${_recordingStart!.millisecondsSinceEpoch}',
       name: _sessionName!,
@@ -227,9 +265,12 @@ class Shade {
       imprints: List.of(_imprints),
       description: _sessionDescription,
       startRoute: _startRoute,
+      tableaux: List.of(_tableaux),
     );
 
     _imprints.clear();
+    _tableaux.clear();
+    _currentTableauIndex = -1;
     _recordingStart = null;
     _sessionName = null;
     _sessionDescription = null;
@@ -245,6 +286,8 @@ class Shade {
 
     isRecordingCore.value = false;
     _imprints.clear();
+    _tableaux.clear();
+    _currentTableauIndex = -1;
     _recordingStart = null;
     _sessionName = null;
     _sessionDescription = null;
@@ -280,10 +323,16 @@ class Shade {
       scrollDeltaX: event is PointerScrollEvent ? event.scrollDelta.dx : 0,
       scrollDeltaY: event is PointerScrollEvent ? event.scrollDelta.dy : 0,
       pressure: event.pressure,
+      tableauIndex: _currentTableauIndex >= 0 ? _currentTableauIndex : null,
     );
 
     _imprints.add(imprint);
     onImprintCaptured?.call(imprint);
+
+    // Auto-capture Tableau after pointer up (interaction completed)
+    if (_enableTableauCapture && type == ImprintType.pointerUp) {
+      _scheduleTableauCapture(_imprints.length - 1);
+    }
   }
 
   /// Classifies a [PointerEvent] into an [ImprintType].
@@ -427,5 +476,75 @@ class Shade {
 
     _imprints.add(imprint);
     onImprintCaptured?.call(imprint);
+  }
+
+  // -----------------------------------------------------------------------
+  // Tableau capture (auto-screen-state recording)
+  // -----------------------------------------------------------------------
+
+  /// Schedule a Tableau capture after a brief settle delay.
+  ///
+  /// Waits one frame to allow the widget tree to settle after a
+  /// pointer interaction before capturing the screen state.
+  void _scheduleTableauCapture(int triggerImprintIndex) {
+    if (_isCapturingTableau) return;
+
+    // Post-frame callback to let animations/state settle
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _captureTableau(triggerImprintIndex: triggerImprintIndex);
+    });
+  }
+
+  /// Capture a Tableau synchronously and add to the session.
+  ///
+  /// Performs deduplication: if the new Tableau is structurally
+  /// identical to the last one, it is discarded.
+  void _captureTableau({required int triggerImprintIndex}) async {
+    if (!isRecordingCore.peek()) return;
+    if (_isCapturingTableau) return;
+
+    _isCapturingTableau = true;
+
+    try {
+      final route = getCurrentRoute?.call();
+      final timestamp = DateTime.now().difference(_recordingStart!);
+
+      final tableau = await TableauCapture.capture(
+        index: _tableaux.length,
+        route: route,
+        triggerImprintIndex: triggerImprintIndex,
+        enableScreenCapture: _enableScreenCapture,
+        screenCapturePixelRatio: _screenCapturePixelRatio,
+      );
+
+      // Update timestamp
+      final timestamped = tableau.copyWith(timestamp: timestamp);
+
+      // Deduplication: skip if identical to last captured Tableau
+      if (_tableaux.isNotEmpty &&
+          _tableaux.last.isStructurallyEqual(timestamped)) {
+        _isCapturingTableau = false;
+        return;
+      }
+
+      _tableaux.add(timestamped);
+      _currentTableauIndex = _tableaux.length - 1;
+    } finally {
+      _isCapturingTableau = false;
+    }
+  }
+
+  /// Manually trigger a Tableau capture.
+  ///
+  /// Useful for capturing screen state on route changes or other
+  /// non-pointer events.
+  ///
+  /// ```dart
+  /// shade.captureTableau();
+  /// ```
+  void captureTableau() {
+    if (!isRecordingCore.peek()) return;
+    if (!_enableTableauCapture) return;
+    _captureTableau(triggerImprintIndex: _imprints.length - 1);
   }
 }

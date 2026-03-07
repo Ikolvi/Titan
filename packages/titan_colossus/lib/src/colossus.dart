@@ -1,9 +1,15 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart' show ChangeNotifier;
+import 'dart:io';
+
 import 'package:flutter/scheduler.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 
 import 'alerts/tremor.dart';
 import 'integration/lens.dart';
 import 'export/inscribe.dart';
+import 'integration/blueprint_lens_tab.dart';
 import 'integration/colossus_lens_tab.dart';
 import 'integration/shade_lens_tab.dart';
 import 'metrics/decree.dart';
@@ -15,6 +21,17 @@ import 'recording/imprint.dart';
 import 'recording/phantom.dart';
 import 'recording/shade.dart';
 import 'recording/shade_vault.dart';
+import 'recording/tableau_capture.dart';
+import 'testing/stratagem.dart';
+import 'testing/stratagem_runner.dart';
+import 'testing/verdict.dart';
+import 'testing/campaign.dart';
+import 'testing/debrief.dart';
+import 'discovery/gauntlet.dart';
+import 'discovery/lineage.dart';
+import 'discovery/scout.dart';
+import 'discovery/terrain.dart';
+import 'integration/colossus_atlas_observer.dart';
 import 'widgets/shade_text_controller.dart';
 
 // ---------------------------------------------------------------------------
@@ -133,6 +150,9 @@ class Colossus extends Pillar {
   /// Whether to log performance events to Chronicle.
   final bool _enableChronicle;
 
+  /// Whether to auto-feed Shade sessions into Scout for Terrain building.
+  final bool _autoLearnSessions;
+
   // -----------------------------------------------------------------------
   // State
   // -----------------------------------------------------------------------
@@ -140,8 +160,22 @@ class Colossus extends Pillar {
   final Map<String, int> _rebuildsPerWidget = {};
   final DateTime _sessionStart = DateTime.now();
   Chronicle? _chronicle;
+
+  /// Notifier that fires when Terrain is updated (session analyzed).
+  ///
+  /// Subscribe to this in UI layers to reactively rebuild when
+  /// new screens or transitions are discovered.
+  final ChangeNotifier terrainNotifier = ChangeNotifier();
+
   ColossusLensTab? _lensTab;
   ShadeLensTab? _shadeLensTab;
+  BlueprintLensTab? _blueprintLensTab;
+
+  /// Atlas observer auto-registered by [ColossusPlugin].
+  ///
+  /// Stored here so it can be removed on shutdown. Only non-null
+  /// when auto-Atlas integration is active.
+  ColossusAtlasObserver? autoAtlasObserver;
 
   /// Directory path for exporting reports.
   ///
@@ -242,9 +276,11 @@ class Colossus extends Pillar {
     required List<Tremor> tremors,
     required bool enableLensTab,
     required bool enableChronicle,
+    required bool autoLearnSessions,
   }) : _tremors = tremors,
        _enableLensTab = enableLensTab,
-       _enableChronicle = enableChronicle;
+       _enableChronicle = enableChronicle,
+       _autoLearnSessions = autoLearnSessions;
 
   // -----------------------------------------------------------------------
   // Factory initialization
@@ -273,6 +309,10 @@ class Colossus extends Pillar {
     bool enableChronicle = true,
     String? shadeStoragePath,
     String? exportDirectory,
+    bool enableTableauCapture = false,
+    bool enableScreenCapture = false,
+    double screenCapturePixelRatio = 0.5,
+    bool autoLearnSessions = true,
   }) {
     if (_instance != null) {
       return _instance!;
@@ -289,6 +329,7 @@ class Colossus extends Pillar {
       tremors: tremors,
       enableLensTab: enableLensTab,
       enableChronicle: enableChronicle,
+      autoLearnSessions: autoLearnSessions,
     );
 
     if (shadeStoragePath != null) {
@@ -298,6 +339,11 @@ class Colossus extends Pillar {
     if (exportDirectory != null) {
       colossus._exportDirectory = exportDirectory;
     }
+
+    // Configure Tableau capture on Shade
+    colossus.shade.enableTableauCapture = enableTableauCapture;
+    colossus.shade.enableScreenCapture = enableScreenCapture;
+    colossus.shade.screenCapturePixelRatio = screenCapturePixelRatio;
 
     _instance = colossus;
     Titan.put(colossus);
@@ -341,6 +387,8 @@ class Colossus extends Pillar {
       Lens.registerPlugin(_shadeLensTab!);
       _lensTab = ColossusLensTab(this);
       Lens.registerPlugin(_lensTab!);
+      _blueprintLensTab = BlueprintLensTab(this);
+      Lens.registerPlugin(_blueprintLensTab!);
     }
 
     // Register Spark text controller factory so useTextController()
@@ -351,6 +399,17 @@ class Colossus extends Pillar {
     Spark.textControllerFactory = ({String? text, String? fieldId}) {
       return ShadeTextController(shade: shade, text: text, fieldId: fieldId);
     };
+
+    // Auto-wire Shade → Scout: every completed recording automatically
+    // feeds Scout to build the Terrain flow graph. This is the key
+    // zero-code integration that makes Blueprint discovery automatic.
+    if (_autoLearnSessions) {
+      final existingCallback = shade.onRecordingStopped;
+      shade.onRecordingStopped = (session) {
+        learnFromSession(session);
+        existingCallback?.call(session);
+      };
+    }
   }
 
   @override
@@ -371,6 +430,18 @@ class Colossus extends Pillar {
       Lens.unregisterPlugin(_shadeLensTab!);
       _shadeLensTab = null;
     }
+    if (_blueprintLensTab != null) {
+      Lens.unregisterPlugin(_blueprintLensTab!);
+      _blueprintLensTab = null;
+    }
+
+    // Clean up auto-learn wiring
+    if (_autoLearnSessions) {
+      shade.onRecordingStopped = null;
+    }
+
+    // Dispose terrain notifier
+    terrainNotifier.dispose();
 
     _chronicle?.info('Colossus shut down');
     Spark.textControllerFactory = null;
@@ -759,6 +830,458 @@ class Colossus extends Pillar {
     }
 
     return result;
+  }
+
+  // -----------------------------------------------------------------------
+  // Stratagem Engine — AI-Driven Testing
+  // -----------------------------------------------------------------------
+
+  /// Execute a [Stratagem] and return the [Verdict].
+  ///
+  /// Runs each step against the live UI, capturing screen state as
+  /// [Tableau]x and producing a detailed execution report.
+  ///
+  /// ```dart
+  /// final stratagem = Stratagem.fromJson(jsonDecode(spec));
+  /// final verdict = await Colossus.instance.executeStratagem(stratagem);
+  /// print(verdict.toReport());
+  /// ```
+  Future<Verdict> executeStratagem(
+    Stratagem stratagem, {
+    bool captureScreenshots = false,
+    Duration? stepTimeout,
+    void Function(VerdictStep)? onStepComplete,
+  }) async {
+    _chronicle?.info(
+      'Executing Stratagem: ${stratagem.name} '
+      '(${stratagem.steps.length} steps)',
+    );
+
+    final runner = StratagemRunner(
+      shade: shade,
+      captureScreenshots: captureScreenshots,
+      defaultStepTimeout: stepTimeout ?? const Duration(seconds: 10),
+      onStepComplete: onStepComplete,
+    );
+
+    final verdict = await runner.execute(stratagem);
+
+    _chronicle?.info(
+      'Stratagem ${stratagem.name} '
+      '${verdict.passed ? "PASSED" : "FAILED"}: '
+      '${verdict.summary.oneLiner}',
+    );
+
+    return verdict;
+  }
+
+  /// Execute a Stratagem from a JSON file path.
+  ///
+  /// Reads and parses the file, then executes the Stratagem.
+  /// The file must be valid JSON matching the Stratagem schema.
+  ///
+  /// ```dart
+  /// final verdict = await Colossus.instance.executeStratagemFile(
+  ///   'test/stratagems/login_flow.json',
+  /// );
+  /// ```
+  Future<Verdict> executeStratagemFile(
+    String path, {
+    bool captureScreenshots = false,
+  }) async {
+    final file = File(path);
+    if (!file.existsSync()) {
+      throw ArgumentError('Stratagem file not found: $path');
+    }
+    final content = await file.readAsString();
+    final json = jsonDecode(content) as Map<String, dynamic>;
+    final stratagem = Stratagem.fromJson(json);
+    return executeStratagem(
+      stratagem,
+      captureScreenshots: captureScreenshots,
+    );
+  }
+
+  /// Execute all Stratagems in a directory.
+  ///
+  /// Scans for `*.stratagem.json` files and executes each one.
+  /// Returns a list of [Verdict]s in execution order.
+  ///
+  /// ```dart
+  /// final verdicts = await Colossus.instance.executeStratagemSuite(
+  ///   directory: 'test/stratagems/',
+  ///   stopOnFirstFailure: true,
+  /// );
+  /// for (final v in verdicts) {
+  ///   print(v.summary.oneLiner);
+  /// }
+  /// ```
+  Future<List<Verdict>> executeStratagemSuite({
+    required String directory,
+    bool stopOnFirstFailure = false,
+    bool captureScreenshots = false,
+  }) async {
+    final dir = Directory(directory);
+    if (!dir.existsSync()) {
+      throw ArgumentError('Stratagem directory not found: $directory');
+    }
+
+    final files = dir
+        .listSync()
+        .whereType<File>()
+        .where((f) =>
+            f.path.endsWith('.stratagem.json') || f.path.endsWith('.json'))
+        .toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+
+    _chronicle?.info(
+      'Running Stratagem suite: ${files.length} files in $directory',
+    );
+
+    final verdicts = <Verdict>[];
+    for (final file in files) {
+      final verdict = await executeStratagemFile(
+        file.path,
+        captureScreenshots: captureScreenshots,
+      );
+      verdicts.add(verdict);
+
+      if (stopOnFirstFailure && !verdict.passed) {
+        _chronicle?.warning(
+          'Stratagem suite stopped: ${verdict.stratagemName} failed',
+        );
+        break;
+      }
+    }
+
+    return verdicts;
+  }
+
+  /// Get context information for AI to write better Stratagems.
+  ///
+  /// Returns a map containing:
+  /// - `screenDimensions`: current screen size
+  /// - `currentRoute`: active route (if available)
+  /// - `elementCount`: number of glyphs visible
+  /// - `currentTableau`: current screen state as Tableau JSON
+  /// - `stratagemTemplate`: JSON schema for writing Stratagems
+  /// - `templateDescription`: natural-language guide for AI
+  /// - `actionList`: all available StratagemAction values
+  ///
+  /// ```dart
+  /// final context = Colossus.instance.getAiContext();
+  /// // Send context to AI along with prompt
+  /// ```
+  Future<Map<String, dynamic>> getAiContext() async {
+    final tableau = await TableauCapture.capture(index: 0);
+
+    return {
+      'screenDimensions': {
+        'width': tableau.screenWidth,
+        'height': tableau.screenHeight,
+      },
+      'currentRoute': tableau.route,
+      'elementCount': tableau.glyphs.length,
+      'currentTableau': tableau.toMap(),
+      'stratagemTemplate': Stratagem.template,
+      'templateDescription': Stratagem.templateDescription,
+      'actionList': StratagemAction.values.map((a) => a.name).toList(),
+    };
+  }
+
+  /// Save a [Verdict] to disk.
+  ///
+  /// Writes to `[directory]/[stratagemName].verdict.json`.
+  /// Defaults to the app's documents directory.
+  ///
+  /// ```dart
+  /// await Colossus.instance.saveVerdict(verdict, directory: '/tmp/verdicts');
+  /// ```
+  Future<void> saveVerdict(
+    Verdict verdict, {
+    String? directory,
+  }) async {
+    final dir = directory ?? 'verdicts';
+    await verdict.saveToFile(dir);
+    _chronicle?.info(
+      'Verdict saved: $dir/${verdict.stratagemName}.verdict.json',
+    );
+  }
+
+  /// Load a previously saved [Verdict] from disk.
+  ///
+  /// Returns `null` if the file doesn't exist.
+  ///
+  /// ```dart
+  /// final verdict = await Colossus.instance.loadVerdict(
+  ///   'login_flow',
+  ///   directory: '/tmp/verdicts',
+  /// );
+  /// ```
+  Future<Verdict?> loadVerdict(
+    String name, {
+    String? directory,
+  }) async {
+    final dir = directory ?? 'verdicts';
+    return Verdict.loadFromFile(name, directory: dir);
+  }
+
+  // -----------------------------------------------------------------------
+  // AI Blueprint Generation — Discovery & Testing Integration
+  // -----------------------------------------------------------------------
+
+  /// The [Scout] instance for flow discovery.
+  ///
+  /// Scout passively builds the [Terrain] flow graph from recorded
+  /// sessions and executed Stratagems.
+  ///
+  /// ```dart
+  /// final scout = Colossus.instance.scout;
+  /// scout.analyzeSession(session);
+  /// ```
+  Scout get scout => Scout.instance;
+
+  /// The current [Terrain] — a complete flow graph of the app.
+  ///
+  /// Shows all discovered screens ([Outpost]s) and transitions
+  /// ([March]es) between them.
+  ///
+  /// ```dart
+  /// final terrain = Colossus.instance.terrain;
+  /// print(terrain.toMermaid()); // Visualize the flow graph
+  /// ```
+  Terrain get terrain => Scout.instance.terrain;
+
+  /// Analyze a [ShadeSession] to update the Terrain flow graph.
+  ///
+  /// Extracts screen fingerprints and transitions from the recorded
+  /// session and feeds them into the Scout.
+  ///
+  /// ```dart
+  /// final session = shade.stopRecording();
+  /// Colossus.instance.learnFromSession(session);
+  /// print(Colossus.instance.terrain.outposts.length);
+  /// ```
+  void learnFromSession(ShadeSession session) {
+    _chronicle?.info(
+      'Learning from session: ${session.name} '
+      '(${session.tableaux.length} tableaux)',
+    );
+    Scout.instance.analyzeSession(session);
+    _chronicle?.info(
+      'Terrain updated: ${terrain.outposts.length} screens, '
+      '${terrain.marches.length} transitions',
+    );
+
+    // Notify listeners that Terrain data has changed.
+    // This allows reactive UI (like the Blueprint Lens tab) to
+    // auto-rebuild without polling or manual refresh.
+    // ignore: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
+    terrainNotifier.notifyListeners();
+  }
+
+  /// Generate exploration Stratagems for unmapped routes.
+  ///
+  /// Returns a list of Stratagems that will visit screens with
+  /// limited test coverage.
+  ///
+  /// ```dart
+  /// final sorties = Colossus.instance.generateSorties();
+  /// for (final s in sorties) {
+  ///   await Colossus.instance.executeStratagem(s);
+  /// }
+  /// ```
+  List<Stratagem> generateSorties() {
+    final sorties = Scout.instance.generateAllSorties();
+    _chronicle?.info('Generated ${sorties.length} exploration sorties');
+    return sorties;
+  }
+
+  /// Resolve prerequisites for reaching a specific route.
+  ///
+  /// Returns a [Lineage] describing the shortest path from an app
+  /// entry point to the target, including any auth or form gates.
+  ///
+  /// ```dart
+  /// final lineage = Colossus.instance.resolveLineage('/settings/profile');
+  /// print(lineage.toAiSummary());
+  /// ```
+  Lineage resolveLineage(String targetRoute) {
+    return Lineage.resolve(terrain, targetRoute: targetRoute);
+  }
+
+  /// Get prerequisite chain as AI-readable text.
+  ///
+  /// Returns a formatted string describing the navigation steps
+  /// needed to reach the target route.
+  ///
+  /// ```dart
+  /// final summary = Colossus.instance.getLineageSummary('/dashboard');
+  /// // Send to AI along with Stratagem prompt
+  /// ```
+  String getLineageSummary(String targetRoute) {
+    return resolveLineage(targetRoute).toAiSummary();
+  }
+
+  /// Generate edge-case test Stratagems for a specific screen.
+  ///
+  /// Looks up the [Outpost] for [routePattern] in the Terrain,
+  /// resolves its [Lineage], and generates stress/boundary tests.
+  ///
+  /// ```dart
+  /// final tests = Colossus.instance.generateGauntlet(
+  ///   '/login',
+  ///   intensity: GauntletIntensity.thorough,
+  /// );
+  /// ```
+  List<Stratagem> generateGauntlet(
+    String routePattern, {
+    GauntletIntensity intensity = GauntletIntensity.standard,
+  }) {
+    final outpost = terrain.outposts[routePattern];
+    if (outpost == null) {
+      _chronicle?.warning(
+        'Gauntlet: no outpost found for "$routePattern"',
+      );
+      return [];
+    }
+
+    final lineage = Lineage.resolve(terrain, targetRoute: routePattern);
+    final stratagems = Gauntlet.generateFor(
+      outpost,
+      lineage: lineage.isNotEmpty ? lineage : null,
+      intensity: intensity,
+    );
+
+    _chronicle?.info(
+      'Generated ${stratagems.length} Gauntlet tests for "$routePattern" '
+      '(intensity: ${intensity.name})',
+    );
+
+    return stratagems;
+  }
+
+  /// Execute a [Campaign] — an ordered test suite with dependencies.
+  ///
+  /// Resolves prerequisites, performs topological sort, and executes
+  /// Stratagems in dependency order.
+  ///
+  /// ```dart
+  /// final result = await Colossus.instance.executeCampaign(campaign);
+  /// print(result.passRate);
+  /// ```
+  Future<CampaignResult> executeCampaign(
+    Campaign campaign, {
+    bool captureScreenshots = false,
+  }) async {
+    _chronicle?.info(
+      'Executing Campaign: ${campaign.name} '
+      '(${campaign.entries.length} entries)',
+    );
+
+    final runner = StratagemRunner(
+      shade: shade,
+      captureScreenshots: captureScreenshots,
+      defaultStepTimeout: campaign.timeout,
+    );
+
+    final result = await campaign.execute(
+      runner: runner,
+      terrain: terrain,
+    );
+
+    _chronicle?.info(
+      'Campaign ${campaign.name} complete: '
+      '${result.totalExecuted} executed, '
+      '${result.totalFailed} failed '
+      '(${(result.passRate * 100).toStringAsFixed(1)}%)',
+    );
+
+    return result;
+  }
+
+  /// Execute a [Campaign] from JSON.
+  ///
+  /// Deserializes the JSON into a [Campaign] and executes it.
+  ///
+  /// ```dart
+  /// final result = await Colossus.instance.executeCampaignJson(json);
+  /// ```
+  Future<CampaignResult> executeCampaignJson(
+    Map<String, dynamic> json, {
+    bool captureScreenshots = false,
+  }) {
+    final campaign = Campaign.fromJson(json);
+    return executeCampaign(
+      campaign,
+      captureScreenshots: captureScreenshots,
+    );
+  }
+
+  /// Analyze verdicts and produce a [DebriefReport].
+  ///
+  /// Feeds verdicts back into the Terrain via Scout, classifies
+  /// failures, detects patterns, and suggests next actions.
+  ///
+  /// ```dart
+  /// final report = Colossus.instance.debrief(verdicts);
+  /// print(report.toAiSummary());
+  /// ```
+  DebriefReport debrief(List<Verdict> verdicts) {
+    _chronicle?.info('Debriefing ${verdicts.length} verdicts');
+
+    final report = Debrief(
+      verdicts: verdicts,
+      terrain: terrain,
+    ).analyze();
+
+    _chronicle?.info(
+      'Debrief complete: ${report.passedVerdicts}/${report.totalVerdicts} '
+      'passed, ${report.insights.length} insights',
+    );
+
+    return report;
+  }
+
+  /// Get comprehensive AI context for Blueprint generation.
+  ///
+  /// Returns everything an AI agent needs to write effective
+  /// Stratagems: screen inventory, transitions, element details,
+  /// auth gates, dead ends, and template schemas.
+  ///
+  /// This is the **primary method AI agents call** for context.
+  ///
+  /// ```dart
+  /// final blueprint = await Colossus.instance.getAiBlueprint();
+  /// // Send blueprint to AI with prompt
+  /// ```
+  Future<Map<String, dynamic>> getAiBlueprint() async {
+    final baseContext = await getAiContext();
+
+    return {
+      ...baseContext,
+      'terrain': terrain.toJson(),
+      'terrainMap': terrain.toAiMap(),
+      'terrainMermaid': terrain.toMermaid(),
+      'campaignTemplate': Campaign.templateDescription,
+      'gauntletCatalog':
+          Gauntlet.catalog.map((p) => p.toJson()).toList(),
+      'discoveredScreens':
+          terrain.outposts.values.map((o) => o.toAiSummary()).toList(),
+      'authProtectedRoutes':
+          terrain.authProtectedScreens.map((o) => o.routePattern).toList(),
+      'publicRoutes':
+          terrain.publicScreens.map((o) => o.routePattern).toList(),
+      'deadEnds':
+          terrain.deadEnds.map((o) => o.routePattern).toList(),
+      'unreliableTransitions': terrain.unreliableMarches
+          .map((m) => {
+                'from': m.fromRoute,
+                'to': m.toRoute,
+                'observations': m.observationCount,
+              })
+          .toList(),
+    };
   }
 }
 

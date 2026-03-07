@@ -24,6 +24,18 @@ Titan's enterprise performance monitoring package provides frame tracking, page 
 | Session Store | **ShadeVault** | `ShadeVault` |
 | Text Controller | **ShadeTextController** | `ShadeTextController` |
 | Plugin Adapter | **ColossusPlugin** | `ColossusPlugin` |
+| Test Discovery | **Scout** | `Scout` |
+| Flow Graph | **Terrain** | `Terrain` |
+| Screen Node | **Outpost** | `Outpost` |
+| Transition Edge | **March** | `March` |
+| Route Resolver | **Lineage** | `RouteParameterizer` |
+| Edge-Case Generator | **Gauntlet** | `Gauntlet` |
+| Test Plan | **Stratagem** | `Stratagem` |
+| Test Orchestrator | **Campaign** | `Campaign` |
+| Step Result | **Verdict** | `Verdict` |
+| Campaign Analysis | **Debrief** | `Debrief` |
+| Screen Identifier | **Signet** | `Signet` |
+| Blueprint Overlay | **BlueprintLensTab** | `BlueprintLensTab` |
 
 ## Installation
 
@@ -609,10 +621,365 @@ void main() async {
 
 ---
 
+## AI Blueprint Generation
+
+Colossus can passively learn your app's navigation structure from real user sessions, then auto-generate edge-case test plans. This entire pipeline — from passive recording to AI-ready test blueprints — requires zero manual configuration when using `ColossusPlugin`.
+
+### How It Works
+
+```
+Shade (recording) → Scout (analysis) → Terrain (graph)
+                                           ↓
+                              Gauntlet (edge-case generation)
+                                           ↓
+                              Campaign (orchestrated execution)
+                                           ↓
+                              Verdict / Debrief (results)
+```
+
+1. **Shade** records user interactions as `ShadeSession` objects
+2. **Scout** analyzes each session, extracting screen names and transitions
+3. **Terrain** builds a directed graph of Outposts (screens) and Marches (transitions)
+4. **Gauntlet** reads the Terrain and generates Stratagems targeting dead-ends, low-reliability edges, and orphaned screens
+5. **Campaign** executes Stratagems in sequence with lifecycle management
+6. **Verdict** captures per-step pass/fail results; **Debrief** aggregates campaign-level analysis
+
+### Scout — Passive Session Analysis
+
+Scout is a singleton that incrementally builds a Terrain from Shade sessions:
+
+```dart
+final scout = Scout.instance;
+
+// Analyze a recorded session
+scout.analyzeSession(session);
+
+// Each session enriches the existing terrain
+scout.analyzeSession(anotherSession);
+
+// Access the live terrain
+final terrain = scout.terrain;
+```
+
+With `autoLearnSessions: true` (the default), every completed Shade recording is automatically fed to Scout — no manual calls needed.
+
+### Terrain — The Flow Graph
+
+Terrain is a directed graph where:
+- **Outpost** = a screen (identified by route path)
+- **March** = a directed edge between two screens (a navigation transition)
+
+```dart
+final terrain = scout.terrain;
+
+// Inspect the graph
+print(terrain.outposts.length);   // Number of unique screens
+print(terrain.marches.length);    // Number of unique transitions
+
+// Find a specific screen
+final screen = terrain.findOutpost('/quest/details');
+print(screen?.visitCount);        // How many times visited
+print(screen?.deadEnd);           // true if no outgoing transitions
+print(screen?.reliability);       // Transition success rate
+
+// Export for visualization or AI consumption
+final mermaid = terrain.toMermaid();   // Mermaid graph diagram
+final aiMap = terrain.toAiMap();       // Structured AI-ready map
+```
+
+### Lineage — Route Resolution
+
+When Scout encounters paths like `/quest/42` or `/hero/7`, Lineage resolves them back to their registered patterns:
+
+```dart
+final parameterizer = RouteParameterizer();
+parameterizer.registerPattern('/quest/:id');
+parameterizer.registerPattern('/hero/:heroId/quest/:questId');
+
+// Resolves concrete paths to patterns
+parameterizer.resolve('/quest/42');           // → '/quest/:id'
+parameterizer.resolve('/hero/7/quest/99');    // → '/hero/:heroId/quest/:questId'
+parameterizer.resolve('/settings');           // → '/settings' (no pattern match)
+```
+
+With `autoAtlasIntegration: true`, route patterns are pre-seeded from Atlas's trie — no manual registration required.
+
+### Gauntlet — Edge-Case Test Generation
+
+Gauntlet reads the Terrain and generates **Stratagems** — test plans targeting weak spots:
+
+```dart
+final gauntlet = Gauntlet(terrain: scout.terrain);
+
+// Generate for a specific screen
+final stratagems = gauntlet.forOutpost('/quest/details');
+
+// Generate for the entire terrain
+final all = gauntlet.forAll();
+
+for (final s in all) {
+  print('${s.name}: ${s.steps.length} steps, '
+        'targets: ${s.targetOutposts.join(", ")}');
+}
+```
+
+Gauntlet targets:
+- **Dead-end screens** — screens with no outgoing transitions
+- **Low-reliability edges** — transitions that fail often
+- **Orphaned screens** — screens reachable only from one path
+- **High-traffic bottlenecks** — screens with many incoming transitions
+- **Back-navigation gaps** — screens that users frequently back out of
+
+### Campaign — Test Orchestration
+
+Campaign executes a batch of Stratagems with full lifecycle management:
+
+```dart
+final campaign = Campaign(
+  stratagems: gauntlet.forAll(),
+  onSetup: () async {
+    // Initialize test environment, seed data, etc.
+  },
+  onTeardown: () async {
+    // Clean up test state
+  },
+);
+
+final debrief = await campaign.execute();
+```
+
+### Verdict & Debrief — Results
+
+**Verdict** captures per-step results:
+
+```dart
+for (final verdict in debrief.verdicts) {
+  print('${verdict.step}: ${verdict.outcome}');
+  if (verdict.outcome == VerdictOutcome.fail) {
+    print('  Error: ${verdict.error}');
+    print('  Fix: ${verdict.fixSuggestion}');
+  }
+}
+```
+
+**Debrief** aggregates campaign-level analysis:
+
+```dart
+print(debrief.passRate);           // e.g. 0.85
+print(debrief.failedVerdicts);     // List<Verdict> that failed
+print(debrief.fixSuggestions);     // AI-ready fix recommendations
+print(debrief.duration);           // Total execution time
+```
+
+### Blueprint Lens Tab
+
+The Blueprint tab adds a 5-sub-tab interactive interface to the Lens overlay:
+
+| Sub-tab | What it shows |
+|---------|---------------|
+| **Terrain** | Mermaid graph visualization, AI map export, dead-end/conflict detection |
+| **Stratagem** | Browse auto-generated test plans with expandable detail cards |
+| **Verdict** | Step-by-step test results with pass/fail/skip rows and fix suggestions |
+| **Lineage** | Route resolution metrics, Signet analysis, pattern matching stats |
+| **Campaign** | Campaign execution timeline, debrief summaries, pass rate charts |
+
+The Blueprint tab auto-refreshes when Scout analyzes new sessions, thanks to the `terrainNotifier` ChangeNotifier.
+
+### Zero-Code Auto-Integration
+
+With `ColossusPlugin`, the entire Blueprint pipeline wires itself automatically:
+
+```dart
+ColossusPlugin(
+  tremors: [Tremor.fps(), Tremor.leaks()],
+  // All three default to true:
+  enableTableauCapture: true,     // Shade records screen metadata
+  autoLearnSessions: true,        // Shade → Scout auto-feed
+  autoAtlasIntegration: true,     // Auto-wire Atlas observer & routes
+)
+```
+
+What happens behind the scenes:
+
+1. **`autoLearnSessions`**: Chains onto `shade.onRecordingStopped` so every completed recording is automatically fed to `Scout.analyzeSession()`
+2. **`autoAtlasIntegration`**: Registers a `ColossusAtlasObserver` for page-load timing, pre-seeds `RouteParameterizer` with patterns from `Atlas.registeredPatterns`, and sets `shade.getCurrentRoute` from Atlas
+3. **`enableTableauCapture`**: Passed through to `Colossus.init()` for Shade tableau metadata
+4. **`terrainNotifier`**: Fires after each Scout analysis, triggering Blueprint Lens Tab auto-refresh
+
+All integration is try-catch wrapped — if Atlas isn't available, Colossus gracefully degrades without errors.
+
+---
+
+## AI-Bridge Export
+
+The AI Blueprint Generation pipeline builds rich data at **runtime** — but AI assistants like Copilot and Claude operate at **IDE time**. The AI-Bridge Export layer closes this gap by exporting Blueprint data to disk in formats that AI tools can consume.
+
+### The Problem
+
+```
+Runtime (app running)          IDE-time (Copilot/Claude)
+━━━━━━━━━━━━━━━━━━━━          ━━━━━━━━━━━━━━━━━━━━━━━━
+Scout → Terrain                ← "What's in the Terrain?"
+Gauntlet → Stratagems          ← "What tests should I write?"
+Campaign → Verdicts            ← "What failed last time?"
+Debrief → Fix suggestions      ← "How do I fix this?"
+```
+
+Without export, Copilot has no access to the navigation graph, test plans, or past results. AI-Bridge Export solves this with four complementary strategies.
+
+### Strategy 1: Auto-Export on App Shutdown
+
+The simplest approach — add one parameter to `ColossusPlugin`:
+
+```dart
+ColossusPlugin(
+  blueprintExportDirectory: '.titan',
+)
+```
+
+When the app shuts down (`onDetach`), the plugin automatically:
+1. Creates a `BlueprintExport` from the current Scout state
+2. Saves `.titan/blueprint.json` (structured data for MCP tools)
+3. Saves `.titan/blueprint-prompt.md` (AI-ready Markdown summary)
+
+This is fire-and-forget — no manual intervention required.
+
+### Strategy 2: Programmatic Export
+
+For finer control, use `BlueprintExport` and `BlueprintExportIO` directly:
+
+```dart
+// Create export from live Scout state
+final export = BlueprintExport.fromScout(
+  scout: Scout.instance,
+  verdicts: recentVerdicts,   // Optional: include test results
+  intensity: GauntletIntensity.thorough,
+);
+
+// Save to disk
+final result = await BlueprintExportIO.saveAll(
+  export,
+  directory: '.titan',
+);
+
+print(result.json);    // .titan/blueprint.json
+print(result.prompt);  // .titan/blueprint-prompt.md
+
+// Or get raw data without writing files
+final jsonString = export.toJsonString();
+final aiPrompt = export.toAiPrompt();
+```
+
+### Strategy 3: Offline CLI Export
+
+Export a Blueprint from previously saved Shade session files — useful for CI/CD pipelines or team-shared session archives:
+
+```bash
+cd packages/titan_colossus
+
+# Basic export (default: .titan/sessions → .titan/)
+fvm dart run titan_colossus:export_blueprint
+
+# Full options
+fvm dart run titan_colossus:export_blueprint \
+  --sessions-dir .titan/sessions \
+  --output-dir .titan \
+  --patterns /quest/:id,/hero/:heroId \
+  --intensity thorough
+
+# AI prompt only (skip JSON)
+fvm dart run titan_colossus:export_blueprint --prompt-only
+```
+
+The CLI tool:
+1. Loads all JSON session files from `--sessions-dir`
+2. Feeds them through Scout analysis
+3. Generates Stratagems via Gauntlet
+4. Writes `blueprint.json` and `blueprint-prompt.md` to `--output-dir`
+
+### Strategy 4: MCP Server
+
+The Blueprint MCP Server exposes Blueprint data directly to AI assistants via the [Model Context Protocol](https://modelcontextprotocol.io/):
+
+```json
+// .vscode/settings.json
+{
+  "github.copilot.chat.mcpServers": {
+    "titan-blueprint": {
+      "command": "dart",
+      "args": ["run", "titan_colossus:blueprint_mcp_server"],
+      "cwd": "${workspaceFolder}/packages/titan_colossus"
+    }
+  }
+}
+```
+
+Available MCP tools:
+
+| Tool | Description |
+|------|-------------|
+| `get_terrain` | Full navigation graph (json, mermaid, or ai_map format) |
+| `get_stratagems` | Generated test plans, filterable by route |
+| `get_ai_prompt` | AI-ready Markdown summary of the entire Blueprint |
+| `get_dead_ends` | Screens with no outgoing transitions |
+| `get_unreliable_routes` | Transitions with low reliability scores |
+| `get_route_patterns` | Registered parameterized route patterns |
+
+The MCP server reads from `.titan/blueprint.json` and caches results until the file changes on disk.
+
+### BlueprintExport Data Structure
+
+The exported `blueprint.json` contains:
+
+```json
+{
+  "version": "1.0.0",
+  "exportedAt": "2025-03-15T10:30:00.000Z",
+  "terrain": { /* Full Terrain graph with Outposts & Marches */ },
+  "aiMap": "APP TERRAIN MAP\n===============\n...",
+  "mermaid": "graph LR\n  home[/home] -->|tap| quest_list[/quests]\n...",
+  "stratagems": [ /* Generated test plans */ ],
+  "lineage": {
+    "patterns": ["/quest/:id", "/hero/:heroId"],
+    "totalScreens": 12,
+    "totalTransitions": 18,
+    "sessionsAnalyzed": 47
+  },
+  "verdicts": [ /* Previous test results (if available) */ ],
+  "debrief": { /* Aggregated analysis (if verdicts exist) */ },
+  "metadata": { "source": "offline", "sessionsAnalyzed": 47 }
+}
+```
+
+### Loading Exported Data
+
+Read back a saved Blueprint programmatically:
+
+```dart
+// Load terrain from a blueprint.json file
+final terrain = await BlueprintExportIO.loadTerrain(
+  '.titan/blueprint.json',
+);
+
+// Load sessions from a directory of JSON files
+final sessions = await BlueprintExportIO.loadSessions(
+  '.titan/sessions',
+);
+
+// Re-analyze with fresh settings
+final export = BlueprintExport.fromSessions(
+  sessions: sessions,
+  routePatterns: ['/quest/:id'],
+  intensity: GauntletIntensity.thorough,
+);
+```
+
+---
+
 ## Testing
 
 ```bash
-cd packages/titan_colossus && flutter test  # 303+ tests
+cd packages/titan_colossus && fvm flutter test  # 1197+ tests
 ```
 
 ---

@@ -32,6 +32,7 @@
 library;
 
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:titan/titan.dart';
@@ -125,8 +126,8 @@ class Atlas {
   /// Route guards.
   final List<Sentinel> _sentinels;
 
-  /// Navigation observers.
-  final List<AtlasObserver> _observers;
+  /// Navigation observers (insertion-ordered, O(1) dedup).
+  final Set<AtlasObserver> _observers;
 
   /// Global redirect function.
   final String? Function(String path, Waypoint waypoint)? _drift;
@@ -177,8 +178,8 @@ class Atlas {
     String initialPath = '/',
     Shift? defaultShift,
     Listenable? refreshListenable,
-  }) : _sentinels = sentinels,
-       _observers = observers,
+  }) : _sentinels = List<Sentinel>.of(sentinels),
+       _observers = LinkedHashSet<AtlasObserver>.of(observers),
        _drift = drift,
        _onError = onError,
        _initialPath = initialPath,
@@ -724,6 +725,62 @@ class Atlas {
   static bool hasRoute(String path) {
     _ensureInstance();
     return _instance!._trie.match(path) != null;
+  }
+
+  // -------------------------------------------------------------------------
+  // Dynamic observer management
+  // -------------------------------------------------------------------------
+
+  /// Whether an [Atlas] instance is currently active.
+  ///
+  /// Use this to safely check before calling Atlas APIs that throw
+  /// when no instance exists.
+  ///
+  /// ```dart
+  /// if (Atlas.isActive) {
+  ///   Atlas.go('/home');
+  /// }
+  /// ```
+  static bool get isActive => _instance != null;
+
+  /// Add an [AtlasObserver] dynamically at runtime.
+  ///
+  /// Useful for plugins that need to observe navigation events
+  /// without requiring constructor-time registration.
+  ///
+  /// ```dart
+  /// final observer = MyObserver();
+  /// Atlas.addObserver(observer);
+  /// // ... later ...
+  /// Atlas.removeObserver(observer);
+  /// ```
+  static void addObserver(AtlasObserver observer) {
+    _ensureInstance();
+    _instance!._observers.add(observer);
+  }
+
+  /// Remove a previously added [AtlasObserver].
+  ///
+  /// No-op if the observer was not registered.
+  static void removeObserver(AtlasObserver observer) {
+    _ensureInstance();
+    _instance!._observers.remove(observer);
+  }
+
+  /// All registered route patterns.
+  ///
+  /// Returns the route patterns from the route trie.
+  /// Useful for discovery tools that need to know declared routes.
+  ///
+  /// ```dart
+  /// final patterns = Atlas.registeredPatterns;
+  /// for (final p in patterns) {
+  ///   print(p); // '/home', '/user/:id', '/settings'
+  /// }
+  /// ```
+  static List<String> get registeredPatterns {
+    _ensureInstance();
+    return _instance!._trie.patterns;
   }
 
   static void _ensureInstance() {

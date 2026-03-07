@@ -320,4 +320,4 @@ The `main.dart` never changed between environments. The plugin list was the sing
 
 ---
 
-| [← Chapter LII: The Cartographer's Table](chapter-52-the-cartographers-table.md) |
+| [← Chapter LII: The Cartographer's Table](chapter-52-the-cartographers-table.md) | [Chapter LIV: The Scout Surveys →](chapter-54-the-scout-surveys.md) |

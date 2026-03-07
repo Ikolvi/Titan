@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'glyph.dart';
+import 'tableau.dart';
+
 // ---------------------------------------------------------------------------
 // Imprint — Recorded interaction event
 // ---------------------------------------------------------------------------
@@ -121,6 +124,14 @@ class Imprint {
   /// Associates text input events with a specific text field.
   final String? fieldId;
 
+  /// Index into the session's [ShadeSession.tableaux] list.
+  ///
+  /// When non-null, indicates which [Tableau] (screen snapshot)
+  /// was active at the time this Imprint was recorded. This lets
+  /// AI consumers correlate each gesture with the screen state
+  /// that was visible when the user performed it.
+  final int? tableauIndex;
+
   /// Creates an [Imprint] from a recorded event.
   const Imprint({
     required this.type,
@@ -145,6 +156,7 @@ class Imprint {
     this.composingExtent,
     this.textInputAction,
     this.fieldId,
+    this.tableauIndex,
   });
 
   /// Converts this imprint to a JSON-serializable map.
@@ -171,6 +183,7 @@ class Imprint {
     if (composingExtent != null) 'compExtent': composingExtent,
     if (textInputAction != null) 'action': textInputAction,
     if (fieldId != null) 'fieldId': fieldId,
+    if (tableauIndex != null) 'tIdx': tableauIndex,
   };
 
   /// Creates an [Imprint] from a deserialized map.
@@ -198,6 +211,7 @@ class Imprint {
       composingExtent: map['compExtent'] as int?,
       textInputAction: map['action'] as int?,
       fieldId: map['fieldId'] as String?,
+      tableauIndex: map['tIdx'] as int?,
     );
   }
 
@@ -205,6 +219,28 @@ class Imprint {
   String toString() =>
       'Imprint(${type.name}, ($positionX, $positionY), '
       '${timestamp.inMilliseconds}ms)';
+
+  /// Resolve which [Glyph] this Imprint targeted on the given [Tableau].
+  ///
+  /// Uses the Imprint's position to hit-test against the Tableau's
+  /// Glyphs. Returns the interactive Glyph at the event position,
+  /// or `null` if no interactive element was found.
+  ///
+  /// ```dart
+  /// final glyph = imprint.resolveTargetGlyph(tableau);
+  /// print('User tapped: ${glyph?.label}');
+  /// ```
+  Glyph? resolveTargetGlyph(Tableau tableau) {
+    // Only pointer events have meaningful positions
+    if (positionX == 0 && positionY == 0) return null;
+
+    // Try interactive elements first (most useful for AI)
+    final interactive = tableau.glyphAt(positionX, positionY);
+    if (interactive != null) return interactive;
+
+    // Fall back to any element at position
+    return tableau.anyGlyphAt(positionX, positionY);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +366,17 @@ class ShadeSession {
   /// screen, which would produce invalid results.
   final String? startRoute;
 
+  /// Ordered screen snapshots captured during the session.
+  ///
+  /// Each [Tableau] is a snapshot of the visible widget tree at a
+  /// specific moment. Imprints reference Tableaux via their
+  /// [Imprint.tableauIndex] field, letting AI consumers see exactly
+  /// what was on screen when each gesture occurred.
+  ///
+  /// Empty when Tableau capture is disabled (the default for
+  /// backward compatibility).
+  final List<Tableau> tableaux;
+
   /// Creates a [ShadeSession] with metadata and recorded events.
   const ShadeSession({
     required this.id,
@@ -342,6 +389,7 @@ class ShadeSession {
     required this.imprints,
     this.description,
     this.startRoute,
+    this.tableaux = const [],
   });
 
   /// The total number of recorded events.
@@ -360,6 +408,8 @@ class ShadeSession {
     if (description != null) 'description': description,
     if (startRoute != null) 'startRoute': startRoute,
     'imprints': List.generate(imprints.length, (i) => imprints[i].toMap()),
+    if (tableaux.isNotEmpty)
+      'tableaux': List.generate(tableaux.length, (i) => tableaux[i].toMap()),
   };
 
   /// Serializes this session to a JSON string.
@@ -383,6 +433,10 @@ class ShadeSession {
       imprints: (map['imprints'] as List)
           .map((e) => Imprint.fromMap(e as Map<String, dynamic>))
           .toList(),
+      tableaux: (map['tableaux'] as List?)
+              ?.map((e) => Tableau.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
     );
   }
 
@@ -395,4 +449,282 @@ class ShadeSession {
   String toString() =>
       'ShadeSession($name, $eventCount events, '
       '${duration.inMilliseconds}ms)';
+
+  // -----------------------------------------------------------------------
+  // AI Output Generators
+  // -----------------------------------------------------------------------
+
+  /// Generate a natural-language flow description for AI agents.
+  ///
+  /// Walks through the session's [Imprint]s and [Tableau]x, producing
+  /// a human+AI-readable narrative of what happened, what changed,
+  /// and what was on screen at each step.
+  ///
+  /// ```dart
+  /// final description = session.generateFlowDescription();
+  /// // Send to AI: "Here's what the user did..."
+  /// ```
+  String generateFlowDescription() {
+    final buffer = StringBuffer();
+    buffer.writeln(
+      'Session: $name (${(duration.inMilliseconds / 1000).toStringAsFixed(1)}s, '
+      '$eventCount events, ${tableaux.length} tableaux)',
+    );
+    if (startRoute != null) buffer.writeln('Start Route: $startRoute');
+    buffer.writeln();
+
+    // Track which tableaux we've described
+    final describedTableaux = <int>{};
+    int lastTableauIndex = -1;
+
+    // Describe the initial Tableau if available
+    if (tableaux.isNotEmpty) {
+      _describeTableau(buffer, tableaux.first, null, 'Initial Screen');
+      describedTableaux.add(0);
+      lastTableauIndex = 0;
+    }
+
+    // Walk through significant imprints
+    int stepNumber = 0;
+    for (var i = 0; i < imprints.length; i++) {
+      final imprint = imprints[i];
+
+      // Only describe significant events
+      if (!_isSignificantForFlow(imprint)) continue;
+
+      stepNumber++;
+      final seconds =
+          (imprint.timestamp.inMilliseconds / 1000).toStringAsFixed(1);
+
+      // Describe the action
+      final actionDescription = _describeAction(imprint, i);
+      buffer.writeln('═══ Step $stepNumber [${seconds}s]: $actionDescription ═══');
+
+      // Resolve what was tapped
+      if (imprint.tableauIndex != null &&
+          imprint.tableauIndex! < tableaux.length) {
+        final glyph = imprint.resolveTargetGlyph(
+          tableaux[imprint.tableauIndex!],
+        );
+        if (glyph != null) {
+          buffer.writeln(
+            'Target: ${glyph.widgetType} "${glyph.label ?? "?"}" '
+            'at (${glyph.centerX.round()}, ${glyph.centerY.round()})',
+          );
+        }
+      }
+
+      // Show text input content
+      if (imprint.type == ImprintType.textInput && imprint.text != null) {
+        final fieldName = imprint.fieldId ?? 'text field';
+        buffer.writeln('  "$fieldName" ← "${imprint.text}"');
+      }
+
+      buffer.writeln();
+
+      // Describe the Tableau that follows this imprint
+      if (imprint.tableauIndex != null) {
+        final nextTableauIndex = imprint.tableauIndex! + 1;
+        if (nextTableauIndex < tableaux.length &&
+            !describedTableaux.contains(nextTableauIndex)) {
+          final prevTableau =
+              lastTableauIndex >= 0 ? tableaux[lastTableauIndex] : null;
+          _describeTableau(
+            buffer,
+            tableaux[nextTableauIndex],
+            prevTableau,
+            'After Step $stepNumber',
+          );
+          describedTableaux.add(nextTableauIndex);
+          lastTableauIndex = nextTableauIndex;
+        }
+      }
+    }
+
+    // Describe final Tableau if not yet described
+    if (tableaux.length > 1 &&
+        !describedTableaux.contains(tableaux.length - 1)) {
+      final prevTableau =
+          lastTableauIndex >= 0 ? tableaux[lastTableauIndex] : null;
+      _describeTableau(
+        buffer,
+        tableaux.last,
+        prevTableau,
+        'Final Screen',
+      );
+    }
+
+    return buffer.toString().trimRight();
+  }
+
+  /// Export as structured JSON optimized for AI agent consumption.
+  ///
+  /// Returns a map containing:
+  /// - Session metadata
+  /// - Tableaux with Glyph details
+  /// - Significant actions with resolved targets
+  /// - Screen diffs between steps
+  ///
+  /// ```dart
+  /// final spec = session.toAiTestSpec();
+  /// final json = jsonEncode(spec);
+  /// // Feed to AI for test generation
+  /// ```
+  Map<String, dynamic> toAiTestSpec() {
+    final steps = <Map<String, dynamic>>[];
+    int stepNumber = 0;
+
+    for (var i = 0; i < imprints.length; i++) {
+      final imprint = imprints[i];
+      if (!_isSignificantForFlow(imprint)) continue;
+
+      stepNumber++;
+      final step = <String, dynamic>{
+        'step': stepNumber,
+        'action': _actionName(imprint),
+        'timestampMs': imprint.timestamp.inMilliseconds,
+        'position': {
+          'x': imprint.positionX.round(),
+          'y': imprint.positionY.round(),
+        },
+      };
+
+      // Resolve target Glyph
+      if (imprint.tableauIndex != null &&
+          imprint.tableauIndex! < tableaux.length) {
+        final glyph = imprint.resolveTargetGlyph(
+          tableaux[imprint.tableauIndex!],
+        );
+        if (glyph != null) {
+          step['target'] = {
+            'widgetType': glyph.widgetType,
+            'label': glyph.label,
+            'interactionType': glyph.interactionType,
+            if (glyph.fieldId != null) 'fieldId': glyph.fieldId,
+            if (glyph.key != null) 'key': glyph.key,
+            if (glyph.semanticRole != null) 'semanticRole': glyph.semanticRole,
+            'isEnabled': glyph.isEnabled,
+          };
+        }
+      }
+
+      // Text input data
+      if (imprint.type == ImprintType.textInput) {
+        step['text'] = imprint.text;
+        if (imprint.fieldId != null) step['fieldId'] = imprint.fieldId;
+      }
+
+      steps.add(step);
+    }
+
+    return {
+      'session': {
+        'name': name,
+        'id': id,
+        'durationMs': duration.inMilliseconds,
+        'eventCount': eventCount,
+        'startRoute': startRoute,
+        'screenWidth': screenWidth,
+        'screenHeight': screenHeight,
+      },
+      'tableaux': [
+        for (var i = 0; i < tableaux.length; i++)
+          {
+            'index': i,
+            'route': tableaux[i].route,
+            'summary': tableaux[i].summary,
+            'interactiveElements': tableaux[i].interactiveGlyphs.length,
+            'totalElements': tableaux[i].glyphs.length,
+            if (i > 0)
+              'diff': tableaux[i - 1].diff(tableaux[i]).toString(),
+          },
+      ],
+      'steps': steps,
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // Private helpers for flow description
+  // -----------------------------------------------------------------------
+
+  void _describeTableau(
+    StringBuffer buffer,
+    Tableau tableau,
+    Tableau? previous,
+    String label,
+  ) {
+    buffer.writeln('═══ Tableau #${tableau.index} — $label ═══');
+    if (tableau.route != null) {
+      if (previous != null &&
+          previous.route != null &&
+          previous.route != tableau.route) {
+        buffer.writeln('Route: ${tableau.route} (was ${previous.route})');
+      } else {
+        buffer.writeln('Route: ${tableau.route}');
+      }
+    }
+
+    if (previous != null) {
+      // Show diff from previous
+      final diff = previous.diff(tableau);
+      if (diff.hasChanges) {
+        buffer.writeln(diff.toString());
+      } else {
+        // Show current elements if no diff
+        _describeGlyphs(buffer, tableau);
+      }
+    } else {
+      _describeGlyphs(buffer, tableau);
+    }
+    buffer.writeln();
+  }
+
+  void _describeGlyphs(StringBuffer buffer, Tableau tableau) {
+    for (final glyph in tableau.glyphs.take(20)) {
+      final suffix = <String>[];
+      if (glyph.isInteractive && !glyph.isEnabled) suffix.add('disabled');
+      if (glyph.isInteractive && glyph.isEnabled) suffix.add('enabled');
+      if (glyph.currentValue != null) suffix.add(glyph.currentValue!);
+
+      final suffixStr = suffix.isNotEmpty ? ' [${suffix.join(", ")}]' : '';
+      buffer.writeln(
+        '  ${glyph.widgetType}: "${glyph.label ?? "?"}"$suffixStr',
+      );
+    }
+    if (tableau.glyphs.length > 20) {
+      buffer.writeln('  ... and ${tableau.glyphs.length - 20} more');
+    }
+  }
+
+  bool _isSignificantForFlow(Imprint imprint) {
+    return switch (imprint.type) {
+      ImprintType.pointerDown => true,
+      ImprintType.pointerUp => false, // paired with down
+      ImprintType.pointerScroll => true,
+      ImprintType.textInput => true,
+      ImprintType.textAction => true,
+      ImprintType.keyDown => false, // text events cover this
+      _ => false,
+    };
+  }
+
+  String _describeAction(Imprint imprint, int index) {
+    return switch (imprint.type) {
+      ImprintType.pointerDown => 'Tap',
+      ImprintType.pointerScroll => 'Scroll',
+      ImprintType.textInput => 'Text Input',
+      ImprintType.textAction => 'Text Action',
+      _ => imprint.type.name,
+    };
+  }
+
+  String _actionName(Imprint imprint) {
+    return switch (imprint.type) {
+      ImprintType.pointerDown => 'tap',
+      ImprintType.pointerScroll => 'scroll',
+      ImprintType.textInput => 'enterText',
+      ImprintType.textAction => 'textAction',
+      _ => imprint.type.name,
+    };
+  }
 }

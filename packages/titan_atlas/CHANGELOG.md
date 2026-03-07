@@ -5,6 +5,19 @@ All notable changes to the Titan packages will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-03-06
+
+### Added
+- **`Atlas.isActive`** — Static getter to check whether an Atlas instance exists. Enables safe conditional integration by external packages (e.g., `ColossusPlugin` auto-wiring).
+- **`Atlas.addObserver()`** — Dynamically register an `AtlasObserver` at runtime without constructor-time registration. Deduplicates automatically.
+- **`Atlas.removeObserver()`** — Dynamically unregister a previously added `AtlasObserver`. No-op if observer was not registered.
+- **`Atlas.registeredPatterns`** — Returns all declared route patterns from the route trie. Enables discovery tools to know the app's route structure.
+- **`RouteTrie.patterns`** — Getter that recursively collects all registered patterns (static, dynamic, wildcard) from the trie.
+
+### Changed
+- **`_observers`** — Internal storage changed from `List` to `LinkedHashSet` for O(1) deduplication while preserving insertion order.
+- **`_sentinels`** — Internal storage now uses `List.of()` for mutable copy, preventing `UnsupportedError` on `const []` default.
+
 ## [1.0.3] - 2026-03-04
 
 ### Changed

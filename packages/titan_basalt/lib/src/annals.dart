@@ -127,6 +127,15 @@ class Annals {
   static final Queue<AnnalEntry> _entries = Queue<AnnalEntry>();
   static StreamController<AnnalEntry>? _controller;
 
+  /// Secondary index: pillarType → entries for O(1) type-scoped queries.
+  static final Map<String, List<AnnalEntry>> _byPillarType = {};
+
+  /// Whether the secondary index is enabled.
+  ///
+  /// Enabled automatically when [enable] is called with `indexed: true`.
+  static bool get isIndexed => _indexed;
+  static bool _indexed = false;
+
   /// Lazily creates the broadcast StreamController.
   static StreamController<AnnalEntry> get _activeController {
     var c = _controller;
@@ -148,9 +157,21 @@ class Annals {
   ///
   /// When enabled, calls to [record] store entries and emit them
   /// through [stream].
-  static void enable({int maxEntries = 10000}) {
+  ///
+  /// Set [indexed] to `true` to maintain a secondary index on
+  /// [AnnalEntry.pillarType] for O(1) type-scoped queries. The index
+  /// costs one hash-map insertion per [record] but eliminates linear
+  /// scans for the most common query pattern:
+  ///
+  /// ```dart
+  /// Annals.enable(indexed: true);
+  /// // Later:
+  /// Annals.query(pillarType: 'AccountPillar'); // O(1) lookup
+  /// ```
+  static void enable({int maxEntries = 10000, bool indexed = false}) {
     _enabled = true;
     _maxEntries = maxEntries;
+    _indexed = indexed;
   }
 
   /// Disable the audit trail.
@@ -188,9 +209,17 @@ class Annals {
 
     _entries.addLast(entry);
 
+    // Maintain secondary index.
+    if (_indexed && entry.pillarType != null) {
+      _byPillarType.putIfAbsent(entry.pillarType!, () => []).add(entry);
+    }
+
     // Evict oldest when over capacity — O(1) with Queue.removeFirst().
     while (_entries.length > _maxEntries) {
-      _entries.removeFirst();
+      final evicted = _entries.removeFirst();
+      if (_indexed && evicted.pillarType != null) {
+        _byPillarType[evicted.pillarType!]?.remove(evicted);
+      }
     }
 
     final c = _controller;
@@ -242,6 +271,39 @@ class Annals {
       return true;
     }
 
+    // Index fast-path: pillarType-only query with no other filters.
+    if (_indexed &&
+        pillarType != null &&
+        coreName == null &&
+        action == null &&
+        userId == null &&
+        after == null &&
+        before == null) {
+      final indexed = _byPillarType[pillarType];
+      if (indexed == null || indexed.isEmpty) return const [];
+      if (limit != null && limit > 0 && limit < indexed.length) {
+        return indexed.sublist(indexed.length - limit);
+      }
+      return List.of(indexed);
+    }
+
+    // Index-assisted: pillarType filter with additional filters.
+    // Start from the narrower index instead of scanning all entries.
+    if (_indexed && pillarType != null) {
+      final indexed = _byPillarType[pillarType];
+      if (indexed == null || indexed.isEmpty) return const [];
+      if (limit != null && limit > 0) {
+        final collected = <AnnalEntry>[];
+        for (var i = indexed.length - 1;
+            i >= 0 && collected.length < limit;
+            i--) {
+          if (matches(indexed[i])) collected.add(indexed[i]);
+        }
+        return collected.reversed.toList();
+      }
+      return indexed.where(matches).toList();
+    }
+
     // Fast path: when limit is specified, collect the last N matches
     // by iterating backwards.
     if (limit != null && limit > 0) {
@@ -282,6 +344,76 @@ class Annals {
     return filtered.map((e) => e.toMap()).toList();
   }
 
+  /// Export entries directly to a [StringSink] as a JSON array.
+  ///
+  /// Avoids building an intermediate `List<Map>` — writes entries
+  /// one-by-one to the provided sink. For 100K entries this is
+  /// significantly faster and uses less peak memory.
+  ///
+  /// ```dart
+  /// final buffer = StringBuffer();
+  /// Annals.exportToBuffer(buffer);
+  /// final json = buffer.toString();
+  /// ```
+  static void exportToBuffer(
+    StringSink sink, {
+    String? pillarType,
+    DateTime? after,
+    DateTime? before,
+  }) {
+    final filtered = query(
+      pillarType: pillarType,
+      after: after,
+      before: before,
+    );
+
+    sink.write('[');
+    for (var i = 0; i < filtered.length; i++) {
+      if (i > 0) sink.write(',');
+      _writeEntryJson(sink, filtered[i]);
+    }
+    sink.write(']');
+  }
+
+  /// Write a single entry as JSON to a [StringSink].
+  static void _writeEntryJson(StringSink sink, AnnalEntry e) {
+    sink.write('{"coreName":"');
+    sink.write(_escapeJson(e.coreName));
+    sink.write('"');
+    if (e.pillarType != null) {
+      sink.write(',"pillarType":"');
+      sink.write(_escapeJson(e.pillarType!));
+      sink.write('"');
+    }
+    sink.write(',"oldValue":"');
+    sink.write(_escapeJson('${e.oldValue}'));
+    sink.write('","newValue":"');
+    sink.write(_escapeJson('${e.newValue}'));
+    sink.write('","timestamp":"');
+    sink.write(e.timestamp.toIso8601String());
+    sink.write('"');
+    if (e.action != null) {
+      sink.write(',"action":"');
+      sink.write(_escapeJson(e.action!));
+      sink.write('"');
+    }
+    if (e.userId != null) {
+      sink.write(',"userId":"');
+      sink.write(_escapeJson(e.userId!));
+      sink.write('"');
+    }
+    sink.write('}');
+  }
+
+  static String _escapeJson(String s) {
+    return s
+        .replaceAll(r'\', r'\\')
+        .replaceAll('"', r'\"')
+        .replaceAll('\n', r'\n')
+        .replaceAll('\r', r'\r')
+        .replaceAll('\t', r'\t');
+  }
+
   // ---------------------------------------------------------------------------
   // Management
   // ---------------------------------------------------------------------------
@@ -289,6 +421,7 @@ class Annals {
   /// Clear all audit entries.
   static void clear() {
     _entries.clear();
+    _byPillarType.clear();
   }
 
   /// Reset the audit system completely.
@@ -296,7 +429,9 @@ class Annals {
   /// Clears all entries and disables auditing.
   static void reset() {
     _entries.clear();
+    _byPillarType.clear();
     _enabled = false;
+    _indexed = false;
     _maxEntries = 10000;
   }
 
@@ -308,7 +443,9 @@ class Annals {
     _controller?.close();
     _controller = null;
     _entries.clear();
+    _byPillarType.clear();
     _enabled = false;
+    _indexed = false;
     _maxEntries = 10000;
   }
 }

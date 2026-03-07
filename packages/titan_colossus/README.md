@@ -25,8 +25,18 @@ Colossus — named after the Colossus of Rhodes, a representation of the Titan H
 | Gesture Recording | **Shade** | Record user interactions as replayable macros |
 | Gesture Replay | **Phantom** | Replay recorded sessions with synthetic events |
 | Debug Overlay | **Lens** | In-app debug overlay with extensible plugin tabs |
-| Lens Tabs | **Lens Tab** | Auto-registered "Perf" and "Shade" tabs in Lens |
+| Lens Tabs | **Lens Tab** | Auto-registered "Perf", "Shade", and "Blueprint" tabs |
 | Route Integration | **Atlas Observer** | Automatic page load timing via Atlas |
+| AI Test Discovery | **Scout** | Passive session analyzer building a flow graph |
+| Flow Graph | **Terrain** | Screen/transition map with dead-end & reliability detection |
+| Edge-Case Tests | **Gauntlet** | Auto-generate targeted Stratagems for any screen |
+| Test Execution | **Campaign** | Multi-route test orchestrator with setup/teardown |
+| Test Results | **Verdict** / **Debrief** | Per-step results & aggregated analysis with fix suggestions |
+| Blueprint Overlay | **Blueprint Tab** | Interactive Lens tab for AI-assisted test generation |
+| Auto-Integration | **ColossusPlugin** | Zero-code Atlas + Shade → Scout wiring |
+| Blueprint Export | **BlueprintExport** | Export Terrain, Stratagems & Verdicts to JSON/Markdown for AI assistants |
+| Export CLI | **export_blueprint** | Offline Blueprint export from saved Shade sessions |
+| MCP Server | **blueprint_mcp_server** | Model Context Protocol server for Copilot/Claude integration |
 
 ## Quick Start
 
@@ -49,6 +59,12 @@ void main() {
       plugins: [
         if (kDebugMode) ColossusPlugin(
           tremors: [Tremor.fps(), Tremor.leaks()],
+          // AI Blueprint Generation — all enabled by default
+          enableTableauCapture: true,   // Shade records screen metadata
+          autoLearnSessions: true,      // Shade → Scout auto-feed
+          autoAtlasIntegration: true,   // Auto-wire Atlas observer & routes
+          // AI-Bridge Export — auto-save Blueprint on app shutdown
+          blueprintExportDirectory: '.titan',
         ),
       ],
       child: MaterialApp.router(routerConfig: atlas.config),
@@ -57,7 +73,7 @@ void main() {
 }
 ```
 
-One line to add, one line to remove. ColossusPlugin handles `Colossus.init()`, wraps with `Lens` and `ShadeListener`, and calls `Colossus.shutdown()` on dispose.
+One line to add, one line to remove. ColossusPlugin handles `Colossus.init()`, wraps with `Lens` and `ShadeListener`, auto-wires Atlas observer, feeds Shade recordings into Scout, and calls `Colossus.shutdown()` on dispose.
 
 ### Manual initialization (alternative)
 
@@ -112,6 +128,22 @@ That's it. Colossus auto-registers its Lens tab and begins monitoring.
 | `PhantomResult` | 📊 | Replay outcome statistics |
 | `ShadeListener` | 👂 | Transparent widget capturing pointer events |
 | `ColossusPlugin` | 🔌 | One-line Beacon plugin for full Colossus integration |
+| `Scout` | 🔭 | Passive session analyzer — builds flow graph from recordings |
+| `Terrain` | 🗺️ | Screen/transition graph with dead-end & reliability detection |
+| `Outpost` | 🏕️ | Single screen node in the Terrain graph |
+| `March` | 🚶 | Directed edge between two Outposts (navigation transition) |
+| `Lineage` | 🧬 | Resolves parameterized routes (e.g. `/quest/:id` → `/quest/42`) |
+| `RouteParameterizer` | 📐 | Registers known route patterns for Lineage resolution |
+| `Gauntlet` | ⚔️ | Auto-generates edge-case Stratagems for any Outpost |
+| `Stratagem` | 📋 | Single test scenario: steps, setup, teardown, expected outcomes |
+| `Campaign` | 🎯 | Multi-route test orchestrator with setup/teardown lifecycle |
+| `Verdict` | ⚖️ | Per-step test result with outcome and diagnostics |
+| `Debrief` | 📝 | Aggregated campaign analysis with fix suggestions |
+| `Signet` | 🔖 | Type-safe screen identifier for Outpost lookup |
+| `BlueprintLensTab` | 🗂️ | Interactive Lens tab with 5 sub-tabs for Blueprint data |
+| `BlueprintExport` | 📦 | Structured export container for Terrain, Stratagems & Verdicts |
+| `BlueprintExportIO` | 💾 | File I/O for saving/loading Blueprint exports |
+| `BlueprintSaveResult` | ✅ | Result object from `saveAll()` with JSON and prompt paths |
 
 ## Usage
 
@@ -337,6 +369,195 @@ The `fieldId` parameter enables accurate text replay — Phantom matches
 recorded text events to the correct field by ID. Without `fieldId`,
 Phantom falls back to injecting text into the currently focused field.
 
+### Scout — AI Test Discovery
+
+Scout passively analyzes Shade sessions to build a **Terrain** — a live map of
+every screen the user visited and every transition between them:
+
+```dart
+final scout = Scout.instance;
+
+// Analyze a completed recording session
+scout.analyzeSession(session);
+
+// Access the discovered terrain
+final terrain = scout.terrain;
+print(terrain.outposts.length);  // Number of unique screens
+print(terrain.marches.length);   // Number of transitions
+
+// Export as Mermaid diagram or AI-ready map
+final mermaid = terrain.toMermaid();
+final aiMap = terrain.toAiMap();
+```
+
+Scout learns incrementally — each new session enriches the existing Terrain
+with new routes, transitions, and reliability data.
+
+### Terrain — Flow Graph
+
+Terrain is a directed graph of **Outposts** (screens) connected by **Marches**
+(transitions). It auto-detects dead-ends, low-reliability edges, and orphaned screens:
+
+```dart
+final terrain = scout.terrain;
+
+// Find a specific screen
+final quest = terrain.findOutpost('/quest/details');
+
+// Check screen health
+print(quest?.deadEnd);         // true if no outgoing transitions
+print(quest?.visitCount);     // How many times the screen was visited
+print(quest?.reliability);    // Transition success rate (0.0 → 1.0)
+```
+
+### Gauntlet — Edge-Case Test Generation
+
+Gauntlet auto-generates **Stratagems** (test plans) targeting weak spots
+discovered by Scout:
+
+```dart
+final gauntlet = Gauntlet(terrain: scout.terrain);
+
+// Generate stratagems for a specific screen
+final stratagems = gauntlet.forOutpost('/quest/details');
+
+// Generate stratagems for the entire terrain
+final all = gauntlet.forAll();
+
+for (final s in all) {
+  print('${s.name}: ${s.steps.length} steps');
+}
+```
+
+### Campaign — Test Execution
+
+Campaign orchestrates multi-step test runs with lifecycle management:
+
+```dart
+final campaign = Campaign(
+  stratagems: gauntlet.forAll(),
+  onSetup: () async => initTestEnvironment(),
+  onTeardown: () async => cleanupTestEnvironment(),
+);
+
+final debrief = await campaign.execute();
+
+print(debrief.passRate);           // e.g. 0.85
+print(debrief.failedVerdicts);     // List of failed step results
+print(debrief.fixSuggestions);     // AI-ready fix recommendations
+```
+
+### Lineage — Route Resolution
+
+Lineage resolves parameterized routes back to their registered patterns:
+
+```dart
+final parameterizer = RouteParameterizer();
+parameterizer.registerPattern('/quest/:id');
+parameterizer.registerPattern('/hero/:heroId/quest/:questId');
+
+final resolved = parameterizer.resolve('/quest/42');
+print(resolved); // '/quest/:id'
+```
+
+### Zero-Code Integration
+
+With `ColossusPlugin`, everything wires itself automatically:
+
+1. **Shade → Scout**: Every completed recording is auto-fed to Scout
+2. **Atlas → Scout**: Route patterns are pre-seeded from Atlas's trie
+3. **Atlas Observer**: Page-load timing via `ColossusAtlasObserver`
+4. **Shade.getCurrentRoute**: Auto-wired from Atlas for screen identification
+5. **Terrain Notifier**: UI auto-refreshes when new sessions are analyzed
+
+```dart
+// That's it — one plugin, zero manual wiring
+ColossusPlugin(
+  tremors: [Tremor.fps(), Tremor.leaks()],
+)
+```
+
+### Blueprint Lens Tab
+
+The Blueprint tab adds a 5-sub-tab interactive interface to the Lens overlay:
+
+- **Terrain** — Mermaid graph visualization, AI map export, conflict detection
+- **Stratagem** — Browse auto-generated test plans with expandable detail cards
+- **Verdict** — Step-by-step test results with pass/fail/skip rows
+- **Lineage** — Route resolution metrics and Signet analysis
+- **Campaign** — Campaign execution details with debrief summaries
+
+### BlueprintExport — AI-Bridge Export
+
+Export the complete Blueprint (Terrain + Stratagems + Verdicts) to disk
+so AI assistants like Copilot and Claude can consume it at IDE time:
+
+```dart
+// Live export from the current Scout state
+final export = BlueprintExport.fromScout(scout: Scout.instance);
+
+// Save to .titan/ directory
+await BlueprintExportIO.saveAll(export, directory: '.titan');
+// → .titan/blueprint.json       (structured data)
+// → .titan/blueprint-prompt.md  (AI-ready Markdown summary)
+```
+
+#### Auto-Export on App Shutdown
+
+Set `blueprintExportDirectory` on `ColossusPlugin` and Blueprint data is
+automatically exported when the app shuts down:
+
+```dart
+ColossusPlugin(
+  blueprintExportDirectory: '.titan',
+)
+```
+
+#### Offline Export from Saved Sessions
+
+Use the CLI tool to build a Blueprint from previously saved Shade sessions:
+
+```bash
+cd packages/titan_colossus
+
+# Basic export
+fvm dart run titan_colossus:export_blueprint
+
+# With options
+fvm dart run titan_colossus:export_blueprint \
+  --sessions-dir .titan/sessions \
+  --output-dir .titan \
+  --patterns /quest/:id,/hero/:heroId \
+  --intensity thorough
+
+# AI prompt only
+fvm dart run titan_colossus:export_blueprint --prompt-only
+```
+
+#### Blueprint MCP Server
+
+Expose Blueprint data to AI assistants via the Model Context Protocol:
+
+```json
+{
+  "github.copilot.chat.mcpServers": {
+    "titan-blueprint": {
+      "command": "dart",
+      "args": ["run", "titan_colossus:blueprint_mcp_server"],
+      "cwd": "${workspaceFolder}/packages/titan_colossus"
+    }
+  }
+}
+```
+
+Available MCP tools:
+- `get_terrain` — Full navigation graph (json, mermaid, or ai_map format)
+- `get_stratagems` — Generated test plans (filterable by route)
+- `get_ai_prompt` — AI-ready Markdown summary
+- `get_dead_ends` — Screens with no outgoing transitions
+- `get_unreliable_routes` — Transitions with low reliability scores
+- `get_route_patterns` — Registered parameterized route patterns
+
 ## Ecosystem Integration
 
 | System | Integration |
@@ -345,8 +566,12 @@ Phantom falls back to injecting text into the currently focused field.
 | **Herald** | Emits `ColossusTremor` events for alerts |
 | **Chronicle** | Logs performance events and alerts |
 | **Vigil** | Reports alert violations with severity |
-| **Lens** | Auto-registered "Perf" debug tab |
-| **Atlas** | `ColossusAtlasObserver` for route timing |
+| **Lens** | Auto-registered "Perf", "Shade", and "Blueprint" tabs |
+| **Atlas** | Auto-wired observer, route pre-seeding, `getCurrentRoute` |
+| **Shade** | Auto-feeds completed recordings into Scout |
+| **Scout** | Builds Terrain from sessions, triggers `terrainNotifier` |
+| **BlueprintExport** | Bridges runtime data to IDE-time AI assistants |
+| **MCP Server** | Exposes Blueprint tools to Copilot/Claude |
 
 ## Architecture
 
@@ -358,11 +583,15 @@ Phantom falls back to injecting text into the currently focused field.
 │  Pulse   │  Stride  │  Vessel  │   Echo     │
 │  (FPS)   │ (Loads)  │ (Memory) │ (Rebuilds) │
 ├──────────┴──────────┴──────────┴────────────┤
-│        Shade         │       Inscribe       │
-│  (Record & Replay)   │  (Export Reports)    │
-├──────────────────────┴──────────────────────┤
-│              Tremor Engine                   │
-│        (Threshold evaluation loop)           │
+│  Shade (Record & Replay) │ Inscribe (Export)│
+├──────────────────────────┴──────────────────┤
+│            AI Blueprint Generation           │
+│  Scout → Terrain → Gauntlet → Campaign       │
+│  Lineage │ Stratagem │ Verdict │ Debrief     │
+├─────────────────────────────────────────────┤
+│              AI-Bridge Export                 │
+│  BlueprintExport │ ExportIO │ MCP Server     │
+│  CLI Tool │ Auto-Export │ AI Prompt          │
 ├──────────┬──────────┬──────────┬────────────┤
 │  Herald  │Chronicle │  Vigil   │   Lens     │
 │ (Events) │ (Logs)   │ (Errors) │  (UI Tab)  │

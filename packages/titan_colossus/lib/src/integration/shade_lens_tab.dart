@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:titan_bastion/titan_bastion.dart';
@@ -9,6 +11,9 @@ import '../export/inscribe_io.dart';
 import '../recording/imprint.dart';
 import '../recording/phantom.dart';
 import '../recording/shade_vault.dart';
+import '../recording/tableau.dart';
+import '../testing/stratagem.dart';
+import '../testing/verdict.dart';
 
 // ---------------------------------------------------------------------------
 // ShadeLensTab — Enhanced Lens Plugin for Shade v2
@@ -114,6 +119,23 @@ class _ShadeLensPillar extends Pillar {
 
   /// Whether the session library is expanded.
   late final showLibrary = core(false);
+
+  // -- Stratagem state ------------------------------------------------------
+
+  /// Whether the Stratagem section is expanded.
+  late final showStratagem = core(false);
+
+  /// JSON input for Stratagem editing.
+  late final stratagemJson = core('');
+
+  /// Whether a Stratagem is currently executing.
+  late final isExecutingStratagem = core(false);
+
+  /// The last Verdict from Stratagem execution.
+  late final lastVerdict = core<Verdict?>(null);
+
+  /// List of saved Verdicts for the step viewer.
+  late final savedVerdicts = core<List<Verdict>>([]);
 
   // -- Lifecycle ------------------------------------------------------------
 
@@ -367,6 +389,78 @@ class _ShadeLensPillar extends Pillar {
     }
   }
 
+  // -- Stratagem actions ----------------------------------------------------
+
+  /// Execute a Stratagem from the JSON input.
+  Future<void> executeStratagemFromJson() async {
+    if (stratagemJson.value.isEmpty) {
+      status.value = 'Paste a Stratagem JSON to execute';
+      return;
+    }
+
+    try {
+      final json = jsonDecode(stratagemJson.value) as Map<String, dynamic>;
+      final stratagem = Stratagem.fromJson(json);
+
+      isExecutingStratagem.value = true;
+      status.value = 'Executing Stratagem: ${stratagem.name}...';
+      Lens.hide();
+
+      final verdict = await colossus.executeStratagem(stratagem);
+
+      lastVerdict.value = verdict;
+      savedVerdicts.value = [...savedVerdicts.value, verdict];
+      isExecutingStratagem.value = false;
+      status.value = verdict.passed
+          ? '✅ Stratagem passed: ${verdict.summary.oneLiner}'
+          : '❌ Stratagem failed: ${verdict.summary.oneLiner}';
+    } on FormatException catch (e) {
+      status.value = 'Invalid JSON: $e';
+    } on Exception catch (e) {
+      isExecutingStratagem.value = false;
+      status.value = 'Stratagem error: $e';
+    }
+  }
+
+  /// Copy AI context to clipboard.
+  Future<void> copyAiContext() async {
+    final context = await colossus.getAiContext();
+    final text = const JsonEncoder.withIndent('  ').convert(context);
+    await Clipboard.setData(ClipboardData(text: text));
+    status.value = 'AI context copied to clipboard';
+  }
+
+  /// Copy Stratagem template to clipboard.
+  Future<void> copyStratagemTemplate() async {
+    final text = const JsonEncoder.withIndent('  ').convert(
+      Stratagem.template,
+    );
+    await Clipboard.setData(ClipboardData(text: text));
+    status.value = 'Stratagem template copied';
+  }
+
+  /// Copy last Verdict report to clipboard.
+  Future<void> copyVerdictReport() async {
+    final verdict = lastVerdict.value;
+    if (verdict == null) {
+      status.value = 'No Verdict to copy';
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: verdict.toReport()));
+    status.value = 'Verdict report copied';
+  }
+
+  /// Copy last Verdict AI diagnostic to clipboard.
+  Future<void> copyVerdictDiagnostic() async {
+    final verdict = lastVerdict.value;
+    if (verdict == null) {
+      status.value = 'No Verdict to copy';
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: verdict.toAiDiagnostic()));
+    status.value = 'Verdict AI diagnostic copied';
+  }
+
   Future<void> _loadSavedSessions() async {
     final vault = colossus.vault;
     if (vault == null) return;
@@ -438,6 +532,10 @@ class _ShadeTabContent extends StatelessWidget {
             _buildIntelligentWaitToggle(p),
             const SizedBox(height: 8),
             if (p.lastSession.value != null) _buildSessionInfo(p),
+            if (p.lastSession.value != null &&
+                p.lastSession.value!.tableaux.isNotEmpty)
+              _buildTableauViewer(p),
+            if (p.lastSession.value != null) _buildAiExportButton(p),
             if (p.isReplaying.value) _buildReplayProgress(p),
             if (p.lastResult.value != null && !p.isReplaying.value)
               _buildReplayResult(p),
@@ -445,6 +543,8 @@ class _ShadeTabContent extends StatelessWidget {
               const SizedBox(height: 8),
               _buildLibrarySection(p),
             ],
+            const SizedBox(height: 8),
+            _buildStratagemSection(p),
             if (p.status.value.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
@@ -759,6 +859,137 @@ Widget _buildRouteMismatchWarning(String message) {
               fontSize: 9,
               fontWeight: FontWeight.w600,
             ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// -----------------------------------------------------------------------
+// Tableau viewer
+// -----------------------------------------------------------------------
+
+Widget _buildTableauViewer(_ShadeLensPillar p) {
+  final session = p.lastSession.value!;
+  final tableaux = session.tableaux;
+
+  return Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.all(8),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: Colors.white12),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Tableaux',
+              style: TextStyle(
+                color: Colors.cyanAccent,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              '${tableaux.length} snapshots',
+              style: const TextStyle(color: Colors.white38, fontSize: 9),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ...tableaux.take(10).map((t) => _buildTableauRow(t)),
+        if (tableaux.length > 10)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '... and ${tableaux.length - 10} more',
+              style: const TextStyle(color: Colors.white30, fontSize: 9),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+Widget _buildTableauRow(Tableau tableau) {
+  final interactive = tableau.interactiveGlyphs.length;
+  final total = tableau.glyphs.length;
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      children: [
+        Container(
+          width: 18,
+          height: 18,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.cyanAccent.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Text(
+            '#${tableau.index}',
+            style: const TextStyle(
+              color: Colors.cyanAccent,
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            '${tableau.route ?? "?"} · $total elements ($interactive interactive)',
+            style: const TextStyle(color: Colors.white60, fontSize: 9),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// -----------------------------------------------------------------------
+// AI Export button
+// -----------------------------------------------------------------------
+
+Widget _buildAiExportButton(_ShadeLensPillar p) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.smart_toy_outlined,
+            label: 'Copy AI Flow',
+            color: Colors.cyanAccent,
+            onTap: () {
+              final session = p.lastSession.value!;
+              final description = session.generateFlowDescription();
+              Clipboard.setData(ClipboardData(text: description));
+              p.status.value = 'AI flow description copied to clipboard';
+            },
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.data_object,
+            label: 'Copy AI Spec',
+            color: Colors.cyanAccent,
+            onTap: () {
+              final session = p.lastSession.value!;
+              final spec = session.toAiTestSpec();
+              final json = const JsonEncoder.withIndent('  ').convert(spec);
+              Clipboard.setData(ClipboardData(text: json));
+              p.status.value = 'AI test spec copied to clipboard';
+            },
           ),
         ),
       ],
@@ -1281,4 +1512,290 @@ class _MetricCheckRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Stratagem UI Section
+// ---------------------------------------------------------------------------
+
+/// Build the Stratagem section — execute, view Verdicts, step viewer.
+Widget _buildStratagemSection(_ShadeLensPillar p) {
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.deepPurple.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: Colors.deepPurple.withValues(alpha: 0.3),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Header
+        InkWell(
+          onTap: () =>
+              p.showStratagem.value = !p.showStratagem.value,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                Icon(
+                  p.showStratagem.value
+                      ? Icons.expand_less
+                      : Icons.expand_more,
+                  size: 14,
+                  color: Colors.deepPurple.shade200,
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.science_outlined,
+                  size: 14,
+                  color: Colors.deepPurple.shade200,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Stratagem Engine',
+                  style: TextStyle(
+                    color: Colors.deepPurple.shade100,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+                const Spacer(),
+                if (p.lastVerdict.value != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.lastVerdict.value!.passed
+                          ? Colors.green.withValues(alpha: 0.2)
+                          : Colors.red.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      p.lastVerdict.value!.passed ? '✅ PASS' : '❌ FAIL',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: p.lastVerdict.value!.passed
+                            ? Colors.greenAccent
+                            : Colors.redAccent,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        if (p.showStratagem.value) ...[
+          const Divider(height: 1, color: Colors.white12),
+
+          // Action buttons row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                _ActionButton(
+                  label: 'Template',
+                  icon: Icons.copy,
+                  color: Colors.deepPurple.shade200,
+                  onTap: p.copyStratagemTemplate,
+                ),
+                _ActionButton(
+                  label: 'AI Context',
+                  icon: Icons.psychology,
+                  color: Colors.teal.shade200,
+                  onTap: p.copyAiContext,
+                ),
+                if (p.lastVerdict.value != null) ...[
+                  _ActionButton(
+                    label: 'Report',
+                    icon: Icons.description,
+                    color: Colors.amber.shade200,
+                    onTap: p.copyVerdictReport,
+                  ),
+                  _ActionButton(
+                    label: 'Diagnostic',
+                    icon: Icons.bug_report,
+                    color: Colors.orange.shade200,
+                    onTap: p.copyVerdictDiagnostic,
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Execute from JSON
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(
+              'Paste Stratagem JSON and tap Execute:',
+              style: TextStyle(
+                fontSize: 9,
+                color: Colors.white.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: TextField(
+              maxLines: 5,
+              style: const TextStyle(
+                fontSize: 9,
+                color: Colors.white70,
+                fontFamily: 'monospace',
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.all(6),
+                hintText: '{ "name": "...", "startRoute": "/", "steps": [] }',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  fontSize: 9,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+              ),
+              onChanged: (v) => p.stratagemJson.value = v,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: SizedBox(
+              height: 28,
+              child: ElevatedButton.icon(
+                onPressed: p.isExecutingStratagem.value
+                    ? null
+                    : p.executeStratagemFromJson,
+                icon: p.isExecutingStratagem.value
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.play_arrow, size: 14),
+                label: Text(
+                  p.isExecutingStratagem.value
+                      ? 'Executing...'
+                      : 'Execute Stratagem',
+                  style: const TextStyle(fontSize: 10),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
+            ),
+          ),
+
+          // Verdict step viewer
+          if (p.lastVerdict.value != null)
+            _buildVerdictStepViewer(p.lastVerdict.value!),
+        ],
+      ],
+    ),
+  );
+}
+
+/// Build a step-by-step Verdict viewer.
+Widget _buildVerdictStepViewer(Verdict verdict) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const Divider(height: 1, color: Colors.white12),
+      Padding(
+        padding: const EdgeInsets.all(8),
+        child: Text(
+          'Verdict: ${verdict.stratagemName} '
+          '(${verdict.summary.passedSteps}/${verdict.summary.totalSteps})',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      ...verdict.steps.map(_buildVerdictStepRow),
+    ],
+  );
+}
+
+/// Build a single Verdict step row.
+Widget _buildVerdictStepRow(VerdictStep step) {
+  final icon = switch (step.status) {
+    VerdictStepStatus.passed => '✅',
+    VerdictStepStatus.failed => '❌',
+    VerdictStepStatus.skipped => '⏭️',
+  };
+  final color = switch (step.status) {
+    VerdictStepStatus.passed => Colors.greenAccent,
+    VerdictStepStatus.failed => Colors.redAccent,
+    VerdictStepStatus.skipped => Colors.grey,
+  };
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 10)),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                '#${step.stepId}: ${step.description}',
+                style: TextStyle(color: color, fontSize: 9),
+              ),
+            ),
+            Text(
+              '${step.duration.inMilliseconds}ms',
+              style: TextStyle(
+                color: color.withValues(alpha: 0.6),
+                fontSize: 8,
+              ),
+            ),
+          ],
+        ),
+        if (step.resolvedTarget != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 18),
+            child: Text(
+              '→ ${step.resolvedTarget!.widgetType} '
+              '"${step.resolvedTarget!.label ?? "?"}"',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.3),
+                fontSize: 8,
+              ),
+            ),
+          ),
+        if (step.failure != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 18),
+            child: Text(
+              '${step.failure!.type.name}: ${step.failure!.message}',
+              style: const TextStyle(color: Colors.redAccent, fontSize: 8),
+            ),
+          ),
+      ],
+    ),
+  );
 }

@@ -177,4 +177,36 @@ class RouteTrie<T> {
   static List<String> _splitPath(String path) {
     return path.split('/').where((s) => s.isNotEmpty).toList(growable: false);
   }
+
+  /// All registered route patterns, sorted alphabetically.
+  ///
+  /// Walks the trie to collect every pattern that has a registered value.
+  ///
+  /// ```dart
+  /// final trie = RouteTrie<int>();
+  /// trie.insert('/home', 1);
+  /// trie.insert('/user/:id', 2);
+  /// trie.insert('/files/*', 3);
+  /// print(trie.patterns); // ['/files/*', '/home', '/user/:id']
+  /// ```
+  List<String> get patterns {
+    final result = <String>{};
+    _collectPatterns(_root, result);
+    return result.toList()..sort();
+  }
+
+  void _collectPatterns(_TrieNode<T> node, Set<String> result) {
+    if (node.pattern != null) {
+      result.add(node.pattern!);
+    }
+    for (final child in node.staticChildren.values) {
+      _collectPatterns(child, result);
+    }
+    if (node.paramChild != null) {
+      _collectPatterns(node.paramChild!, result);
+    }
+    if (node.wildcardChild != null) {
+      _collectPatterns(node.wildcardChild!, result);
+    }
+  }
 }

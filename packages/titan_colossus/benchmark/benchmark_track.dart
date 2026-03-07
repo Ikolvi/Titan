@@ -43,6 +43,7 @@ void main() {
     _runRecordingBenchmarks();
     _runExportBenchmarks();
     _runOverheadBenchmarks();
+    _runBlueprintBenchmarks();
     _isWarmup = false;
     _results.clear();
     warmupSw.stop();
@@ -59,6 +60,7 @@ void main() {
       _runRecordingBenchmarks();
       _runExportBenchmarks();
       _runOverheadBenchmarks();
+      _runBlueprintBenchmarks();
       for (final entry in _results.entries) {
         allSamples.putIfAbsent(entry.key, () => []).add(entry.value);
       }
@@ -706,6 +708,328 @@ void _runOverheadBenchmarks() {
       'overhead',
     );
   }
+}
+
+// =============================================================================
+// Blueprint Benchmarks (27–34)
+// =============================================================================
+
+void _runBlueprintBenchmarks() {
+  // 27. Scout.analyzeSession()
+  {
+    Scout.reset();
+    final terrain = Terrain();
+    final scout = Scout.withTerrain(terrain);
+
+    const sessions = 200;
+    const routeCount = 20;
+    final routes = [for (var i = 0; i < routeCount; i++) '/screen_$i'];
+
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < sessions; i++) {
+      scout.analyzeSession(_blueprintSession(
+        id: 's_$i',
+        routes: routes,
+      ));
+    }
+    sw.stop();
+    Scout.reset();
+
+    _record(
+      'Scout Analyze (200×20)',
+      sw.elapsedMicroseconds / sessions,
+      'µs/session',
+      'blueprint',
+    );
+  }
+
+  // 28. Terrain toJson (25 outposts)
+  {
+    Scout.reset();
+    final terrain = Terrain();
+    final scout = Scout.withTerrain(terrain);
+    for (var i = 0; i < 10; i++) {
+      scout.analyzeSession(_blueprintSession(
+        id: 'tj_$i',
+        routes: [for (var j = 0; j < 25; j++) '/screen_$j'],
+      ));
+    }
+    Scout.reset();
+
+    const count = 1000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      terrain.toJson();
+    }
+    sw.stop();
+
+    _record(
+      'Terrain toJson (25 outposts)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'blueprint',
+    );
+  }
+
+  // 29. Terrain fromJson
+  {
+    Scout.reset();
+    final terrain = Terrain();
+    final scout = Scout.withTerrain(terrain);
+    for (var i = 0; i < 10; i++) {
+      scout.analyzeSession(_blueprintSession(
+        id: 'tf_$i',
+        routes: [for (var j = 0; j < 25; j++) '/screen_$j'],
+      ));
+    }
+    Scout.reset();
+
+    final json = terrain.toJson();
+    const count = 1000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      Terrain.fromJson(json);
+    }
+    sw.stop();
+
+    _record(
+      'Terrain fromJson (25 outposts)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'blueprint',
+    );
+  }
+
+  // 30. Terrain graph queries (cached vs uncached)
+  {
+    Scout.reset();
+    final terrain = Terrain();
+    final scout = Scout.withTerrain(terrain);
+    for (var i = 0; i < 10; i++) {
+      scout.analyzeSession(_blueprintSession(
+        id: 'gq_$i',
+        routes: [for (var j = 0; j < 30; j++) '/screen_$j'],
+      ));
+    }
+    Scout.reset();
+
+    const count = 10000;
+
+    // unreliableMarches (now cached)
+    terrain.invalidateCache();
+    final sw1 = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      terrain.unreliableMarches;
+    }
+    sw1.stop();
+
+    _record(
+      'Terrain unreliableMarches (10K)',
+      sw1.elapsedMicroseconds / count,
+      'µs/op',
+      'blueprint',
+    );
+
+    // deadEnds (now cached)
+    terrain.invalidateCache();
+    final sw2 = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      terrain.deadEnds;
+    }
+    sw2.stop();
+
+    _record(
+      'Terrain deadEnds (10K)',
+      sw2.elapsedMicroseconds / count,
+      'µs/op',
+      'blueprint',
+    );
+  }
+
+  // 31. Gauntlet.generateFor()
+  {
+    Scout.reset();
+    final terrain = Terrain();
+    final scout = Scout.withTerrain(terrain);
+    for (var i = 0; i < 5; i++) {
+      scout.analyzeSession(_blueprintSession(
+        id: 'g_$i',
+        routes: [for (var j = 0; j < 10; j++) '/screen_$j'],
+      ));
+    }
+    Scout.reset();
+
+    final outpost = terrain.outposts.values.first;
+    const count = 1000;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      Gauntlet.generateFor(outpost);
+    }
+    sw.stop();
+
+    _record(
+      'Gauntlet generateFor (1K)',
+      sw.elapsedMicroseconds / count,
+      'µs/outpost',
+      'blueprint',
+    );
+  }
+
+  // 32. BlueprintExport toJson
+  {
+    Scout.reset();
+    final terrain = Terrain();
+    final scout = Scout.withTerrain(terrain);
+    for (var i = 0; i < 10; i++) {
+      scout.analyzeSession(_blueprintSession(
+        id: 'bj_$i',
+        routes: [for (var j = 0; j < 20; j++) '/screen_$j'],
+      ));
+    }
+
+    final export = BlueprintExport.fromScout(scout: scout);
+    Scout.reset();
+
+    const count = 100;
+    final sw = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      export.toJson();
+    }
+    sw.stop();
+
+    _record(
+      'BlueprintExport toJson (100)',
+      sw.elapsedMicroseconds / count,
+      'µs/op',
+      'blueprint',
+    );
+  }
+
+  // 33. BlueprintExport toCompactJsonString
+  {
+    Scout.reset();
+    final terrain = Terrain();
+    final scout = Scout.withTerrain(terrain);
+    for (var i = 0; i < 10; i++) {
+      scout.analyzeSession(_blueprintSession(
+        id: 'bc_$i',
+        routes: [for (var j = 0; j < 20; j++) '/screen_$j'],
+      ));
+    }
+
+    final export = BlueprintExport.fromScout(scout: scout);
+    Scout.reset();
+
+    const count = 100;
+
+    // Pretty-printed
+    final sw1 = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      export.toJsonString();
+    }
+    sw1.stop();
+
+    _record(
+      'BlueprintExport toJsonString (100)',
+      sw1.elapsedMicroseconds / count,
+      'µs/op',
+      'blueprint',
+    );
+
+    // Compact
+    final sw2 = Stopwatch()..start();
+    for (var i = 0; i < count; i++) {
+      export.toCompactJsonString();
+    }
+    sw2.stop();
+
+    _record(
+      'BlueprintExport toCompactJson (100)',
+      sw2.elapsedMicroseconds / count,
+      'µs/op',
+      'blueprint',
+    );
+  }
+
+  // 34. Full pipeline: sessions → Scout → Gauntlet → Export
+  {
+    const routeCount = 50;
+    const sessionCount = 50;
+    final routes = [for (var i = 0; i < routeCount; i++) '/screen_$i'];
+
+    final sw = Stopwatch()..start();
+    Scout.reset();
+    final terrain = Terrain();
+    final scout = Scout.withTerrain(terrain);
+    for (var i = 0; i < sessionCount; i++) {
+      scout.analyzeSession(_blueprintSession(
+        id: 'pipe_$i',
+        routes: routes,
+      ));
+    }
+    final export = BlueprintExport.fromScout(scout: scout);
+    export.toCompactJsonString();
+    Scout.reset();
+    sw.stop();
+
+    _record(
+      'Full Pipeline (50×50)',
+      sw.elapsedMilliseconds.toDouble(),
+      'ms',
+      'blueprint',
+    );
+  }
+}
+
+/// Helper: create a Blueprint benchmark session.
+ShadeSession _blueprintSession({
+  required String id,
+  required List<String> routes,
+}) {
+  return ShadeSession(
+    id: id,
+    name: 'bench-$id',
+    recordedAt: DateTime(2025),
+    duration: Duration(seconds: routes.length * 3),
+    screenWidth: 400,
+    screenHeight: 800,
+    devicePixelRatio: 2.0,
+    imprints: [
+      for (var i = 0; i < routes.length; i++)
+        Imprint(
+          type: ImprintType.pointerDown,
+          positionX: 100.0 + i,
+          positionY: 200.0 + i,
+          timestamp: Duration(milliseconds: i * 100),
+          tableauIndex: i,
+        ),
+    ],
+    tableaux: [
+      for (var i = 0; i < routes.length; i++)
+        Tableau(
+          index: i,
+          route: routes[i],
+          timestamp: Duration(seconds: i + 1),
+          screenWidth: 400,
+          screenHeight: 800,
+          glyphs: [
+            Glyph(
+              widgetType: 'ElevatedButton',
+              label: 'Button $i',
+              left: 0,
+              top: 0,
+              width: 100,
+              height: 48,
+              isInteractive: true,
+              interactionType: 'tap',
+              key: 'key_$i',
+              isEnabled: true,
+              depth: i,
+            ),
+          ],
+        ),
+    ],
+  );
 }
 
 // =============================================================================
