@@ -568,6 +568,19 @@ class _BlueprintMcpServer {
               },
             },
           },
+          {
+            'name': 'scry_diff',
+            'description':
+                'Compare the current screen state against the '
+                'previously observed state, showing what appeared, '
+                'disappeared, and changed. Useful after performing '
+                'an action to verify it had the expected effect. '
+                'Must call scry at least once beforehand. Returns '
+                'a structured diff showing route changes, screen '
+                'type transitions, new/removed elements, and '
+                'value changes.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
         ],
       },
       'id': id,
@@ -606,6 +619,7 @@ class _BlueprintMcpServer {
         'audit_screen' => await _auditScreen(toolArgs),
         'scry' => await _scry(),
         'scry_act' => await _scryAct(toolArgs),
+        'scry_diff' => await _scryDiff(),
         _ => 'Unknown tool: $toolName',
       };
 
@@ -1875,6 +1889,9 @@ class _BlueprintMcpServer {
   static const _screenAuditor = ScreenAuditor();
   static const _scryEngine = Scry();
 
+  /// Last observed [ScryGaze] for diff comparison.
+  static ScryGaze? _lastGaze;
+
   /// Automatically detect data-binding bugs via a full
   /// sign-out → re-login cycle.
   ///
@@ -2176,6 +2193,7 @@ class _BlueprintMcpServer {
       }
 
       final gaze = _scryEngine.observe(glyphs, route: route);
+      _lastGaze = gaze;
       return _scryEngine.formatGaze(gaze);
     } on SocketException {
       return '# Scry Failed\n\nCannot connect to Relay.';
@@ -2246,6 +2264,7 @@ class _BlueprintMcpServer {
 
       // Observe the new screen state
       final newGaze = await _observeCurrentScreen();
+      _lastGaze = newGaze;
 
       return _scryEngine.formatActionResult(
         action: action,
@@ -2327,6 +2346,7 @@ class _BlueprintMcpServer {
 
       // Observe the new screen state
       final newGaze = await _observeCurrentScreen();
+      _lastGaze = newGaze;
 
       return _scryEngine.formatMultiActionResult(
         actions: resolvedActions,
@@ -2337,6 +2357,36 @@ class _BlueprintMcpServer {
       return '# Scry Act Failed\n\nCannot connect to Relay.';
     } on TimeoutException {
       return '# Scry Act Failed\n\nRelay did not respond (timeout).';
+    }
+  }
+
+  /// Compare the current screen state against the last observation.
+  Future<String> _scryDiff() async {
+    final previousGaze = _lastGaze;
+    if (previousGaze == null) {
+      return '# Scry Diff Failed\n\n'
+          'No previous observation to compare against. '
+          'Call `scry` at least once before using `scry_diff`.';
+    }
+
+    try {
+      final currentGaze = await _observeCurrentScreen();
+      final diff = _scryEngine.diff(previousGaze, currentGaze);
+
+      // Update cached gaze to current
+      _lastGaze = currentGaze;
+
+      final buf = StringBuffer();
+      buf.write(diff.format());
+      buf.writeln();
+      buf.writeln('---');
+      buf.writeln();
+      buf.write(_scryEngine.formatGaze(currentGaze));
+      return buf.toString();
+    } on SocketException {
+      return '# Scry Diff Failed\n\nCannot connect to Relay.';
+    } on TimeoutException {
+      return '# Scry Diff Failed\n\nRelay did not respond (timeout).';
     }
   }
 

@@ -168,6 +168,7 @@ void main() {
 
     test('isAuthScreen detects login screens', () {
       const loginGaze = ScryGaze(
+        screenType: ScryScreenType.login,
         elements: [
           ScryElement(
             kind: ScryElementKind.field,
@@ -622,6 +623,7 @@ void main() {
 
     test('marks login screen', () {
       const gaze = ScryGaze(
+        screenType: ScryScreenType.login,
         elements: [
           ScryElement(
             kind: ScryElementKind.field,
@@ -1307,6 +1309,794 @@ void main() {
       expect(md, contains('❌ Actions Failed'));
       expect(md, contains('Element not found'));
       expect(md, contains('step 2'));
+    });
+  });
+
+  // ===================================================================
+  // ScryScreenType — Screen classification
+  // ===================================================================
+  group('ScryScreenType', () {
+    test('has all expected values', () {
+      expect(ScryScreenType.values, hasLength(9));
+      expect(ScryScreenType.values, contains(ScryScreenType.login));
+      expect(ScryScreenType.values, contains(ScryScreenType.form));
+      expect(ScryScreenType.values, contains(ScryScreenType.list));
+      expect(ScryScreenType.values, contains(ScryScreenType.detail));
+      expect(ScryScreenType.values, contains(ScryScreenType.settings));
+      expect(ScryScreenType.values, contains(ScryScreenType.empty));
+      expect(ScryScreenType.values, contains(ScryScreenType.error));
+      expect(ScryScreenType.values, contains(ScryScreenType.dashboard));
+      expect(ScryScreenType.values, contains(ScryScreenType.unknown));
+    });
+
+    test('detects login screen (fields + login button)', () {
+      final glyphs = [
+        glyph(
+          label: 'Username',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'username',
+        ),
+        glyph(
+          label: 'Sign In',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.login);
+    });
+
+    test('detects login screen with "Enter" button', () {
+      final glyphs = [
+        glyph(
+          label: 'Hero Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'hero_name',
+        ),
+        glyph(
+          label: 'Enter the Questboard',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.login);
+    });
+
+    test('detects form screen (multiple fields + submit)', () {
+      final glyphs = [
+        glyph(
+          label: 'First Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'first',
+        ),
+        glyph(
+          label: 'Last Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'last',
+        ),
+        glyph(
+          label: 'Email',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'email',
+        ),
+        glyph(label: 'Save', widgetType: 'ElevatedButton', interactive: true),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.form);
+    });
+
+    test('detects settings screen (toggles and switches)', () {
+      final glyphs = [
+        glyph(
+          label: 'Dark Mode',
+          widgetType: 'Switch',
+          interactive: true,
+          interactionType: 'switch',
+          currentValue: 'on',
+        ),
+        glyph(
+          label: 'Notifications',
+          widgetType: 'Switch',
+          interactive: true,
+          interactionType: 'switch',
+          currentValue: 'off',
+        ),
+        glyph(
+          label: 'Sound',
+          widgetType: 'Checkbox',
+          interactive: true,
+          interactionType: 'checkbox',
+          currentValue: 'true',
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.settings);
+    });
+
+    test('detects list screen (many content items)', () {
+      final glyphs = <Map<String, dynamic>>[];
+      for (var i = 0; i < 7; i++) {
+        glyphs.add(glyph(label: 'Item $i', widgetType: 'Text'));
+      }
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.list);
+    });
+
+    test('detects empty screen (no content, no fields)', () {
+      final glyphs = <Map<String, dynamic>>[];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.empty);
+    });
+
+    test('detects empty screen with just structural elements', () {
+      final glyphs = [
+        glyph(label: 'App Title', widgetType: 'Text', ancestors: ['AppBar']),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.empty);
+    });
+
+    test('returns unknown for ambiguous screens', () {
+      final glyphs = [
+        glyph(label: 'Some content'),
+        glyph(label: 'More text'),
+        glyph(
+          label: 'A button',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.unknown);
+    });
+  });
+
+  // ===================================================================
+  // ScryAlert — Error / Loading / Notice detection
+  // ===================================================================
+  group('ScryAlert detection', () {
+    test('detects loading indicators by widget type', () {
+      final glyphs = [
+        glyph(label: '', widgetType: 'CircularProgressIndicator'),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.alerts, hasLength(1));
+      expect(gaze.alerts.first.severity, ScryAlertSeverity.loading);
+      expect(gaze.alerts.first.message, contains('CircularProgressIndicator'));
+    });
+
+    test('detects loading indicator with label', () {
+      final glyphs = [
+        glyph(
+          label: 'Loading quests...',
+          widgetType: 'CircularProgressIndicator',
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.alerts, hasLength(1));
+      expect(gaze.alerts.first.severity, ScryAlertSeverity.loading);
+      expect(gaze.alerts.first.message, 'Loading quests...');
+    });
+
+    test('detects snackbar with error text as error', () {
+      final glyphs = [
+        glyph(
+          label: 'Error: Could not load data',
+          widgetType: 'Text',
+          ancestors: ['SnackBar', 'Scaffold'],
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.alerts, hasLength(1));
+      expect(gaze.alerts.first.severity, ScryAlertSeverity.error);
+      expect(gaze.alerts.first.message, 'Error: Could not load data');
+    });
+
+    test('detects snackbar with normal text as info', () {
+      final glyphs = [
+        glyph(
+          label: 'Quest completed!',
+          widgetType: 'Text',
+          ancestors: ['SnackBar', 'Scaffold'],
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.alerts, hasLength(1));
+      expect(gaze.alerts.first.severity, ScryAlertSeverity.info);
+      expect(gaze.alerts.first.message, 'Quest completed!');
+    });
+
+    test('detects MaterialBanner content', () {
+      final glyphs = [
+        glyph(
+          label: 'New update available',
+          widgetType: 'Text',
+          ancestors: ['MaterialBanner'],
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.alerts, hasLength(1));
+      expect(gaze.alerts.first.severity, ScryAlertSeverity.info);
+    });
+
+    test('detects error text content with keywords', () {
+      final glyphs = [glyph(label: 'Could not load data. Please try again')];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.alerts, hasLength(1));
+      expect(gaze.alerts.first.severity, ScryAlertSeverity.warning);
+    });
+
+    test('does not flag normal text as error', () {
+      final glyphs = [
+        glyph(label: 'Welcome to the app'),
+        glyph(label: 'Your profile is complete'),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.alerts, isEmpty);
+    });
+
+    test('isLoading returns true when loading alerts present', () {
+      final glyphs = [glyph(label: '', widgetType: 'LinearProgressIndicator')];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.isLoading, isTrue);
+      expect(gaze.hasErrors, isFalse);
+    });
+
+    test('hasErrors returns true when error alerts present', () {
+      final glyphs = [
+        glyph(
+          label: 'Error: Connection refused',
+          widgetType: 'Text',
+          ancestors: ['SnackBar'],
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.hasErrors, isTrue);
+      expect(gaze.isLoading, isFalse);
+    });
+
+    test('alert serializes to JSON', () {
+      const alert = ScryAlert(
+        severity: ScryAlertSeverity.error,
+        message: 'Something broke',
+        widgetType: 'SnackBar',
+      );
+      final json = alert.toJson();
+      expect(json['severity'], 'error');
+      expect(json['message'], 'Something broke');
+      expect(json['widgetType'], 'SnackBar');
+    });
+
+    test('de-duplicates identical alert messages', () {
+      // Two glyphs with the same text in a SnackBar
+      final glyphs = [
+        glyph(
+          label: 'Duplicate alert',
+          widgetType: 'Text',
+          ancestors: ['SnackBar'],
+        ),
+        glyph(
+          label: 'Duplicate alert',
+          widgetType: 'RichText',
+          ancestors: ['SnackBar'],
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      // Should only have 1 alert, not 2
+      expect(gaze.alerts, hasLength(1));
+    });
+  });
+
+  // ===================================================================
+  // ScryKeyValue — Key-value pair extraction
+  // ===================================================================
+  group('ScryKeyValue extraction', () {
+    test('extracts inline "Key: Value" patterns', () {
+      final glyphs = [
+        glyph(label: 'Class: Scout'),
+        glyph(label: 'Level: Novice'),
+        glyph(label: 'Glory: 0'),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.dataFields, hasLength(3));
+      expect(gaze.dataFields[0].key, 'Class');
+      expect(gaze.dataFields[0].value, 'Scout');
+      expect(gaze.dataFields[1].key, 'Level');
+      expect(gaze.dataFields[1].value, 'Novice');
+      expect(gaze.dataFields[2].key, 'Glory');
+      expect(gaze.dataFields[2].value, '0');
+    });
+
+    test('skips interactive elements for KV extraction', () {
+      final glyphs = [
+        glyph(label: 'Name: Kael', widgetType: 'TextField', interactive: true),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.dataFields, isEmpty);
+    });
+
+    test('skips long keys (> 30 chars)', () {
+      final glyphs = [
+        glyph(
+          label: 'This is a very long label that should not be a key: value',
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.dataFields, isEmpty);
+    });
+
+    test('extracts proximity-based pairs by Y alignment', () {
+      // Two text labels on the same row, left one short
+      final glyphs = [
+        {
+          'wt': 'Text',
+          'l': 'Name:',
+          'x': 16.0,
+          'y': 100.0,
+          'w': 60.0,
+          'h': 20.0,
+        },
+        {
+          'wt': 'Text',
+          'l': 'Kael',
+          'x': 80.0,
+          'y': 100.0,
+          'w': 50.0,
+          'h': 20.0,
+        },
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.dataFields, hasLength(1));
+      expect(gaze.dataFields.first.key, 'Name');
+      expect(gaze.dataFields.first.value, 'Kael');
+    });
+
+    test('does not pair labels on different rows', () {
+      final glyphs = [
+        {
+          'wt': 'Text',
+          'l': 'Status:',
+          'x': 16.0,
+          'y': 100.0,
+          'w': 60.0,
+          'h': 20.0,
+        },
+        {
+          'wt': 'Text',
+          'l': 'Active',
+          'x': 16.0,
+          'y': 150.0,
+          'w': 50.0,
+          'h': 20.0,
+        },
+      ];
+      final gaze = scry.observe(glyphs);
+      // "Status:" is an inline pattern that fails (no value after colon
+      // in the proximity pairing), but it should not pair with "Active"
+      // Since "Status:" by itself has no trailing value, the inline
+      // pattern won't match. And proximity fails due to Y diff (50px).
+      // Check no proximity pairs were created.
+      expect(
+        gaze.dataFields
+            .where((d) => d.key == 'Status' && d.value == 'Active')
+            .isEmpty,
+        isTrue,
+      );
+    });
+
+    test('KV pair serializes to JSON', () {
+      const kv = ScryKeyValue(key: 'Role', value: 'Admin');
+      final json = kv.toJson();
+      expect(json['key'], 'Role');
+      expect(json['value'], 'Admin');
+    });
+  });
+
+  // ===================================================================
+  // ScryDiff — State change detection
+  // ===================================================================
+  group('ScryDiff', () {
+    test('detects appeared elements', () {
+      final before = scry.observe([glyph(label: 'Hello')]);
+      final after = scry.observe([
+        glyph(label: 'Hello'),
+        glyph(label: 'World'),
+      ]);
+      final diff = scry.diff(before, after);
+      expect(diff.appeared, hasLength(1));
+      expect(diff.appeared.first.label, 'World');
+      expect(diff.disappeared, isEmpty);
+      expect(diff.hasChanges, isTrue);
+    });
+
+    test('detects disappeared elements', () {
+      final before = scry.observe([
+        glyph(label: 'Hello'),
+        glyph(label: 'World'),
+      ]);
+      final after = scry.observe([glyph(label: 'Hello')]);
+      final diff = scry.diff(before, after);
+      expect(diff.appeared, isEmpty);
+      expect(diff.disappeared, hasLength(1));
+      expect(diff.disappeared.first.label, 'World');
+    });
+
+    test('detects changed values', () {
+      final before = scry.observe([
+        glyph(label: 'Score', widgetType: 'Text', currentValue: '10'),
+      ]);
+      final after = scry.observe([
+        glyph(label: 'Score', widgetType: 'Text', currentValue: '20'),
+      ]);
+      final diff = scry.diff(before, after);
+      expect(diff.changedValues, hasLength(1));
+      expect(diff.changedValues['Score']!['from'], '10');
+      expect(diff.changedValues['Score']!['to'], '20');
+    });
+
+    test('detects route change', () {
+      final before = scry.observe([glyph(label: 'Page A')], route: '/a');
+      final after = scry.observe([glyph(label: 'Page B')], route: '/b');
+      final diff = scry.diff(before, after);
+      expect(diff.routeChanged, isTrue);
+      expect(diff.previousRoute, '/a');
+      expect(diff.currentRoute, '/b');
+    });
+
+    test('detects no route change when same', () {
+      final before = scry.observe([glyph(label: 'Page A')], route: '/a');
+      final after = scry.observe([glyph(label: 'Page A updated')], route: '/a');
+      final diff = scry.diff(before, after);
+      expect(diff.routeChanged, isFalse);
+    });
+
+    test('detects screen type change', () {
+      // Login screen
+      final before = scry.observe([
+        glyph(
+          label: 'Username',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'user',
+        ),
+        glyph(label: 'Log In', widgetType: 'ElevatedButton', interactive: true),
+      ]);
+      // After login: list screen
+      final after = scry.observe([
+        glyph(label: 'Item 1'),
+        glyph(label: 'Item 2'),
+        glyph(label: 'Item 3'),
+        glyph(label: 'Item 4'),
+        glyph(label: 'Item 5'),
+      ]);
+      final diff = scry.diff(before, after);
+      expect(diff.screenTypeChanged, isTrue);
+      expect(diff.previousScreenType, ScryScreenType.login);
+      expect(diff.currentScreenType, ScryScreenType.list);
+    });
+
+    test('hasChanges is false when nothing changed', () {
+      final glyphs = [glyph(label: 'Static content')];
+      final before = scry.observe(glyphs, route: '/x');
+      final after = scry.observe(glyphs, route: '/x');
+      final diff = scry.diff(before, after);
+      expect(diff.hasChanges, isFalse);
+    });
+
+    test('format produces readable markdown', () {
+      final before = scry.observe([
+        glyph(label: 'Old Button', interactive: true),
+      ], route: '/old');
+      final after = scry.observe([
+        glyph(label: 'New Text'),
+        glyph(label: 'New Button', interactive: true),
+      ], route: '/new');
+      final diff = scry.diff(before, after);
+      final md = diff.format();
+      expect(md, contains('What Changed'));
+      expect(md, contains('/old'));
+      expect(md, contains('/new'));
+      expect(md, contains('Appeared'));
+      expect(md, contains('Disappeared'));
+      expect(md, contains('Old Button'));
+      expect(md, contains('New Text'));
+      expect(md, contains('New Button'));
+    });
+
+    test('format handles empty diff', () {
+      final glyphs = [glyph(label: 'Static')];
+      final before = scry.observe(glyphs);
+      final after = scry.observe(glyphs);
+      final diff = scry.diff(before, after);
+      final md = diff.format();
+      expect(md, contains('No visible changes'));
+    });
+
+    test('diff serializes to JSON', () {
+      final before = scry.observe([glyph(label: 'AA')], route: '/a');
+      final after = scry.observe([glyph(label: 'BB')], route: '/b');
+      final diff = scry.diff(before, after);
+      final json = diff.toJson();
+      expect(json['routeChanged'], isTrue);
+      expect(json['previousRoute'], '/a');
+      expect(json['currentRoute'], '/b');
+      expect(json['hasChanges'], isTrue);
+      expect(json['appeared'], isA<List>());
+      expect(json['disappeared'], isA<List>());
+    });
+  });
+
+  // ===================================================================
+  // Action suggestions
+  // ===================================================================
+  group('Action suggestions', () {
+    test('suggests credentials on login screen', () {
+      final glyphs = [
+        glyph(
+          label: 'Hero Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'hero',
+        ),
+        glyph(
+          label: 'Enter the Questboard',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.suggestions, isNotEmpty);
+      expect(
+        gaze.suggestions.any(
+          (s) => s.contains('Hero Name') && s.contains('Enter the Questboard'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('suggests filling fields on form screen', () {
+      final glyphs = [
+        glyph(
+          label: 'First Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'f',
+        ),
+        glyph(
+          label: 'Last Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'l',
+        ),
+        glyph(label: 'Save', widgetType: 'ElevatedButton', interactive: true),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.suggestions, isNotEmpty);
+      expect(gaze.suggestions.any((s) => s.contains('Save')), isTrue);
+    });
+
+    test('suggests item tap on list screen', () {
+      final glyphs = <Map<String, dynamic>>[];
+      for (var i = 0; i < 6; i++) {
+        glyphs.add(glyph(label: 'Quest $i'));
+      }
+      final gaze = scry.observe(glyphs);
+      expect(gaze.suggestions.any((s) => s.contains('item')), isTrue);
+    });
+
+    test('warns about errors when error alerts present', () {
+      final glyphs = [
+        glyph(
+          label: 'Error: Connection refused',
+          widgetType: 'Text',
+          ancestors: ['SnackBar'],
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(
+        gaze.suggestions.any((s) => s.toLowerCase().contains('error')),
+        isTrue,
+      );
+    });
+
+    test('warns about loading state', () {
+      final glyphs = [
+        glyph(label: '', widgetType: 'CircularProgressIndicator'),
+        glyph(label: 'Some content'),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.suggestions.any((s) => s.contains('loading')), isTrue);
+    });
+
+    test('suggests navigation on dashboard screen', () {
+      final glyphs = [
+        glyph(label: 'Content 1'),
+        glyph(label: 'Content 2'),
+        glyph(label: 'Content 3'),
+        glyph(
+          label: 'Tab A',
+          widgetType: 'Text',
+          interactive: true,
+          ancestors: ['NavigationBar'],
+        ),
+        glyph(
+          label: 'Tab B',
+          widgetType: 'Text',
+          interactive: true,
+          ancestors: ['NavigationBar'],
+        ),
+        glyph(label: 'Action', widgetType: 'ElevatedButton', interactive: true),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.dashboard);
+      expect(gaze.suggestions, isNotEmpty);
+    });
+  });
+
+  // ===================================================================
+  // Updated formatGaze — new sections
+  // ===================================================================
+  group('formatGaze — intelligence sections', () {
+    test('includes screen type in header', () {
+      final glyphs = [
+        glyph(
+          label: 'Username',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'u',
+        ),
+        glyph(label: 'Log In', widgetType: 'ElevatedButton', interactive: true),
+      ];
+      final gaze = scry.observe(glyphs, route: '/login');
+      final md = scry.formatGaze(gaze);
+      expect(md, contains('**Type**: login'));
+    });
+
+    test('includes alerts section', () {
+      final glyphs = [
+        glyph(label: '', widgetType: 'CircularProgressIndicator'),
+      ];
+      final gaze = scry.observe(glyphs);
+      final md = scry.formatGaze(gaze);
+      expect(md, contains('⏳'));
+      expect(md, contains('loading'));
+    });
+
+    test('includes data fields section', () {
+      final glyphs = [
+        glyph(label: 'Class: Scout'),
+        glyph(label: 'Level: Novice'),
+      ];
+      final gaze = scry.observe(glyphs);
+      final md = scry.formatGaze(gaze);
+      expect(md, contains('📊 Data'));
+      expect(md, contains('**Class**: Scout'));
+      expect(md, contains('**Level**: Novice'));
+    });
+
+    test('includes suggestions section', () {
+      final glyphs = [
+        glyph(
+          label: 'Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'n',
+        ),
+        glyph(label: 'Submit', widgetType: 'ElevatedButton', interactive: true),
+        glyph(
+          label: 'Email',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'e',
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final md = scry.formatGaze(gaze);
+      expect(md, contains('💡 Suggestions'));
+    });
+
+    test('ScryGaze toJson includes new fields', () {
+      final glyphs = [
+        glyph(label: 'Class: Scout'),
+        glyph(label: '', widgetType: 'CircularProgressIndicator'),
+        glyph(
+          label: 'Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'n',
+        ),
+        glyph(label: 'Submit', widgetType: 'ElevatedButton', interactive: true),
+        glyph(
+          label: 'Other Field',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'o',
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final json = gaze.toJson();
+      expect(json['screenType'], isA<String>());
+      expect(json['alerts'], isA<List>());
+      expect(json['dataFields'], isA<List>());
+      expect(json['suggestions'], isA<List>());
+    });
+  });
+
+  // ===================================================================
+  // ScryAlertSeverity
+  // ===================================================================
+  group('ScryAlertSeverity', () {
+    test('has all expected values', () {
+      expect(ScryAlertSeverity.values, hasLength(4));
+      expect(ScryAlertSeverity.values, contains(ScryAlertSeverity.error));
+      expect(ScryAlertSeverity.values, contains(ScryAlertSeverity.warning));
+      expect(ScryAlertSeverity.values, contains(ScryAlertSeverity.info));
+      expect(ScryAlertSeverity.values, contains(ScryAlertSeverity.loading));
+    });
+  });
+
+  // ===================================================================
+  // Error screen type detection
+  // ===================================================================
+  group('ScryScreenType.error', () {
+    test('error screen detected when snackbar has error', () {
+      final glyphs = [
+        glyph(
+          label: 'Failed to load data',
+          widgetType: 'Text',
+          ancestors: ['SnackBar'],
+        ),
+        glyph(label: 'Some content'),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.error);
+    });
+
+    test('error takes precedence over login', () {
+      final glyphs = [
+        glyph(
+          label: 'Error: Invalid credentials',
+          widgetType: 'Text',
+          ancestors: ['SnackBar'],
+        ),
+        glyph(
+          label: 'Username',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'u',
+        ),
+        glyph(
+          label: 'Sign In',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      // Error takes precedence over login detection
+      expect(gaze.screenType, ScryScreenType.error);
+    });
+  });
+
+  // ===================================================================
+  // Detail screen type detection
+  // ===================================================================
+  group('ScryScreenType.detail', () {
+    test('detected when data fields present with no input fields', () {
+      final glyphs = [
+        glyph(label: 'Name: Kael'),
+        glyph(label: 'Class: Scout'),
+        glyph(label: 'Level: Novice'),
+        glyph(label: 'Edit', widgetType: 'ElevatedButton', interactive: true),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.screenType, ScryScreenType.detail);
+      expect(gaze.dataFields, hasLength(3));
     });
   });
 }

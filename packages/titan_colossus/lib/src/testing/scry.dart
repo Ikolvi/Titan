@@ -9,6 +9,284 @@
 // result, forming an autonomous agent loop.
 // ---------------------------------------------------------------------------
 
+// =========================================================================
+// ScryScreenType — Screen classification for AI context
+// =========================================================================
+
+/// The detected type of the current screen.
+///
+/// Helps the AI understand what kind of screen it's looking at,
+/// enabling smarter action selection without detailed screen analysis.
+///
+/// ```dart
+/// final gaze = scry.observe(glyphs);
+/// if (gaze.screenType == ScryScreenType.login) {
+///   // Enter credentials and tap login
+/// }
+/// ```
+enum ScryScreenType {
+  /// Login / authentication screen (fields + login button).
+  login,
+
+  /// Form screen (multiple fields + submit button).
+  form,
+
+  /// List screen (many similar content items, repeating patterns).
+  list,
+
+  /// Detail screen (single item with labels + values, back button).
+  detail,
+
+  /// Settings screen (toggles, switches, dropdowns).
+  settings,
+
+  /// Empty state (very few content elements, no data).
+  empty,
+
+  /// Error screen (error messages visible).
+  error,
+
+  /// Dashboard (mixed content types, stats, navigation).
+  dashboard,
+
+  /// Cannot be classified into a specific type.
+  unknown,
+}
+
+// =========================================================================
+// ScryAlert — Detected warnings, errors, and status indicators
+// =========================================================================
+
+/// The severity of a detected screen alert.
+///
+/// Used by [ScryAlert] to indicate how critical the detected
+/// condition is, helping the AI prioritize its response.
+enum ScryAlertSeverity {
+  /// Error condition (red text, error icon, failure message).
+  error,
+
+  /// Warning condition (yellow text, warning icon).
+  warning,
+
+  /// Informational notice (snackbar, toast, banner).
+  info,
+
+  /// Loading / in-progress state (spinner, progress bar).
+  loading,
+}
+
+/// A detected alert condition on the screen.
+///
+/// Represents errors, warnings, loading indicators, and
+/// informational messages that the AI should know about.
+///
+/// ```dart
+/// for (final alert in gaze.alerts) {
+///   if (alert.severity == ScryAlertSeverity.error) {
+///     print('Error detected: ${alert.message}');
+///   }
+/// }
+/// ```
+class ScryAlert {
+  /// Creates a [ScryAlert].
+  const ScryAlert({
+    required this.severity,
+    required this.message,
+    this.widgetType,
+  });
+
+  /// The severity level of this alert.
+  final ScryAlertSeverity severity;
+
+  /// Human-readable description of the alert (or the visible text).
+  final String message;
+
+  /// The widget type that triggered this detection.
+  final String? widgetType;
+
+  /// Serialize to JSON.
+  Map<String, dynamic> toJson() => {
+    'severity': severity.name,
+    'message': message,
+    if (widgetType != null) 'widgetType': widgetType,
+  };
+}
+
+// =========================================================================
+// ScryKeyValue — Detected data pairs on screen
+// =========================================================================
+
+/// A key-value pair detected by proximity grouping.
+///
+/// When a content label appears near a data value (like "Class:" next
+/// to "Scout"), Scry groups them into a [ScryKeyValue] for the AI
+/// to understand structured data displays.
+///
+/// ```dart
+/// for (final kv in gaze.dataFields) {
+///   print('${kv.key}: ${kv.value}');
+/// }
+/// ```
+class ScryKeyValue {
+  /// Creates a [ScryKeyValue].
+  const ScryKeyValue({required this.key, required this.value});
+
+  /// The label / key text.
+  final String key;
+
+  /// The value text.
+  final String value;
+
+  /// Serialize to JSON.
+  Map<String, dynamic> toJson() => {'key': key, 'value': value};
+}
+
+// =========================================================================
+// ScryDiff — State change detection between observations
+// =========================================================================
+
+/// The result of comparing two [ScryGaze] observations.
+///
+/// Used in the observe→act→observe loop to understand what
+/// changed after an action was performed.
+///
+/// ```dart
+/// final before = scry.observe(glyphsBefore);
+/// // ... perform action ...
+/// final after = scry.observe(glyphsAfter);
+/// final diff = scry.diff(before, after);
+///
+/// if (diff.routeChanged) {
+///   print('Navigated from ${diff.previousRoute} to ${diff.currentRoute}');
+/// }
+/// for (final e in diff.appeared) {
+///   print('New: ${e.label}');
+/// }
+/// ```
+class ScryDiff {
+  /// Creates a [ScryDiff].
+  const ScryDiff({
+    required this.appeared,
+    required this.disappeared,
+    required this.changedValues,
+    this.previousRoute,
+    this.currentRoute,
+    required this.previousScreenType,
+    required this.currentScreenType,
+  });
+
+  /// Elements now visible that were not visible before.
+  final List<ScryElement> appeared;
+
+  /// Elements no longer visible that were visible before.
+  final List<ScryElement> disappeared;
+
+  /// Elements whose [ScryElement.currentValue] changed.
+  ///
+  /// Each entry maps the element label to `{'from': old, 'to': new}`.
+  final Map<String, Map<String, String?>> changedValues;
+
+  /// Route before the action.
+  final String? previousRoute;
+
+  /// Route after the action.
+  final String? currentRoute;
+
+  /// Screen type before the action.
+  final ScryScreenType previousScreenType;
+
+  /// Screen type after the action.
+  final ScryScreenType currentScreenType;
+
+  /// Whether the route changed.
+  bool get routeChanged =>
+      previousRoute != null &&
+      currentRoute != null &&
+      previousRoute != currentRoute;
+
+  /// Whether the screen type changed.
+  bool get screenTypeChanged => previousScreenType != currentScreenType;
+
+  /// Whether anything changed at all.
+  bool get hasChanges =>
+      appeared.isNotEmpty ||
+      disappeared.isNotEmpty ||
+      changedValues.isNotEmpty ||
+      routeChanged;
+
+  /// Format as AI-readable markdown.
+  String format() {
+    final buf = StringBuffer();
+    buf.writeln('## 🔄 What Changed');
+    buf.writeln();
+
+    if (!hasChanges) {
+      buf.writeln('_No visible changes detected._');
+      return buf.toString();
+    }
+
+    if (routeChanged) {
+      buf.writeln('**Route**: `$previousRoute` → `$currentRoute`');
+    }
+    if (screenTypeChanged) {
+      buf.writeln(
+        '**Screen type**: ${previousScreenType.name}'
+        ' → ${currentScreenType.name}',
+      );
+    }
+
+    if (appeared.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('### ➕ Appeared (${appeared.length})');
+      for (final e in appeared) {
+        final extra = <String>[];
+        if (e.isInteractive) extra.add(e.kind.name);
+        if (e.currentValue != null) extra.add('value: "${e.currentValue}"');
+        final suffix = extra.isNotEmpty ? ' (${extra.join(', ')})' : '';
+        buf.writeln('- **${e.label}**$suffix');
+      }
+    }
+
+    if (disappeared.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('### ➖ Disappeared (${disappeared.length})');
+      for (final e in disappeared) {
+        buf.writeln('- ~~${e.label}~~');
+      }
+    }
+
+    if (changedValues.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('### ✏️ Changed Values (${changedValues.length})');
+      for (final entry in changedValues.entries) {
+        final from = entry.value['from'] ?? '(empty)';
+        final to = entry.value['to'] ?? '(empty)';
+        buf.writeln('- **${entry.key}**: "$from" → "$to"');
+      }
+    }
+
+    return buf.toString();
+  }
+
+  /// Serialize to JSON.
+  Map<String, dynamic> toJson() => {
+    if (previousRoute != null) 'previousRoute': previousRoute,
+    if (currentRoute != null) 'currentRoute': currentRoute,
+    'routeChanged': routeChanged,
+    'screenTypeChanged': screenTypeChanged,
+    'previousScreenType': previousScreenType.name,
+    'currentScreenType': currentScreenType.name,
+    'appeared': appeared.map((e) => e.toJson()).toList(),
+    'disappeared': disappeared.map((e) => e.toJson()).toList(),
+    'changedValues': changedValues,
+    'hasChanges': hasChanges,
+  };
+}
+
+// =========================================================================
+// ScryElementKind — Element classification
+// =========================================================================
+
 /// The kind of screen element detected from a glyph.
 ///
 /// Used by [ScryElement] to categorize glyphs into groups that
@@ -143,7 +421,15 @@ class ScryElement {
 /// ```
 class ScryGaze {
   /// Creates a [ScryGaze].
-  const ScryGaze({required this.elements, this.route, this.glyphCount = 0});
+  const ScryGaze({
+    required this.elements,
+    this.route,
+    this.glyphCount = 0,
+    this.screenType = ScryScreenType.unknown,
+    this.alerts = const [],
+    this.dataFields = const [],
+    this.suggestions = const [],
+  });
 
   /// All detected elements.
   final List<ScryElement> elements;
@@ -153,6 +439,18 @@ class ScryGaze {
 
   /// Total number of raw glyphs analyzed.
   final int glyphCount;
+
+  /// Detected screen type.
+  final ScryScreenType screenType;
+
+  /// Detected alerts (errors, warnings, loading indicators).
+  final List<ScryAlert> alerts;
+
+  /// Detected key-value data pairs on screen.
+  final List<ScryKeyValue> dataFields;
+
+  /// AI-generated action suggestions for the current screen.
+  final List<String> suggestions;
 
   /// Interactive buttons (tappable, non-navigation).
   List<ScryElement> get buttons =>
@@ -178,22 +476,33 @@ class ScryGaze {
   List<ScryElement> get gated => elements.where((e) => e.gated).toList();
 
   /// Whether this looks like an authentication/login screen.
-  bool get isAuthScreen =>
-      fields.isNotEmpty &&
-      buttons.any((b) => _loginButtonPattern.hasMatch(b.label.toLowerCase()));
+  bool get isAuthScreen => screenType == ScryScreenType.login;
 
   static final _loginButtonPattern = RegExp(
     r'\b(log\s*in|sign\s*in|enter|submit|continue)\b',
   );
 
+  /// Whether errors are present on screen.
+  bool get hasErrors =>
+      alerts.any((a) => a.severity == ScryAlertSeverity.error);
+
+  /// Whether loading is in progress.
+  bool get isLoading =>
+      alerts.any((a) => a.severity == ScryAlertSeverity.loading);
+
   /// Serialize to JSON.
   Map<String, dynamic> toJson() => {
     if (route != null) 'route': route,
     'glyphCount': glyphCount,
+    'screenType': screenType.name,
     'buttonCount': buttons.length,
     'fieldCount': fields.length,
     'navigationCount': navigation.length,
     'contentCount': content.length,
+    if (alerts.isNotEmpty) 'alerts': alerts.map((a) => a.toJson()).toList(),
+    if (dataFields.isNotEmpty)
+      'dataFields': dataFields.map((d) => d.toJson()).toList(),
+    if (suggestions.isNotEmpty) 'suggestions': suggestions,
     'elements': elements.map((e) => e.toJson()).toList(),
   };
 }
@@ -396,10 +705,22 @@ class Scry {
       );
     }
 
+    final elementList = seen.values.toList();
+
+    // --- Pass 3: Intelligence layer ---
+    final alerts = _detectAlerts(glyphs);
+    final dataFields = _extractKeyValuePairs(glyphs);
+    final screenType = _classifyScreen(elementList, alerts, dataFields);
+    final suggestions = _generateSuggestions(elementList, screenType, alerts);
+
     return ScryGaze(
-      elements: seen.values.toList(),
+      elements: elementList,
       route: route,
       glyphCount: glyphs.length,
+      screenType: screenType,
+      alerts: alerts,
+      dataFields: dataFields,
+      suggestions: suggestions,
     );
   }
 
@@ -423,9 +744,10 @@ class Scry {
     buf.writeln('# Current Screen');
     buf.writeln();
 
-    // Header line
+    // Header line with screen type
     final parts = <String>[];
     if (gaze.route != null) parts.add('**Route**: ${gaze.route}');
+    parts.add('**Type**: ${gaze.screenType.name}');
     parts.add('${gaze.glyphCount} glyphs');
     buf.writeln(parts.join(' | '));
 
@@ -435,6 +757,20 @@ class Scry {
         '> **Login screen detected** — '
         'this screen has text fields and a login button.',
       );
+    }
+
+    // --- Alerts (errors, warnings, loading) ---
+    if (gaze.alerts.isNotEmpty) {
+      buf.writeln();
+      for (final alert in gaze.alerts) {
+        final icon = switch (alert.severity) {
+          ScryAlertSeverity.error => '🔴',
+          ScryAlertSeverity.warning => '🟡',
+          ScryAlertSeverity.info => '🔵',
+          ScryAlertSeverity.loading => '⏳',
+        };
+        buf.writeln('> $icon **${alert.severity.name}**: ${alert.message}');
+      }
     }
 
     // Gated elements warning
@@ -451,6 +787,26 @@ class Scry {
     }
 
     buf.writeln();
+
+    // --- Suggestions (context-aware) ---
+    if (gaze.suggestions.isNotEmpty) {
+      buf.writeln('## 💡 Suggestions');
+      buf.writeln();
+      for (final s in gaze.suggestions) {
+        buf.writeln('- $s');
+      }
+      buf.writeln();
+    }
+
+    // --- Data Fields (key-value pairs) ---
+    if (gaze.dataFields.isNotEmpty) {
+      buf.writeln('## 📊 Data (${gaze.dataFields.length})');
+      buf.writeln();
+      for (final kv in gaze.dataFields) {
+        buf.writeln('- **${kv.key}**: ${kv.value}');
+      }
+      buf.writeln();
+    }
 
     // --- Fields (most important for input) ---
     if (gaze.fields.isNotEmpty) {
@@ -861,6 +1217,73 @@ class Scry {
   }
 
   // -----------------------------------------------------------------------
+  // Diff — State change detection
+  // -----------------------------------------------------------------------
+
+  /// Compare two [ScryGaze] observations to detect changes.
+  ///
+  /// Returns a [ScryDiff] describing what appeared, disappeared,
+  /// or changed between the [before] and [after] observations.
+  ///
+  /// This is the key enabler for the observe→act→observe agent loop:
+  /// the AI performs an action, then diffs the before/after states
+  /// to verify the action had the expected effect.
+  ///
+  /// ```dart
+  /// const scry = Scry();
+  /// final before = scry.observe(glyphsBefore);
+  /// // ... perform action ...
+  /// final after = scry.observe(glyphsAfter);
+  /// final diff = scry.diff(before, after);
+  ///
+  /// if (diff.routeChanged) {
+  ///   print('Navigation detected!');
+  /// }
+  /// ```
+  ScryDiff diff(ScryGaze before, ScryGaze after) {
+    final beforeLabels = <String, ScryElement>{
+      for (final e in before.elements) e.label: e,
+    };
+    final afterLabels = <String, ScryElement>{
+      for (final e in after.elements) e.label: e,
+    };
+
+    // Elements that appeared (in after, not in before)
+    final appeared = <ScryElement>[
+      for (final e in after.elements)
+        if (!beforeLabels.containsKey(e.label)) e,
+    ];
+
+    // Elements that disappeared (in before, not in after)
+    final disappeared = <ScryElement>[
+      for (final e in before.elements)
+        if (!afterLabels.containsKey(e.label)) e,
+    ];
+
+    // Values that changed (element exists in both, but value differs)
+    final changedValues = <String, Map<String, String?>>{};
+    for (final e in after.elements) {
+      final prev = beforeLabels[e.label];
+      if (prev != null && prev.currentValue != e.currentValue) {
+        changedValues[e.label] = {
+          'from': prev.currentValue,
+          'to': e.currentValue,
+        };
+      }
+    }
+
+    return ScryDiff(
+      appeared: appeared,
+      disappeared: disappeared,
+      changedValues: changedValues,
+      previousRoute: before.route,
+      currentRoute: after.route,
+      previousScreenType: before.screenType,
+      currentScreenType: after.screenType,
+    );
+  }
+
+  // -----------------------------------------------------------------------
   // Private helpers
   // -----------------------------------------------------------------------
 
@@ -960,5 +1383,415 @@ class Scry {
   bool _isGatedAction(String label) {
     final lower = label.toLowerCase();
     return gatedPatterns.any((p) => lower.contains(p));
+  }
+
+  // -----------------------------------------------------------------------
+  // Intelligence: Screen type detection
+  // -----------------------------------------------------------------------
+
+  /// Regex patterns for error-like text content.
+  static final _errorTextPattern = RegExp(
+    r'\b(error|failed|failure|invalid|denied|unauthorized|forbidden'
+    r'|not found|exception|could not|unable to|something went wrong'
+    r'|oops|try again|cannot)\b',
+    caseSensitive: false,
+  );
+
+  /// Regex patterns for loading indicator widget types.
+  static final _loadingWidgetPattern = RegExp(
+    r'CircularProgressIndicator|LinearProgressIndicator'
+    r'|RefreshProgressIndicator|CupertinoActivityIndicator'
+    r'|Shimmer|Skeleton',
+    caseSensitive: false,
+  );
+
+  /// Regex patterns for snackbar / toast / banner widgets.
+  static final _noticeWidgetPattern = RegExp(
+    r'SnackBar|MaterialBanner|Toast|Notification',
+    caseSensitive: false,
+  );
+
+  /// Classifications for the login button pattern.
+  static final _submitButtonPattern = RegExp(
+    r'\b(submit|save|confirm|apply|update|create|done|send'
+    r'|register|sign up|next|finish|complete)\b',
+    caseSensitive: false,
+  );
+
+  /// Classify the screen type from elements and context.
+  ScryScreenType _classifyScreen(
+    List<ScryElement> elements,
+    List<ScryAlert> alerts,
+    List<ScryKeyValue> dataFields,
+  ) {
+    final buttons = elements
+        .where((e) => e.kind == ScryElementKind.button)
+        .toList();
+    final fields = elements
+        .where((e) => e.kind == ScryElementKind.field)
+        .toList();
+    final nav = elements
+        .where((e) => e.kind == ScryElementKind.navigation)
+        .toList();
+    final content = elements
+        .where((e) => e.kind == ScryElementKind.content)
+        .toList();
+
+    // Error screen — error alerts present
+    if (alerts.any((a) => a.severity == ScryAlertSeverity.error)) {
+      return ScryScreenType.error;
+    }
+
+    // Login screen — fields + login button
+    if (fields.isNotEmpty &&
+        buttons.any(
+          (b) => ScryGaze._loginButtonPattern.hasMatch(b.label.toLowerCase()),
+        )) {
+      return ScryScreenType.login;
+    }
+
+    // Settings screen — toggles, switches, dropdowns
+    final toggleCount = elements.where((e) {
+      final it = e.interactionType;
+      return it == 'checkbox' ||
+          it == 'radio' ||
+          it == 'switch' ||
+          it == 'slider' ||
+          it == 'dropdown';
+    }).length;
+    if (toggleCount >= 2) {
+      return ScryScreenType.settings;
+    }
+
+    // Form screen — multiple fields + submit/save button
+    if (fields.length >= 2 &&
+        buttons.any((b) => _submitButtonPattern.hasMatch(b.label))) {
+      return ScryScreenType.form;
+    }
+
+    // Empty state — very few elements, no meaningful content
+    if (content.isEmpty && fields.isEmpty && buttons.length <= 1) {
+      return ScryScreenType.empty;
+    }
+
+    // List screen — many similar content items
+    if (content.length >= 5 && fields.isEmpty && dataFields.isEmpty) {
+      return ScryScreenType.list;
+    }
+
+    // Detail screen — data fields + limited buttons, possible back action
+    if (dataFields.length >= 2 && fields.isEmpty) {
+      return ScryScreenType.detail;
+    }
+
+    // Dashboard — mix of navigation, content, and buttons
+    if (nav.length >= 2 && content.length >= 3 && buttons.isNotEmpty) {
+      return ScryScreenType.dashboard;
+    }
+
+    return ScryScreenType.unknown;
+  }
+
+  // -----------------------------------------------------------------------
+  // Intelligence: Alert detection
+  // -----------------------------------------------------------------------
+
+  /// Detect errors, warnings, loading states, and notices from raw glyphs.
+  List<ScryAlert> _detectAlerts(List<dynamic> glyphs) {
+    final alerts = <ScryAlert>[];
+    final seenMessages = <String>{};
+
+    for (final g in glyphs) {
+      final glyph = g as Map<String, dynamic>;
+      final wt = glyph['wt'] as String? ?? '';
+      final label = (glyph['l'] as String? ?? '').trim();
+      final ancestors = glyph['anc'] as List<dynamic>? ?? [];
+      final ancestorStr = ancestors.join(' ');
+
+      // Loading indicators (by widget type)
+      if (_loadingWidgetPattern.hasMatch(wt)) {
+        final msg = label.isNotEmpty ? label : 'Loading indicator ($wt)';
+        if (seenMessages.add(msg)) {
+          alerts.add(
+            ScryAlert(
+              severity: ScryAlertSeverity.loading,
+              message: msg,
+              widgetType: wt,
+            ),
+          );
+        }
+        continue;
+      }
+
+      // Snackbar / MaterialBanner / Toast (by widget type or ancestor)
+      if (_noticeWidgetPattern.hasMatch(wt) ||
+          _noticeWidgetPattern.hasMatch(ancestorStr)) {
+        if (label.isNotEmpty && seenMessages.add(label)) {
+          // Classify as error if text contains error keywords
+          final severity = _errorTextPattern.hasMatch(label)
+              ? ScryAlertSeverity.error
+              : ScryAlertSeverity.info;
+          alerts.add(
+            ScryAlert(severity: severity, message: label, widgetType: wt),
+          );
+        }
+        continue;
+      }
+
+      // Error text detection (by content keywords)
+      // Only if the text is short enough to be a message (not paragraphs)
+      if (label.isNotEmpty &&
+          label.length < 200 &&
+          _errorTextPattern.hasMatch(label)) {
+        // Only flag as error if it's clearly an error message, not
+        // random content containing the word "error".
+        final lower = label.toLowerCase();
+        final isLikelyError =
+            lower.startsWith('error') ||
+            lower.startsWith('failed') ||
+            lower.startsWith('invalid') ||
+            lower.contains('try again') ||
+            lower.contains('went wrong') ||
+            lower.contains('could not') ||
+            lower.contains('unable to');
+
+        if (isLikelyError && seenMessages.add(label)) {
+          alerts.add(
+            ScryAlert(
+              severity: ScryAlertSeverity.warning,
+              message: label,
+              widgetType: wt,
+            ),
+          );
+        }
+      }
+    }
+
+    return alerts;
+  }
+
+  // -----------------------------------------------------------------------
+  // Intelligence: Key-value pair extraction
+  // -----------------------------------------------------------------------
+
+  /// Pattern for labels that look like "Key: Value" pairs.
+  static final _kvInlinePattern = RegExp(r'^(.+?):\s+(.+)$');
+
+  /// Extract key-value pairs from raw glyphs using two strategies:
+  ///
+  /// 1. **Inline** — "Class: Scout" is a single label with ": " separator.
+  /// 2. **Proximity** — "Class" at (x1, y1) and "Scout" at (x2, y2) where
+  ///    they share the same Y band (same row) and x2 > x1.
+  List<ScryKeyValue> _extractKeyValuePairs(List<dynamic> glyphs) {
+    final pairs = <ScryKeyValue>[];
+    final usedLabels = <String>{};
+
+    // --- Strategy 1: Inline "Key: Value" patterns ---
+    for (final g in glyphs) {
+      final glyph = g as Map<String, dynamic>;
+      final label = (glyph['l'] as String? ?? '').trim();
+      if (label.isEmpty) continue;
+
+      // Only consider non-interactive, non-structural text
+      if (glyph['ia'] == true) continue;
+
+      final match = _kvInlinePattern.firstMatch(label);
+      if (match != null) {
+        final key = match.group(1)!.trim();
+        final value = match.group(2)!.trim();
+        // Skip if key is too long (probably not a label:value pair)
+        if (key.length <= 30 && value.isNotEmpty) {
+          pairs.add(ScryKeyValue(key: key, value: value));
+          usedLabels.add(label);
+        }
+      }
+    }
+
+    // --- Strategy 2: Proximity-based pairing ---
+    // Collect non-interactive text glyphs with positions
+    final positioned = <({String label, double x, double y, double w})>[];
+    for (final g in glyphs) {
+      final glyph = g as Map<String, dynamic>;
+      final label = (glyph['l'] as String? ?? '').trim();
+      if (label.isEmpty || label.length < 2) continue;
+      if (glyph['ia'] == true) continue;
+      if (usedLabels.contains(label)) continue;
+
+      final x = (glyph['x'] as num?)?.toDouble();
+      final y = (glyph['y'] as num?)?.toDouble();
+      final w = (glyph['w'] as num?)?.toDouble();
+      if (x == null || y == null || w == null) continue;
+
+      positioned.add((label: label, x: x, y: y, w: w));
+    }
+
+    // Sort by y (rows), then x (left to right)
+    positioned.sort((a, b) {
+      final dy = a.y.compareTo(b.y);
+      return dy != 0 ? dy : a.x.compareTo(b.x);
+    });
+
+    // Find pairs where two labels share the same Y band
+    // and the "key" label is short (< 25 chars) and ends with ":"
+    for (var i = 0; i < positioned.length - 1; i++) {
+      final left = positioned[i];
+      final right = positioned[i + 1];
+
+      // Same row? Y within 8 logical pixels
+      if ((left.y - right.y).abs() > 8) continue;
+      // Right is to the right of left?
+      if (right.x <= left.x + left.w - 5) continue;
+
+      // Key candidate: short, possibly ends with ":"
+      final keyLabel = left.label;
+      final valueLabel = right.label;
+
+      if (keyLabel.length <= 25 &&
+          !usedLabels.contains(keyLabel) &&
+          !usedLabels.contains(valueLabel)) {
+        // Strip trailing colon if present
+        final cleanKey = keyLabel.endsWith(':')
+            ? keyLabel.substring(0, keyLabel.length - 1).trim()
+            : keyLabel;
+        if (cleanKey.isNotEmpty && valueLabel.isNotEmpty) {
+          pairs.add(ScryKeyValue(key: cleanKey, value: valueLabel));
+          usedLabels
+            ..add(keyLabel)
+            ..add(valueLabel);
+        }
+      }
+    }
+
+    return pairs;
+  }
+
+  // -----------------------------------------------------------------------
+  // Intelligence: Action suggestions
+  // -----------------------------------------------------------------------
+
+  /// Generate context-aware action suggestions.
+  List<String> _generateSuggestions(
+    List<ScryElement> elements,
+    ScryScreenType screenType,
+    List<ScryAlert> alerts,
+  ) {
+    final suggestions = <String>[];
+
+    // Alert-driven suggestions
+    if (alerts.any((a) => a.severity == ScryAlertSeverity.error)) {
+      suggestions.add(
+        'An error is visible — check the error message and '
+        'consider navigating back or retrying the action.',
+      );
+    }
+    if (alerts.any((a) => a.severity == ScryAlertSeverity.loading)) {
+      suggestions.add(
+        'The screen is loading — wait for the loading '
+        'indicator to disappear before interacting.',
+      );
+    }
+
+    final fields = elements
+        .where((e) => e.kind == ScryElementKind.field)
+        .toList();
+    final buttons = elements
+        .where((e) => e.kind == ScryElementKind.button)
+        .toList();
+    final nav = elements
+        .where((e) => e.kind == ScryElementKind.navigation)
+        .toList();
+
+    switch (screenType) {
+      case ScryScreenType.login:
+        final loginField = fields.isNotEmpty ? fields.first.label : 'the field';
+        final loginBtn = buttons
+            .where(
+              (b) =>
+                  ScryGaze._loginButtonPattern.hasMatch(b.label.toLowerCase()),
+            )
+            .firstOrNull;
+        suggestions.add(
+          'Enter credentials in "$loginField" and tap '
+          '"${loginBtn?.label ?? 'the login button'}".',
+        );
+
+      case ScryScreenType.form:
+        final fieldNames = fields.map((f) => '"${f.label}"').join(', ');
+        final submitBtn = buttons
+            .where((b) => _submitButtonPattern.hasMatch(b.label))
+            .firstOrNull;
+        suggestions.add(
+          'Fill in $fieldNames, then tap '
+          '"${submitBtn?.label ?? 'Submit'}".',
+        );
+
+      case ScryScreenType.list:
+        suggestions.add(
+          'Tap an item to see its details, or use navigation '
+          'tabs to switch sections.',
+        );
+        if (nav.isNotEmpty) {
+          final tabNames = nav.map((n) => '"${n.label}"').join(', ');
+          suggestions.add('Available tabs: $tabNames.');
+        }
+
+      case ScryScreenType.detail:
+        suggestions.add(
+          'Review the data displayed. Use the back button to '
+          'return, or tap available actions.',
+        );
+
+      case ScryScreenType.settings:
+        suggestions.add(
+          'Toggle settings as needed. Changes may be applied '
+          'immediately or require a save action.',
+        );
+
+      case ScryScreenType.empty:
+        suggestions.add(
+          'The screen appears empty. Try navigating to a '
+          'different section or triggering an action.',
+        );
+
+      case ScryScreenType.error:
+        suggestions.add(
+          'The screen shows an error. Note the error message '
+          'and navigate back or retry.',
+        );
+
+      case ScryScreenType.dashboard:
+        if (nav.isNotEmpty) {
+          final tabNames = nav.map((n) => '"${n.label}"').join(', ');
+          suggestions.add('Navigate to: $tabNames.');
+        }
+        if (buttons.isNotEmpty) {
+          suggestions.add(
+            'Available actions: '
+            '${buttons.map((b) => '"${b.label}"').take(5).join(', ')}.',
+          );
+        }
+
+      case ScryScreenType.unknown:
+        if (fields.isNotEmpty) {
+          suggestions.add(
+            'Text fields available: '
+            '${fields.map((f) => '"${f.label}"').join(', ')}.',
+          );
+        }
+        if (buttons.isNotEmpty) {
+          suggestions.add(
+            'Buttons available: '
+            '${buttons.map((b) => '"${b.label}"').take(5).join(', ')}.',
+          );
+        }
+        if (nav.isNotEmpty) {
+          suggestions.add(
+            'Navigation: '
+            '${nav.map((n) => '"${n.label}"').join(', ')}.',
+          );
+        }
+    }
+
+    return suggestions;
   }
 }
