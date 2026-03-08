@@ -2613,6 +2613,9 @@ class Scry {
       if ((left.y - right.y).abs() > 8) continue;
       // Right is to the right of left?
       if (right.x <= left.x + left.w - 5) continue;
+      // Not too far apart? Reject labels in different visual groups
+      // (e.g. separate stat cards at 500+ px distance).
+      if (right.x - (left.x + left.w) > 250) continue;
 
       // Key candidate: short, possibly ends with ":"
       final keyLabel = left.label;

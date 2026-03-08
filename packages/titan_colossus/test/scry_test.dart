@@ -1969,6 +1969,34 @@ void main() {
       // Should NOT pair "Quests: Hero"
       expect(gaze.dataFields, isEmpty);
     });
+
+    test('rejects proximity pairs with large horizontal gap', () {
+      // Simulate stat cards: "Glory" at x=130 and "Rank" at x=640
+      // on the same row — too far apart to be a real KV pair.
+      final glyphs = [
+        {
+          'wt': 'Text',
+          'l': 'Glory',
+          'ia': false,
+          'x': 129.2,
+          'y': 412.0,
+          'w': 32.2,
+          'h': 16.0,
+        },
+        {
+          'wt': 'Text',
+          'l': 'Rank',
+          'ia': false,
+          'x': 639.9,
+          'y': 412.0,
+          'w': 29.6,
+          'h': 16.0,
+        },
+      ];
+      final gaze = scry.observe(glyphs);
+      // Should NOT pair "Glory: Rank" — gap of 478px exceeds threshold
+      expect(gaze.dataFields, isEmpty);
+    });
   });
 
   // ===================================================================
