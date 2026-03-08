@@ -295,5 +295,23 @@ void main() {
       expect(event.tremor, tremor);
       expect(event.message, 'FPS dropped to 40');
     });
+
+    test('toMap serializes correctly', () {
+      final tremor = Tremor.fps(severity: TremorSeverity.error);
+      final now = DateTime(2025, 1, 15, 12, 0, 0);
+      final event = ColossusTremor(
+        tremor: tremor,
+        message: 'FPS dropped to 40',
+        timestamp: now,
+      );
+
+      final map = event.toMap();
+
+      expect(map['name'], 'fps_low');
+      expect(map['category'], 'frame');
+      expect(map['severity'], 'error');
+      expect(map['message'], 'FPS dropped to 40');
+      expect(map['timestamp'], now.toIso8601String());
+    });
   });
 }

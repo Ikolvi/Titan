@@ -245,6 +245,41 @@ void main() {
       expect(summary.toString(), contains('42'));
       expect(summary.toString(), contains('3500ms'));
     });
+
+    test('toMap serializes all fields', () {
+      final now = DateTime(2025, 1, 15, 12, 0, 0);
+      final summary = ShadeSessionSummary(
+        id: 'sess_123',
+        name: 'checkout_flow',
+        recordedAt: now,
+        durationMs: 5000,
+        eventCount: 75,
+        description: 'Full checkout test',
+      );
+
+      final map = summary.toMap();
+
+      expect(map['id'], 'sess_123');
+      expect(map['name'], 'checkout_flow');
+      expect(map['recordedAt'], now.toIso8601String());
+      expect(map['durationMs'], 5000);
+      expect(map['eventCount'], 75);
+      expect(map['description'], 'Full checkout test');
+    });
+
+    test('toMap omits null description', () {
+      final summary = ShadeSessionSummary(
+        id: 'test',
+        name: 'flow',
+        recordedAt: DateTime(2025),
+        durationMs: 100,
+        eventCount: 5,
+      );
+
+      final map = summary.toMap();
+
+      expect(map.containsKey('description'), false);
+    });
   });
 
   // ---------------------------------------------------------

@@ -163,6 +163,24 @@ class Colossus extends Pillar {
   final DateTime _sessionStart = DateTime.now();
   Chronicle? _chronicle;
 
+  /// History of fired [ColossusTremor] alerts (newest last).
+  ///
+  /// Capped at [_maxAlertHistory] entries to prevent unbounded growth.
+  final List<ColossusTremor> _alertHistory = [];
+
+  /// Maximum number of alerts to retain in history.
+  static const int _maxAlertHistory = 200;
+
+  /// All fired performance alerts since initialization (newest last).
+  ///
+  /// ```dart
+  /// final alerts = Colossus.instance.alertHistory;
+  /// for (final alert in alerts) {
+  ///   print('${alert.tremor.name}: ${alert.message}');
+  /// }
+  /// ```
+  List<ColossusTremor> get alertHistory => List.unmodifiable(_alertHistory);
+
   /// Notifier that fires when Terrain is updated (session analyzed).
   ///
   /// Subscribe to this in UI layers to reactively rebuild when
@@ -555,6 +573,12 @@ class Colossus extends Pillar {
           tremor: tremor,
           message: _tremorMessage(tremor, context),
         );
+
+        // Store in alert history (capped)
+        _alertHistory.add(event);
+        if (_alertHistory.length > _maxAlertHistory) {
+          _alertHistory.removeAt(0);
+        }
 
         // Emit via Herald
         Herald.emit(event);
@@ -1441,4 +1465,68 @@ class _ColossusRelayHandler implements RelayHandler {
 
   @override
   Map<String, dynamic> getPerformanceReport() => _colossus.decree().toMap();
+
+  @override
+  Map<String, dynamic> getFrameHistory() => {
+    'totalFrames': _colossus.pulse.totalFrames,
+    'maxHistory': 300,
+    'frames': _colossus.pulse.history.map((f) => f.toMap()).toList(),
+  };
+
+  @override
+  Map<String, dynamic> getPageLoads() => {
+    'totalPageLoads': _colossus.stride.history.length,
+    'avgPageLoadMs': _colossus.stride.avgPageLoad.inMilliseconds,
+    'pageLoads': _colossus.stride.history.map((p) => p.toMap()).toList(),
+  };
+
+  @override
+  Map<String, dynamic> getMemorySnapshot() {
+    final snapshot = _colossus.vessel.snapshot();
+    return {
+      ...snapshot.toMap(),
+      'leakSuspects': _colossus.vessel.leakSuspects
+          .map((s) => s.toMap())
+          .toList(),
+      'exemptTypes': _colossus.vessel.exemptTypes.toList(),
+    };
+  }
+
+  @override
+  Map<String, dynamic> getAlerts() => {
+    'totalAlerts': _colossus.alertHistory.length,
+    'maxHistory': Colossus._maxAlertHistory,
+    'alerts': _colossus.alertHistory.map((a) => a.toMap()).toList(),
+  };
+
+  @override
+  Future<Map<String, dynamic>> listSessions() async {
+    final vault = _colossus.vault;
+    if (vault == null) {
+      return {
+        'configured': false,
+        'sessions': <Map<String, dynamic>>[],
+        'message':
+            'ShadeVault not configured. Pass shadeStoragePath '
+            'to Colossus.init() or ColossusPlugin.',
+      };
+    }
+
+    final summaries = await vault.list();
+    return {
+      'configured': true,
+      'totalSessions': summaries.length,
+      'sessions': summaries.map((s) => s.toMap()).toList(),
+    };
+  }
+
+  @override
+  Map<String, dynamic> getRecordingStatus() => {
+    'isRecording': _colossus.shade.isRecording,
+    'isReplaying': _colossus.shade.isReplaying,
+    'currentEventCount': _colossus.shade.currentEventCount,
+    'elapsedMs': _colossus.shade.elapsed.inMilliseconds,
+    'isPerfRecording': _colossus.isPerfRecording,
+    'hasLastSession': _colossus.lastRecordedSession != null,
+  };
 }

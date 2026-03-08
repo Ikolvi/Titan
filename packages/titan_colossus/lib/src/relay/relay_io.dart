@@ -158,6 +158,24 @@ class RelayPlatform {
         case ('GET', '/performance'):
           _handleGetPerformance(request);
 
+        case ('GET', '/frames'):
+          _handleGetFrames(request);
+
+        case ('GET', '/pages'):
+          _handleGetPages(request);
+
+        case ('GET', '/memory'):
+          _handleGetMemory(request);
+
+        case ('GET', '/alerts'):
+          _handleGetAlerts(request);
+
+        case ('GET', '/sessions'):
+          await _handleGetSessions(request);
+
+        case ('GET', '/recording'):
+          _handleGetRecording(request);
+
         case ('GET', '/debug/tree'):
           await _handleDebugTree(request);
 
@@ -300,6 +318,91 @@ class RelayPlatform {
 
     final report = handler.getPerformanceReport();
     _sendJson(request.response, report);
+  }
+
+  void _handleGetFrames(HttpRequest request) {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getFrameHistory());
+  }
+
+  void _handleGetPages(HttpRequest request) {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getPageLoads());
+  }
+
+  void _handleGetMemory(HttpRequest request) {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getMemorySnapshot());
+  }
+
+  void _handleGetAlerts(HttpRequest request) {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getAlerts());
+  }
+
+  Future<void> _handleGetSessions(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    final sessions = await handler.listSessions();
+    _sendJson(request.response, sessions);
+  }
+
+  void _handleGetRecording(HttpRequest request) {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getRecordingStatus());
   }
 
   // -----------------------------------------------------------------------

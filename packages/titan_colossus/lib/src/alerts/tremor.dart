@@ -267,6 +267,15 @@ class ColossusTremor {
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 
+  /// Serialize to JSON-safe map.
+  Map<String, dynamic> toMap() => {
+    'name': tremor.name,
+    'category': tremor.category.name,
+    'severity': tremor.severity.name,
+    'message': message,
+    'timestamp': timestamp.toIso8601String(),
+  };
+
   @override
   String toString() => 'ColossusTremor(${tremor.name}: $message)';
 }

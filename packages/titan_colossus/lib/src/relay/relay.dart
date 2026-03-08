@@ -142,6 +142,42 @@ abstract interface class RelayHandler {
   /// Returns the serialized [Decree] including Pulse, Stride,
   /// Vessel, and Echo metrics.
   Map<String, dynamic> getPerformanceReport();
+
+  /// Get per-frame timing history from Pulse.
+  ///
+  /// Returns a list of [FrameMark] maps with build/raster durations,
+  /// jank flags, and timestamps.
+  Map<String, dynamic> getFrameHistory();
+
+  /// Get individual page load records from Stride.
+  ///
+  /// Returns a list of [PageLoadMark] maps with paths, durations,
+  /// and timestamps.
+  Map<String, dynamic> getPageLoads();
+
+  /// Get a live memory snapshot from Vessel.
+  ///
+  /// Returns Pillar counts, DI instances, and detailed leak
+  /// suspects with ages.
+  Map<String, dynamic> getMemorySnapshot();
+
+  /// Get fired Tremor performance alerts.
+  ///
+  /// Returns the alert history with tremor names, severities,
+  /// messages, and timestamps.
+  Map<String, dynamic> getAlerts();
+
+  /// List saved Shade recording sessions.
+  ///
+  /// Returns session summaries with IDs, names, durations,
+  /// and event counts.
+  Future<Map<String, dynamic>> listSessions();
+
+  /// Get the current Shade recording/replaying status.
+  ///
+  /// Returns whether recording or replaying is active,
+  /// the elapsed time, and event count.
+  Map<String, dynamic> getRecordingStatus();
 }
 
 // ---------------------------------------------------------------------------

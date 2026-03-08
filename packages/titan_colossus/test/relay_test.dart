@@ -477,6 +477,107 @@ void main() {
       expect(body['health'], 'good');
     });
 
+    // -- GET /frames --
+
+    test('GET /frames returns frame history', () async {
+      await startRelay();
+
+      final request = await client.get('127.0.0.1', port, '/frames');
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['totalFrames'], 2);
+      expect(body['maxHistory'], 300);
+      expect(body['frames'], isA<List>());
+      expect((body['frames'] as List).length, 2);
+      expect(handler.getFrameHistoryCallCount, 1);
+    });
+
+    // -- GET /pages --
+
+    test('GET /pages returns page loads', () async {
+      await startRelay();
+
+      final request = await client.get('127.0.0.1', port, '/pages');
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['totalPageLoads'], 1);
+      expect(body['avgPageLoadMs'], 150);
+      expect(body['pageLoads'], isA<List>());
+      expect(handler.getPageLoadsCallCount, 1);
+    });
+
+    // -- GET /memory --
+
+    test('GET /memory returns memory snapshot', () async {
+      await startRelay();
+
+      final request = await client.get('127.0.0.1', port, '/memory');
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['pillarCount'], 3);
+      expect(body['totalInstances'], 5);
+      expect(body['leakSuspects'], isA<List>());
+      expect(body['exemptTypes'], isA<List>());
+      expect(handler.getMemorySnapshotCallCount, 1);
+    });
+
+    // -- GET /alerts --
+
+    test('GET /alerts returns alert history', () async {
+      await startRelay();
+
+      final request = await client.get('127.0.0.1', port, '/alerts');
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['totalAlerts'], 0);
+      expect(body['maxHistory'], 200);
+      expect(body['alerts'], isA<List>());
+      expect(handler.getAlertsCallCount, 1);
+    });
+
+    // -- GET /sessions --
+
+    test('GET /sessions returns session list', () async {
+      await startRelay();
+
+      final request = await client.get('127.0.0.1', port, '/sessions');
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['configured'], true);
+      expect(body['totalSessions'], 0);
+      expect(body['sessions'], isA<List>());
+      expect(handler.listSessionsCallCount, 1);
+    });
+
+    // -- GET /recording --
+
+    test('GET /recording returns recording status', () async {
+      await startRelay();
+
+      final request = await client.get('127.0.0.1', port, '/recording');
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['isRecording'], false);
+      expect(body['isReplaying'], false);
+      expect(body['currentEventCount'], 0);
+      expect(body['elapsedMs'], 0);
+      expect(body['isPerfRecording'], false);
+      expect(body['hasLastSession'], false);
+      expect(handler.getRecordingStatusCallCount, 1);
+    });
+
     // -- Unknown endpoint --
 
     test('unknown endpoint returns 404', () async {
@@ -740,6 +841,12 @@ class _MockRelayHandler implements RelayHandler {
   int getBlueprintCallCount = 0;
   int debriefCallCount = 0;
   int getPerformanceReportCallCount = 0;
+  int getFrameHistoryCallCount = 0;
+  int getPageLoadsCallCount = 0;
+  int getMemorySnapshotCallCount = 0;
+  int getAlertsCallCount = 0;
+  int listSessionsCallCount = 0;
+  int getRecordingStatusCallCount = 0;
 
   @override
   Future<Map<String, dynamic>> executeCampaign(
@@ -820,6 +927,94 @@ class _MockRelayHandler implements RelayHandler {
         'rebuildsPerWidget': <String, int>{},
         'topRebuilders': <String, int>{},
       },
+    };
+  }
+
+  @override
+  Map<String, dynamic> getFrameHistory() {
+    getFrameHistoryCallCount++;
+    return {
+      'totalFrames': 2,
+      'maxHistory': 300,
+      'frames': [
+        {
+          'buildDurationUs': 8000,
+          'rasterDurationUs': 4000,
+          'totalDurationUs': 12000,
+          'isJank': false,
+          'isSevereJank': false,
+          'timestamp': '2025-01-01T00:00:00.000Z',
+        },
+        {
+          'buildDurationUs': 20000,
+          'rasterDurationUs': 10000,
+          'totalDurationUs': 30000,
+          'isJank': true,
+          'isSevereJank': false,
+          'timestamp': '2025-01-01T00:00:01.000Z',
+        },
+      ],
+    };
+  }
+
+  @override
+  Map<String, dynamic> getPageLoads() {
+    getPageLoadsCallCount++;
+    return {
+      'totalPageLoads': 1,
+      'avgPageLoadMs': 150,
+      'pageLoads': [
+        {
+          'path': '/quest/1',
+          'pattern': '/quest/:id',
+          'durationMs': 150,
+          'timestamp': '2025-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+  }
+
+  @override
+  Map<String, dynamic> getMemorySnapshot() {
+    getMemorySnapshotCallCount++;
+    return {
+      'pillarCount': 3,
+      'totalInstances': 5,
+      'leakSuspects': <Map<String, dynamic>>[],
+      'exemptTypes': <String>['TitanObserver'],
+    };
+  }
+
+  @override
+  Map<String, dynamic> getAlerts() {
+    getAlertsCallCount++;
+    return {
+      'totalAlerts': 0,
+      'maxHistory': 200,
+      'alerts': <Map<String, dynamic>>[],
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> listSessions() async {
+    listSessionsCallCount++;
+    return {
+      'configured': true,
+      'totalSessions': 0,
+      'sessions': <Map<String, dynamic>>[],
+    };
+  }
+
+  @override
+  Map<String, dynamic> getRecordingStatus() {
+    getRecordingStatusCallCount++;
+    return {
+      'isRecording': false,
+      'isReplaying': false,
+      'currentEventCount': 0,
+      'elapsedMs': 0,
+      'isPerfRecording': false,
+      'hasLastSession': false,
     };
   }
 }

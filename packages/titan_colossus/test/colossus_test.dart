@@ -334,6 +334,21 @@ void main() {
       expect(colossus.rebuildsPerWidget['Counter'], 2);
       expect(colossus.rebuildsPerWidget['Header'], 1);
     });
+
+    test('alertHistory starts empty', () {
+      final colossus = Colossus.init(enableLensTab: false);
+      expect(colossus.alertHistory, isEmpty);
+    });
+
+    test('alertHistory is unmodifiable', () {
+      final colossus = Colossus.init(enableLensTab: false);
+      expect(
+        () => colossus.alertHistory.add(
+          ColossusTremor(tremor: Tremor.fps(), message: 'test'),
+        ),
+        throwsUnsupportedError,
+      );
+    });
   });
 
   // ---------------------------------------------------------

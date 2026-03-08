@@ -268,6 +268,16 @@ class ShadeSessionSummary {
     this.description,
   });
 
+  /// Serialize to JSON-safe map.
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'recordedAt': recordedAt.toIso8601String(),
+    'durationMs': durationMs,
+    'eventCount': eventCount,
+    if (description != null) 'description': description,
+  };
+
   @override
   String toString() =>
       'ShadeSessionSummary($name, $eventCount events, ${durationMs}ms)';

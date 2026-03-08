@@ -374,6 +374,65 @@ class _BlueprintMcpServer {
             'inputSchema': {'type': 'object', 'properties': {}},
           },
           {
+            'name': 'get_frame_history',
+            'description':
+                'Get per-frame timing history from Pulse. Returns up '
+                'to 300 individual frame records with build/raster '
+                'durations (µs), jank flags, and timestamps. Use '
+                'this to investigate jank patterns, identify slow '
+                'frames, and analyze rendering performance over time.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'get_page_loads',
+            'description':
+                'Get individual page load records from Stride. '
+                'Returns up to 100 page transitions with route '
+                'paths, durations (ms), and timestamps. Use this '
+                'to identify slow routes, analyze navigation '
+                'performance, and find transition bottlenecks.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'get_memory_snapshot',
+            'description':
+                'Get a live memory snapshot from Vessel. Returns '
+                'current Pillar count, DI instances, leak suspects '
+                'with ages (seconds since first seen), and exempt '
+                'types. Use this to detect memory leaks, track '
+                'Pillar lifecycle, and verify cleanup.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'get_alerts',
+            'description':
+                'Get fired Tremor performance alerts. Returns the '
+                'alert history with tremor names, categories '
+                '(frame, pageLoad, memory, rebuild), severities '
+                '(info, warning, error), messages, and timestamps. '
+                'Up to 200 most recent alerts are retained.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'list_sessions',
+            'description':
+                'List saved Shade recording sessions from the '
+                'ShadeVault. Returns session summaries with IDs, '
+                'names, recording dates, durations (ms), event '
+                'counts, and descriptions. Sessions are sorted '
+                'newest first. Requires shadeStoragePath configured.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'get_recording_status',
+            'description':
+                'Get the current Shade recording and replay status. '
+                'Returns whether recording or replaying is active, '
+                'elapsed time, event count, performance recording '
+                'state, and whether a last session exists in memory.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
             'name': 'generate_auth_stratagem',
             'description':
                 'Auto-generate an authStratagem JSON from the live '
@@ -683,6 +742,12 @@ class _BlueprintMcpServer {
       'relay_status',
       'relay_terrain',
       'get_performance',
+      'get_frame_history',
+      'get_page_loads',
+      'get_memory_snapshot',
+      'get_alerts',
+      'list_sessions',
+      'get_recording_status',
       'generate_auth_stratagem',
       'generate_campaign',
       'audit_screen',
@@ -696,6 +761,12 @@ class _BlueprintMcpServer {
         'relay_status' => await _relayStatus(),
         'relay_terrain' => await _relayTerrain(),
         'get_performance' => await _getPerformance(),
+        'get_frame_history' => await _getFrameHistory(),
+        'get_page_loads' => await _getPageLoads(),
+        'get_memory_snapshot' => await _getMemorySnapshot(),
+        'get_alerts' => await _getAlerts(),
+        'list_sessions' => await _listSessions(),
+        'get_recording_status' => await _getRecordingStatus(),
         'generate_auth_stratagem' => await _generateAuthStratagem(toolArgs),
         'generate_campaign' => await _generateCampaign(toolArgs),
         'audit_screen' => await _auditScreen(toolArgs),
@@ -1670,37 +1741,7 @@ class _BlueprintMcpServer {
 
   /// Fetch a live performance Decree from the running app.
   Future<String> _getPerformance() async {
-    final client = HttpClient();
-    try {
-      client.connectionTimeout = const Duration(seconds: 5);
-
-      final request = await client.getUrl(_relayUri('/performance'));
-      _relayHeaders.forEach(request.headers.set);
-
-      final response = await request.close().timeout(
-        const Duration(seconds: 5),
-      );
-
-      final body = await response.transform(utf8.decoder).join();
-
-      if (response.statusCode != 200) {
-        return 'Relay returned ${response.statusCode}: $body';
-      }
-
-      final data = jsonDecode(body) as Map<String, dynamic>;
-      return _formatPerformanceReport(data);
-    } on SocketException {
-      return '# Performance Report Unavailable\n\n'
-          'Relay is not running at '
-          'http://$_relayHost:$_relayPort\n\n'
-          'Start your app with `ColossusPlugin(enableRelay: true)` '
-          'first.';
-    } on TimeoutException {
-      return '# Performance Report Unavailable\n\n'
-          'Relay did not respond (timeout).';
-    } finally {
-      client.close();
-    }
+    return _fetchAndFormat('/performance', _formatPerformanceReport);
   }
 
   /// Format the raw Decree JSON into readable Markdown.
@@ -1821,6 +1862,395 @@ class _BlueprintMcpServer {
     }
 
     return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Frame History (Pulse detail)
+  // -----------------------------------------------------------------------
+
+  /// Fetch per-frame timing history from the running app.
+  Future<String> _getFrameHistory() async {
+    return _fetchAndFormat('/frames', _formatFrameHistory);
+  }
+
+  /// Format frame history JSON into Markdown.
+  String _formatFrameHistory(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final total = data['totalFrames'] as int? ?? 0;
+    final frames = data['frames'] as List<dynamic>? ?? [];
+
+    buf.writeln('# Frame History (Pulse)');
+    buf.writeln();
+    buf.writeln(
+      '**Total Frames Recorded:** $total | '
+      '**History Size:** ${frames.length}',
+    );
+    buf.writeln();
+
+    if (frames.isEmpty) {
+      buf.writeln('No frame data captured yet.');
+      return buf.toString();
+    }
+
+    // Summary stats
+    final jankCount = frames.where((f) {
+      final m = f as Map<String, dynamic>;
+      return m['isJank'] == true;
+    }).length;
+    final severeCount = frames.where((f) {
+      final m = f as Map<String, dynamic>;
+      return m['isSevereJank'] == true;
+    }).length;
+
+    buf.writeln('| Metric | Value |');
+    buf.writeln('|--------|-------|');
+    buf.writeln('| Frames in History | ${frames.length} |');
+    buf.writeln('| Jank Frames | $jankCount |');
+    buf.writeln('| Severe Jank | $severeCount |');
+    buf.writeln();
+
+    // Show recent janky frames
+    final janky = frames
+        .cast<Map<String, dynamic>>()
+        .where((f) => f['isJank'] == true)
+        .toList();
+
+    if (janky.isNotEmpty) {
+      buf.writeln('## Janky Frames (${janky.length})');
+      buf.writeln();
+      buf.writeln('| Build (µs) | Raster (µs) | Total (µs) | Severe | Time |');
+      buf.writeln('|------------|-------------|------------|--------|------|');
+      for (final f in janky.take(20)) {
+        buf.writeln(
+          '| ${f['buildDurationUs']} '
+          '| ${f['rasterDurationUs']} '
+          '| ${f['totalDurationUs']} '
+          '| ${f['isSevereJank'] == true ? 'YES' : 'no'} '
+          '| ${f['timestamp'] ?? ''} |',
+        );
+      }
+      if (janky.length > 20) {
+        buf.writeln('| ... | ... | ... | ... | ${janky.length - 20} more |');
+      }
+      buf.writeln();
+    }
+
+    // Show last 10 frames
+    buf.writeln('## Recent Frames (last 10)');
+    buf.writeln();
+    buf.writeln('| Build (µs) | Raster (µs) | Total (µs) | Jank |');
+    buf.writeln('|------------|-------------|------------|------|');
+    for (final f in frames.reversed.take(10)) {
+      final m = f as Map<String, dynamic>;
+      buf.writeln(
+        '| ${m['buildDurationUs']} '
+        '| ${m['rasterDurationUs']} '
+        '| ${m['totalDurationUs']} '
+        '| ${m['isJank'] == true ? 'JANK' : 'ok'} |',
+      );
+    }
+    buf.writeln();
+
+    return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Page Loads (Stride detail)
+  // -----------------------------------------------------------------------
+
+  /// Fetch page load records from the running app.
+  Future<String> _getPageLoads() async {
+    return _fetchAndFormat('/pages', _formatPageLoads);
+  }
+
+  /// Format page load JSON into Markdown.
+  String _formatPageLoads(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final total = data['totalPageLoads'] as int? ?? 0;
+    final avgMs = data['avgPageLoadMs'] as int? ?? 0;
+    final pageLoads = data['pageLoads'] as List<dynamic>? ?? [];
+
+    buf.writeln('# Page Loads (Stride)');
+    buf.writeln();
+    buf.writeln('**Total:** $total | **Avg Load Time:** ${avgMs}ms');
+    buf.writeln();
+
+    if (pageLoads.isEmpty) {
+      buf.writeln('No page loads recorded yet.');
+      return buf.toString();
+    }
+
+    buf.writeln('| # | Route | Pattern | Duration (ms) | Time |');
+    buf.writeln('|---|-------|---------|---------------|------|');
+    for (var i = 0; i < pageLoads.length; i++) {
+      final p = pageLoads[i] as Map<String, dynamic>;
+      buf.writeln(
+        '| ${i + 1} '
+        '| ${p['path'] ?? '?'} '
+        '| ${p['pattern'] ?? ''} '
+        '| ${p['durationMs'] ?? '?'} '
+        '| ${p['timestamp'] ?? ''} |',
+      );
+    }
+    buf.writeln();
+
+    return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Memory Snapshot (Vessel detail)
+  // -----------------------------------------------------------------------
+
+  /// Fetch a live memory snapshot from the running app.
+  Future<String> _getMemorySnapshot() async {
+    return _fetchAndFormat('/memory', _formatMemorySnapshot);
+  }
+
+  /// Format memory snapshot JSON into Markdown.
+  String _formatMemorySnapshot(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final pillarCount = data['pillarCount'] as int? ?? 0;
+    final totalInstances = data['totalInstances'] as int? ?? 0;
+    final leaks = data['leakSuspects'] as List<dynamic>? ?? [];
+    final exempts = data['exemptTypes'] as List<dynamic>? ?? [];
+
+    buf.writeln('# Memory Snapshot (Vessel)');
+    buf.writeln();
+    buf.writeln('| Metric | Value |');
+    buf.writeln('|--------|-------|');
+    buf.writeln('| Pillar Count | $pillarCount |');
+    buf.writeln('| Total DI Instances | $totalInstances |');
+    buf.writeln('| Leak Suspects | ${leaks.length} |');
+    buf.writeln('| Exempt Types | ${exempts.length} |');
+    buf.writeln();
+
+    if (leaks.isNotEmpty) {
+      buf.writeln('## Leak Suspects');
+      buf.writeln();
+      buf.writeln('| Type | First Seen | Age (s) |');
+      buf.writeln('|------|------------|---------|');
+      for (final s in leaks) {
+        final suspect = s as Map<String, dynamic>;
+        buf.writeln(
+          '| ${suspect['typeName'] ?? '?'} '
+          '| ${suspect['firstSeen'] ?? '?'} '
+          '| ${suspect['ageSeconds'] ?? '?'} |',
+        );
+      }
+      buf.writeln();
+    }
+
+    if (exempts.isNotEmpty) {
+      buf.writeln('## Exempt Types');
+      buf.writeln();
+      for (final t in exempts) {
+        buf.writeln('- $t');
+      }
+      buf.writeln();
+    }
+
+    return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Alerts (Tremor history)
+  // -----------------------------------------------------------------------
+
+  /// Fetch performance alert history from the running app.
+  Future<String> _getAlerts() async {
+    return _fetchAndFormat('/alerts', _formatAlerts);
+  }
+
+  /// Format alert history JSON into Markdown.
+  String _formatAlerts(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final total = data['totalAlerts'] as int? ?? 0;
+    final maxHistory = data['maxHistory'] as int? ?? 200;
+    final alerts = data['alerts'] as List<dynamic>? ?? [];
+
+    buf.writeln('# Performance Alerts (Tremor)');
+    buf.writeln();
+    buf.writeln('**Total Alerts:** $total | **Max History:** $maxHistory');
+    buf.writeln();
+
+    if (alerts.isEmpty) {
+      buf.writeln('No performance alerts have fired.');
+      return buf.toString();
+    }
+
+    buf.writeln('| # | Name | Category | Severity | Message | Time |');
+    buf.writeln('|---|------|----------|----------|---------|------|');
+    for (var i = 0; i < alerts.length; i++) {
+      final a = alerts[i] as Map<String, dynamic>;
+      buf.writeln(
+        '| ${i + 1} '
+        '| ${a['name'] ?? '?'} '
+        '| ${a['category'] ?? '?'} '
+        '| ${a['severity'] ?? '?'} '
+        '| ${a['message'] ?? '?'} '
+        '| ${a['timestamp'] ?? ''} |',
+      );
+    }
+    buf.writeln();
+
+    // Summary by severity
+    final errors = alerts.where((a) {
+      final m = a as Map<String, dynamic>;
+      return m['severity'] == 'error';
+    }).length;
+    final warnings = alerts.where((a) {
+      final m = a as Map<String, dynamic>;
+      return m['severity'] == 'warning';
+    }).length;
+    final infos = total - errors - warnings;
+
+    buf.writeln('## Summary');
+    buf.writeln();
+    buf.writeln('- Errors: $errors');
+    buf.writeln('- Warnings: $warnings');
+    buf.writeln('- Info: $infos');
+    buf.writeln();
+
+    return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Sessions (ShadeVault list)
+  // -----------------------------------------------------------------------
+
+  /// Fetch saved Shade session list from the running app.
+  Future<String> _listSessions() async {
+    return _fetchAndFormat('/sessions', _formatSessions);
+  }
+
+  /// Format session list JSON into Markdown.
+  String _formatSessions(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final configured = data['configured'] as bool? ?? false;
+    final sessions = data['sessions'] as List<dynamic>? ?? [];
+
+    buf.writeln('# Shade Sessions');
+    buf.writeln();
+
+    if (!configured) {
+      buf.writeln(
+        '**ShadeVault not configured.** Pass `shadeStoragePath` '
+        'to `Colossus.init()` or `ColossusPlugin` to enable '
+        'session persistence.',
+      );
+      return buf.toString();
+    }
+
+    buf.writeln('**Total Sessions:** ${sessions.length}');
+    buf.writeln();
+
+    if (sessions.isEmpty) {
+      buf.writeln('No saved sessions found.');
+      return buf.toString();
+    }
+
+    buf.writeln('| # | Name | Events | Duration | Recorded | ID |');
+    buf.writeln('|---|------|--------|----------|----------|----|');
+    for (var i = 0; i < sessions.length; i++) {
+      final s = sessions[i] as Map<String, dynamic>;
+      final durationMs = s['durationMs'] as int? ?? 0;
+      final durationStr = durationMs >= 1000
+          ? '${(durationMs / 1000).toStringAsFixed(1)}s'
+          : '${durationMs}ms';
+      buf.writeln(
+        '| ${i + 1} '
+        '| ${s['name'] ?? '?'} '
+        '| ${s['eventCount'] ?? '?'} '
+        '| $durationStr '
+        '| ${s['recordedAt'] ?? '?'} '
+        '| ${s['id'] ?? '?'} |',
+      );
+    }
+    buf.writeln();
+
+    return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Recording Status (Shade state)
+  // -----------------------------------------------------------------------
+
+  /// Fetch current recording/replaying status from the running app.
+  Future<String> _getRecordingStatus() async {
+    return _fetchAndFormat('/recording', _formatRecordingStatus);
+  }
+
+  /// Format recording status JSON into Markdown.
+  String _formatRecordingStatus(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final isRecording = data['isRecording'] as bool? ?? false;
+    final isReplaying = data['isReplaying'] as bool? ?? false;
+    final eventCount = data['currentEventCount'] as int? ?? 0;
+    final elapsedMs = data['elapsedMs'] as int? ?? 0;
+    final isPerfRecording = data['isPerfRecording'] as bool? ?? false;
+    final hasLastSession = data['hasLastSession'] as bool? ?? false;
+
+    buf.writeln('# Recording Status (Shade)');
+    buf.writeln();
+    buf.writeln('| Property | Value |');
+    buf.writeln('|----------|-------|');
+    buf.writeln('| Recording | ${isRecording ? 'ACTIVE' : 'inactive'} |');
+    buf.writeln('| Replaying | ${isReplaying ? 'ACTIVE' : 'inactive'} |');
+    buf.writeln('| Event Count | $eventCount |');
+    buf.writeln('| Elapsed | ${(elapsedMs / 1000).toStringAsFixed(1)}s |');
+    buf.writeln(
+      '| Perf Recording | '
+      '${isPerfRecording ? 'ACTIVE' : 'inactive'} |',
+    );
+    buf.writeln(
+      '| Last Session | '
+      '${hasLastSession ? 'available' : 'none'} |',
+    );
+    buf.writeln();
+
+    return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Shared Relay fetch helper
+  // -----------------------------------------------------------------------
+
+  /// Fetch JSON from a Relay endpoint and format with the given formatter.
+  Future<String> _fetchAndFormat(
+    String path,
+    String Function(Map<String, dynamic>) formatter,
+  ) async {
+    final client = HttpClient();
+    try {
+      client.connectionTimeout = const Duration(seconds: 5);
+
+      final request = await client.getUrl(_relayUri(path));
+      _relayHeaders.forEach(request.headers.set);
+
+      final response = await request.close().timeout(
+        const Duration(seconds: 5),
+      );
+
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode != 200) {
+        return 'Relay returned ${response.statusCode}: $body';
+      }
+
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      return formatter(data);
+    } on SocketException {
+      return '# ${path.substring(1).replaceFirst(path[1], path[1].toUpperCase())} Unavailable\n\n'
+          'Relay is not running at '
+          'http://$_relayHost:$_relayPort\n\n'
+          'Start your app with `ColossusPlugin(enableRelay: true)` '
+          'first.';
+    } on TimeoutException {
+      return '# ${path.substring(1)} Unavailable\n\n'
+          'Relay did not respond (timeout).';
+    } finally {
+      client.close();
+    }
   }
 
   // -----------------------------------------------------------------------
