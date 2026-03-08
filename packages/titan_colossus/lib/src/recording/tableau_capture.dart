@@ -571,6 +571,8 @@ class TableauCapture {
       // ignore: deprecated_member_use
       return widget.groupValue?.toString();
     }
+    if (widget is TextField) return widget.controller?.text;
+    if (widget is TextFormField) return widget.controller?.text;
     return null;
   }
 }
