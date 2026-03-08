@@ -434,6 +434,241 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // StratagemTarget — interactive-preference ranking
+  // -------------------------------------------------------------------------
+  group('StratagemTarget — interactive preference', () {
+    Tableau makeTableau([List<Glyph>? glyphs]) {
+      return Tableau(
+        index: 0,
+        timestamp: Duration.zero,
+        glyphs: glyphs ?? [],
+        route: '/test',
+        screenWidth: 400,
+        screenHeight: 800,
+      );
+    }
+
+    test(
+      'resolve prefers interactive glyph over non-interactive (label-only)',
+      () {
+        // Simulates NavigationBar scenario: Text("Hero") appears before
+        // GestureDetector("Hero") in the glyph list.
+        const target = StratagemTarget(label: 'Hero');
+        final tableau = makeTableau([
+          Glyph(
+            label: 'Hero',
+            widgetType: 'Text',
+            left: 100,
+            top: 500,
+            width: 60,
+            height: 20,
+            ancestors: const ['NavigationDestination'],
+            isInteractive: false,
+            isEnabled: true,
+          ),
+          Glyph(
+            label: 'Hero',
+            widgetType: 'GestureDetector',
+            left: 100,
+            top: 490,
+            width: 80,
+            height: 40,
+            ancestors: const ['NavigationBar'],
+            isInteractive: true,
+            isEnabled: true,
+          ),
+        ]);
+        final result = target.resolve(tableau);
+        expect(result, isNotNull);
+        expect(result!.widgetType, 'GestureDetector');
+        expect(result.isInteractive, isTrue);
+      },
+    );
+
+    test('resolve with explicit type ignores interactive ranking', () {
+      const target = StratagemTarget(label: 'Hero', type: 'Text');
+      final tableau = makeTableau([
+        Glyph(
+          label: 'Hero',
+          widgetType: 'Text',
+          left: 100,
+          top: 500,
+          width: 60,
+          height: 20,
+          ancestors: const [],
+          isInteractive: false,
+          isEnabled: true,
+        ),
+        Glyph(
+          label: 'Hero',
+          widgetType: 'GestureDetector',
+          left: 100,
+          top: 490,
+          width: 80,
+          height: 40,
+          ancestors: const [],
+          isInteractive: true,
+          isEnabled: true,
+        ),
+      ]);
+      final result = target.resolve(tableau);
+      expect(result, isNotNull);
+      expect(result!.widgetType, 'Text');
+    });
+
+    test('resolve with preferInteractive: false returns first match', () {
+      const target = StratagemTarget(label: 'Hero');
+      final tableau = makeTableau([
+        Glyph(
+          label: 'Hero',
+          widgetType: 'Text',
+          left: 100,
+          top: 500,
+          width: 60,
+          height: 20,
+          ancestors: const [],
+          isInteractive: false,
+          isEnabled: true,
+        ),
+        Glyph(
+          label: 'Hero',
+          widgetType: 'GestureDetector',
+          left: 100,
+          top: 490,
+          width: 80,
+          height: 40,
+          ancestors: const [],
+          isInteractive: true,
+          isEnabled: true,
+        ),
+      ]);
+      final result = target.resolve(tableau, preferInteractive: false);
+      expect(result, isNotNull);
+      expect(result!.widgetType, 'Text');
+      expect(result.isInteractive, isFalse);
+    });
+
+    test('fuzzyResolve prefers interactive in partial label match', () {
+      // AI writes "Sign" to match "Sign Out" — should prefer IconButton
+      const target = StratagemTarget(label: 'Sign');
+      final tableau = makeTableau([
+        Glyph(
+          label: 'Sign Out',
+          widgetType: 'Text',
+          left: 700,
+          top: 10,
+          width: 60,
+          height: 20,
+          ancestors: const ['AppBar'],
+          isInteractive: false,
+          isEnabled: true,
+        ),
+        Glyph(
+          label: 'Sign Out',
+          widgetType: 'IconButton',
+          left: 700,
+          top: 5,
+          width: 40,
+          height: 40,
+          ancestors: const ['AppBar'],
+          isInteractive: true,
+          isEnabled: true,
+        ),
+      ]);
+      final result = target.fuzzyResolve(tableau);
+      expect(result, isNotNull);
+      expect(result!.widgetType, 'IconButton');
+      expect(result.isInteractive, isTrue);
+    });
+
+    test('resolve with single candidate does not sort', () {
+      const target = StratagemTarget(label: 'Submit');
+      final tableau = makeTableau([
+        Glyph(
+          label: 'Submit',
+          widgetType: 'Text',
+          left: 0,
+          top: 0,
+          width: 100,
+          height: 50,
+          ancestors: const [],
+          isInteractive: false,
+          isEnabled: true,
+        ),
+      ]);
+      final result = target.resolve(tableau);
+      expect(result, isNotNull);
+      expect(result!.widgetType, 'Text');
+    });
+
+    test('all candidates interactive preserves original order', () {
+      const target = StratagemTarget(label: 'OK');
+      final tableau = makeTableau([
+        Glyph(
+          label: 'OK',
+          widgetType: 'ElevatedButton',
+          left: 0,
+          top: 0,
+          width: 100,
+          height: 50,
+          ancestors: const [],
+          isInteractive: true,
+          isEnabled: true,
+        ),
+        Glyph(
+          label: 'OK',
+          widgetType: 'TextButton',
+          left: 0,
+          top: 60,
+          width: 100,
+          height: 50,
+          ancestors: const [],
+          isInteractive: true,
+          isEnabled: true,
+        ),
+      ]);
+      final result = target.resolve(tableau);
+      expect(result, isNotNull);
+      expect(result!.widgetType, 'ElevatedButton');
+    });
+
+    test('index overrides interactive ranking', () {
+      // Even with interactive-preference, explicit index=1 picks second
+      const target = StratagemTarget(label: 'Hero', index: 1);
+      final tableau = makeTableau([
+        Glyph(
+          label: 'Hero',
+          widgetType: 'Text',
+          left: 100,
+          top: 500,
+          width: 60,
+          height: 20,
+          ancestors: const [],
+          isInteractive: false,
+          isEnabled: true,
+        ),
+        Glyph(
+          label: 'Hero',
+          widgetType: 'GestureDetector',
+          left: 100,
+          top: 490,
+          width: 80,
+          height: 40,
+          ancestors: const [],
+          isInteractive: true,
+          isEnabled: true,
+        ),
+      ]);
+      // After sorting: [GestureDetector(ia), Text(non-ia)]
+      // Index 1 → Text (non-interactive)
+      final result = target.resolve(tableau);
+      expect(result, isNotNull);
+      expect(result!.widgetType, 'Text');
+      expect(result.isInteractive, isFalse);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // StratagemExpectations — toString edge cases
   // -------------------------------------------------------------------------
   group('StratagemExpectations — toString', () {

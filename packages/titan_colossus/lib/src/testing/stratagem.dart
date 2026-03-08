@@ -565,13 +565,20 @@ class StratagemTarget {
   /// Returns the matching [Glyph] or `null` if not found.
   /// Matches are filtered by all non-null properties.
   ///
+  /// When [preferInteractive] is `true` (default) and no explicit [type]
+  /// filter is set, interactive candidates are ranked ahead of
+  /// non-interactive ones. This avoids the common pitfall where a
+  /// label-only target (e.g. `{"label": "Hero"}`) resolves to a
+  /// non-interactive `Text` widget instead of its interactive parent
+  /// `GestureDetector`.
+  ///
   /// ```dart
   /// final glyph = target.resolve(tableau);
   /// if (glyph != null) {
   ///   // dispatch tap at glyph.centerX, glyph.centerY
   /// }
   /// ```
-  Glyph? resolve(Tableau tableau) {
+  Glyph? resolve(Tableau tableau, {bool preferInteractive = true}) {
     final candidates = tableau.glyphs.where((g) {
       if (label != null && g.label != label) return false;
       if (type != null && !g.widgetType.contains(type!)) return false;
@@ -584,6 +591,17 @@ class StratagemTarget {
     }).toList();
 
     if (candidates.isEmpty) return null;
+
+    // When no explicit type filter is set, rank interactive candidates
+    // first so label-only targets naturally land on tappable widgets.
+    if (preferInteractive && type == null && candidates.length > 1) {
+      candidates.sort((a, b) {
+        if (a.isInteractive && !b.isInteractive) return -1;
+        if (!a.isInteractive && b.isInteractive) return 1;
+        return 0;
+      });
+    }
+
     final i = index ?? 0;
     if (i >= candidates.length) return null;
     return candidates[i];
@@ -593,9 +611,12 @@ class StratagemTarget {
   ///
   /// Used when the AI's label doesn't exactly match what's on screen
   /// (e.g., AI wrote "Login" but button says "Log In").
-  Glyph? fuzzyResolve(Tableau tableau) {
+  ///
+  /// Like [resolve], interactive candidates are preferred when no
+  /// explicit [type] filter is set and [preferInteractive] is `true`.
+  Glyph? fuzzyResolve(Tableau tableau, {bool preferInteractive = true}) {
     // Try exact match first
-    final exact = resolve(tableau);
+    final exact = resolve(tableau, preferInteractive: preferInteractive);
     if (exact != null) return exact;
 
     // Try partial label match (case-insensitive)
@@ -610,6 +631,14 @@ class StratagemTarget {
             normalizedTarget.contains(normalizedLabel);
       }).toList();
       if (partial.isNotEmpty) {
+        // Rank interactive candidates first when no type filter is set
+        if (preferInteractive && type == null && partial.length > 1) {
+          partial.sort((a, b) {
+            if (a.isInteractive && !b.isInteractive) return -1;
+            if (!a.isInteractive && b.isInteractive) return 1;
+            return 0;
+          });
+        }
         final i = index ?? 0;
         if (i >= partial.length) return null;
         return partial[i];
