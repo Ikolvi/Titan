@@ -155,7 +155,7 @@ void main() {
           enableRelay: true, // Enable HTTP bridge for AI-driven testing
           shadeStoragePath: shadeDir,
           exportDirectory: exportDir,
-          blueprintExportDirectory: '$exportDir/blueprint',
+          blueprintExportDirectory: '.titan',
           onExport: (paths) {
             Clipboard.setData(ClipboardData(text: paths.join('\n')));
           },
