@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "titan-blueprint": {
+      "command": "dart",
+      "args": [
+        "run",
+        "bin/blueprint_mcp_server.dart"
+      ],
+      "cwd": "${workspaceFolder}/packages/titan_colossus"
+    }
+  }
+}

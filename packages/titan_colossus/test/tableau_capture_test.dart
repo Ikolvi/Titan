@@ -80,14 +80,13 @@ void main() {
       controller.dispose();
     });
 
-    testWidgets('TextField without controller has null currentValue',
-        (tester) async {
+    testWidgets('TextField without controller has null currentValue', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: TextField(
-              decoration: InputDecoration(labelText: 'Notes'),
-            ),
+            body: TextField(decoration: InputDecoration(labelText: 'Notes')),
           ),
         ),
       );
@@ -101,8 +100,9 @@ void main() {
       expect(textFieldGlyph.currentValue, isNull);
     });
 
-    testWidgets('captures updated text after controller change',
-        (tester) async {
+    testWidgets('captures updated text after controller change', (
+      tester,
+    ) async {
       final controller = TextEditingController(text: 'initial');
 
       await tester.pumpWidget(
@@ -118,9 +118,7 @@ void main() {
 
       // Verify initial value
       var tableau = await TableauCapture.capture(index: 0);
-      var glyph = tableau.glyphs.firstWhere(
-        (g) => g.widgetType == 'TextField',
-      );
+      var glyph = tableau.glyphs.firstWhere((g) => g.widgetType == 'TextField');
       expect(glyph.currentValue, 'initial');
 
       // Update the controller text
@@ -129,9 +127,7 @@ void main() {
 
       // Verify updated value
       tableau = await TableauCapture.capture(index: 1);
-      glyph = tableau.glyphs.firstWhere(
-        (g) => g.widgetType == 'TextField',
-      );
+      glyph = tableau.glyphs.firstWhere((g) => g.widgetType == 'TextField');
       expect(glyph.currentValue, 'updated');
 
       controller.dispose();
@@ -140,9 +136,7 @@ void main() {
     testWidgets('Checkbox currentValue still works', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: Checkbox(value: true, onChanged: (_) {}),
-          ),
+          home: Scaffold(body: Checkbox(value: true, onChanged: (_) {})),
         ),
       );
 
@@ -157,16 +151,12 @@ void main() {
     testWidgets('Switch currentValue still works', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: Switch(value: false, onChanged: (_) {}),
-          ),
+          home: Scaffold(body: Switch(value: false, onChanged: (_) {})),
         ),
       );
 
       final tableau = await TableauCapture.capture(index: 0);
-      final glyph = tableau.glyphs.firstWhere(
-        (g) => g.widgetType == 'Switch',
-      );
+      final glyph = tableau.glyphs.firstWhere((g) => g.widgetType == 'Switch');
 
       expect(glyph.currentValue, 'off');
     });

@@ -346,14 +346,11 @@ class ScreenAuditor {
 
     // --- Check 1: Is testInput visible on the post-login screen? ---
     final exactMatch = after.contains(testInput);
-    final substringMatches =
-        exactMatch
-            ? <String>[]
-            : after
-                .where(
-                  (l) => l.toLowerCase().contains(testInput.toLowerCase()),
-                )
-                .toList();
+    final substringMatches = exactMatch
+        ? <String>[]
+        : after
+              .where((l) => l.toLowerCase().contains(testInput.toLowerCase()))
+              .toList();
 
     if (!exactMatch && substringMatches.isEmpty) {
       findings.add(
@@ -389,8 +386,9 @@ class ScreenAuditor {
 
     if (inputMissing) {
       final persisting = before.intersection(after);
-      final structural = _extractStructuralLabels(glyphsBefore)
-          .union(_extractStructuralLabels(glyphsAfter));
+      final structural = _extractStructuralLabels(
+        glyphsBefore,
+      ).union(_extractStructuralLabels(glyphsAfter));
 
       for (final label in persisting) {
         if (structural.contains(label)) continue;

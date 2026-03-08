@@ -1,12 +1,15 @@
 {
   "github.copilot.chat.mcpServers": {
     "titan-blueprint": {
-      "command": "dart",
+      "command": "/usr/local/bin/fvm",
       "args": [
+        "dart",
         "run",
         "titan_colossus:blueprint_mcp_server",
         "--blueprint-path",
-        "../../.titan/blueprint.json"
+        "../../.titan/blueprint.json",
+        "--relay-token",
+        "titan-dev-token"
       ],
       "cwd": "${workspaceFolder}/packages/titan_colossus"
     }

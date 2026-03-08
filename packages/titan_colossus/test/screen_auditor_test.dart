@@ -63,10 +63,7 @@ void main() {
     });
 
     test('excludes IconData labels', () {
-      final glyphs = [
-        glyph(label: 'IconData(U+0E15A)'),
-        glyph(label: 'Kael'),
-      ];
+      final glyphs = [glyph(label: 'IconData(U+0E15A)'), glyph(label: 'Kael')];
 
       final labels = auditor.extractDisplayLabels(glyphs);
 
@@ -112,10 +109,7 @@ void main() {
     });
 
     test('trims whitespace from labels', () {
-      final glyphs = [
-        glyph(label: '  Kael  '),
-        glyph(label: ' Questboard '),
-      ];
+      final glyphs = [glyph(label: '  Kael  '), glyph(label: ' Questboard ')];
 
       final labels = auditor.extractDisplayLabels(glyphs);
 
@@ -140,41 +134,31 @@ void main() {
     });
 
     test('detects "Log Out" button', () {
-      final glyphs = [
-        glyph(label: 'Log Out', interactive: true),
-      ];
+      final glyphs = [glyph(label: 'Log Out', interactive: true)];
 
       expect(auditor.detectSignOutButtons(glyphs), ['Log Out']);
     });
 
     test('detects "Logout" button', () {
-      final glyphs = [
-        glyph(label: 'Logout', interactive: true),
-      ];
+      final glyphs = [glyph(label: 'Logout', interactive: true)];
 
       expect(auditor.detectSignOutButtons(glyphs), ['Logout']);
     });
 
     test('detects "Sign Off" button', () {
-      final glyphs = [
-        glyph(label: 'Sign Off', interactive: true),
-      ];
+      final glyphs = [glyph(label: 'Sign Off', interactive: true)];
 
       expect(auditor.detectSignOutButtons(glyphs), ['Sign Off']);
     });
 
     test('detects "Disconnect" button', () {
-      final glyphs = [
-        glyph(label: 'Disconnect', interactive: true),
-      ];
+      final glyphs = [glyph(label: 'Disconnect', interactive: true)];
 
       expect(auditor.detectSignOutButtons(glyphs), ['Disconnect']);
     });
 
     test('ignores non-interactive elements', () {
-      final glyphs = [
-        glyph(label: 'Sign Out', interactive: false),
-      ];
+      final glyphs = [glyph(label: 'Sign Out', interactive: false)];
 
       expect(auditor.detectSignOutButtons(glyphs), isEmpty);
     });
@@ -248,7 +232,10 @@ void main() {
     });
 
     test('generates unique values', () {
-      final probes = List.generate(100, (_) => ScreenAuditor.generateProbeValue());
+      final probes = List.generate(
+        100,
+        (_) => ScreenAuditor.generateProbeValue(),
+      );
       final unique = probes.toSet();
 
       // Very high probability all are unique
@@ -262,14 +249,8 @@ void main() {
   group('ScreenAuditor.compareScreens', () {
     group('missing_input detection', () {
       test('detects when entered value is absent from screen', () {
-        final before = [
-          glyph(label: 'Kael'),
-          glyph(label: 'Questboard'),
-        ];
-        final after = [
-          glyph(label: 'Kael'),
-          glyph(label: 'Questboard'),
-        ];
+        final before = [glyph(label: 'Kael'), glyph(label: 'Questboard')];
+        final after = [glyph(label: 'Kael'), glyph(label: 'Questboard')];
 
         final report = auditor.compareScreens(
           glyphsBefore: before,
@@ -278,22 +259,13 @@ void main() {
         );
 
         expect(report.hasBugs, isTrue);
-        expect(
-          report.bugs.any((f) => f.category == 'missing_input'),
-          isTrue,
-        );
+        expect(report.bugs.any((f) => f.category == 'missing_input'), isTrue);
         expect(report.bugs.first.expected, 'Titan');
       });
 
       test('no bug when entered value appears on screen', () {
-        final before = [
-          glyph(label: 'Kael'),
-          glyph(label: 'Questboard'),
-        ];
-        final after = [
-          glyph(label: 'Titan'),
-          glyph(label: 'Questboard'),
-        ];
+        final before = [glyph(label: 'Kael'), glyph(label: 'Questboard')];
+        final after = [glyph(label: 'Titan'), glyph(label: 'Questboard')];
 
         final report = auditor.compareScreens(
           glyphsBefore: before,
@@ -309,30 +281,32 @@ void main() {
     });
 
     group('partial_match detection', () {
-      test('reports partial match when input is substring of another label',
-          () {
-        final before = [glyph(label: 'Kael')];
-        final after = [
-          glyph(label: 'Welcome, Titan!'),
-          glyph(label: 'Questboard'),
-        ];
+      test(
+        'reports partial match when input is substring of another label',
+        () {
+          final before = [glyph(label: 'Kael')];
+          final after = [
+            glyph(label: 'Welcome, Titan!'),
+            glyph(label: 'Questboard'),
+          ];
 
-        final report = auditor.compareScreens(
-          glyphsBefore: before,
-          glyphsAfter: after,
-          testInput: 'Titan',
-        );
+          final report = auditor.compareScreens(
+            glyphsBefore: before,
+            glyphsAfter: after,
+            testInput: 'Titan',
+          );
 
-        // Should have partial_match info, not a bug
-        expect(
-          report.findings.any((f) => f.category == 'partial_match'),
-          isTrue,
-        );
-        expect(
-          report.findings.any((f) => f.category == 'missing_input'),
-          isFalse,
-        );
-      });
+          // Should have partial_match info, not a bug
+          expect(
+            report.findings.any((f) => f.category == 'partial_match'),
+            isTrue,
+          );
+          expect(
+            report.findings.any((f) => f.category == 'missing_input'),
+            isFalse,
+          );
+        },
+      );
     });
 
     group('data_binding detection', () {
@@ -390,15 +364,10 @@ void main() {
         );
 
         // missing_input should fire (probe not shown)
-        expect(
-          report.bugs.any((f) => f.category == 'missing_input'),
-          isTrue,
-        );
+        expect(report.bugs.any((f) => f.category == 'missing_input'), isTrue);
 
         // But data_binding should NOT flag long/structural labels
-        final bindings = report.bugs.where(
-          (f) => f.category == 'data_binding',
-        );
+        final bindings = report.bugs.where((f) => f.category == 'data_binding');
         // Questboard is > 3 words? No. Let's check:
         // - "Questboard" — 1 word, 10 chars, alphabetic → matches name heuristic
         // - "Champion • 50 glory" — has bullet → filtered out
@@ -414,14 +383,8 @@ void main() {
 
     group('disappeared / appeared tracking', () {
       test('reports disappeared labels', () {
-        final before = [
-          glyph(label: 'Kael'),
-          glyph(label: 'Questboard'),
-        ];
-        final after = [
-          glyph(label: 'Titan'),
-          glyph(label: 'Questboard'),
-        ];
+        final before = [glyph(label: 'Kael'), glyph(label: 'Questboard')];
+        final after = [glyph(label: 'Titan'), glyph(label: 'Questboard')];
 
         final report = auditor.compareScreens(
           glyphsBefore: before,
@@ -430,21 +393,12 @@ void main() {
         );
 
         expect(report.disappeared, contains('Kael'));
-        expect(
-          report.findings.any((f) => f.category == 'disappeared'),
-          isTrue,
-        );
+        expect(report.findings.any((f) => f.category == 'disappeared'), isTrue);
       });
 
       test('reports appeared labels', () {
-        final before = [
-          glyph(label: 'Kael'),
-          glyph(label: 'Questboard'),
-        ];
-        final after = [
-          glyph(label: 'Titan'),
-          glyph(label: 'Questboard'),
-        ];
+        final before = [glyph(label: 'Kael'), glyph(label: 'Questboard')];
+        final after = [glyph(label: 'Titan'), glyph(label: 'Questboard')];
 
         final report = auditor.compareScreens(
           glyphsBefore: before,
@@ -453,17 +407,11 @@ void main() {
         );
 
         expect(report.appeared, contains('Titan'));
-        expect(
-          report.findings.any((f) => f.category == 'appeared'),
-          isTrue,
-        );
+        expect(report.findings.any((f) => f.category == 'appeared'), isTrue);
       });
 
       test('no disappeared/appeared when screens identical', () {
-        final glyphs = [
-          glyph(label: 'Kael'),
-          glyph(label: 'Questboard'),
-        ];
+        final glyphs = [glyph(label: 'Kael'), glyph(label: 'Questboard')];
 
         final report = auditor.compareScreens(
           glyphsBefore: glyphs,
@@ -653,16 +601,12 @@ void main() {
 
         // Verify bullet + long labels are still filtered
         expect(
-          bindingBugs.any(
-            (f) => f.actual == 'Champion \u2022 50 glory',
-          ),
+          bindingBugs.any((f) => f.actual == 'Champion \u2022 50 glory'),
           isFalse,
           reason: 'Labels with bullet separators are structural',
         );
         expect(
-          bindingBugs.any(
-            (f) => f.actual == 'Slay the Bug Dragon',
-          ),
+          bindingBugs.any((f) => f.actual == 'Slay the Bug Dragon'),
           isFalse,
           reason: 'Labels with > 3 words are not name-like',
         );
@@ -749,11 +693,7 @@ void main() {
             category: 'stale_data',
             message: 'test',
           ),
-          AuditFinding(
-            severity: 'info',
-            category: 'appeared',
-            message: 'test',
-          ),
+          AuditFinding(severity: 'info', category: 'appeared', message: 'test'),
         ],
         testInput: 'probe',
         labelsBefore: {'A'},
@@ -766,26 +706,10 @@ void main() {
     test('filters by severity correctly', () {
       const report = AuditReport(
         findings: [
-          AuditFinding(
-            severity: 'bug',
-            category: 'c1',
-            message: 'm1',
-          ),
-          AuditFinding(
-            severity: 'warning',
-            category: 'c2',
-            message: 'm2',
-          ),
-          AuditFinding(
-            severity: 'info',
-            category: 'c3',
-            message: 'm3',
-          ),
-          AuditFinding(
-            severity: 'bug',
-            category: 'c4',
-            message: 'm4',
-          ),
+          AuditFinding(severity: 'bug', category: 'c1', message: 'm1'),
+          AuditFinding(severity: 'warning', category: 'c2', message: 'm2'),
+          AuditFinding(severity: 'info', category: 'c3', message: 'm3'),
+          AuditFinding(severity: 'bug', category: 'c4', message: 'm4'),
         ],
         testInput: 'probe',
         labelsBefore: {},
@@ -850,9 +774,7 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      final bindings = report.bugs.where(
-        (f) => f.category == 'data_binding',
-      );
+      final bindings = report.bugs.where((f) => f.category == 'data_binding');
       expect(bindings.any((f) => f.actual == 'Kael'), isTrue);
     });
 
@@ -867,9 +789,7 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      final bindings = report.bugs.where(
-        (f) => f.category == 'data_binding',
-      );
+      final bindings = report.bugs.where((f) => f.category == 'data_binding');
       expect(bindings.any((f) => f.actual == label), isFalse);
     });
 
@@ -883,9 +803,7 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      final bindings = report.bugs.where(
-        (f) => f.category == 'data_binding',
-      );
+      final bindings = report.bugs.where((f) => f.category == 'data_binding');
       expect(bindings.any((f) => f.actual == 'Status: Active'), isFalse);
     });
 
@@ -899,13 +817,8 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      final bindings = report.bugs.where(
-        (f) => f.category == 'data_binding',
-      );
-      expect(
-        bindings.any((f) => f.actual == 'Slay the Bug Dragon'),
-        isFalse,
-      );
+      final bindings = report.bugs.where((f) => f.category == 'data_binding');
+      expect(bindings.any((f) => f.actual == 'Slay the Bug Dragon'), isFalse);
     });
 
     test('labels > 25 chars are not flagged', () {
@@ -919,9 +832,7 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      final bindings = report.bugs.where(
-        (f) => f.category == 'data_binding',
-      );
+      final bindings = report.bugs.where((f) => f.category == 'data_binding');
       expect(bindings.any((f) => f.actual == longName), isFalse);
     });
 
@@ -935,9 +846,7 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      final bindings = report.bugs.where(
-        (f) => f.category == 'data_binding',
-      );
+      final bindings = report.bugs.where((f) => f.category == 'data_binding');
       expect(bindings.any((f) => f.actual == 'John Smith'), isTrue);
     });
 
@@ -951,9 +860,7 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      final bindings = report.bugs.where(
-        (f) => f.category == 'data_binding',
-      );
+      final bindings = report.bugs.where((f) => f.category == 'data_binding');
       expect(bindings.any((f) => f.actual == 'on/off'), isFalse);
     });
 
@@ -967,9 +874,7 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      final bindings = report.bugs.where(
-        (f) => f.category == 'data_binding',
-      );
+      final bindings = report.bugs.where((f) => f.category == 'data_binding');
       expect(bindings.any((f) => f.actual == 'Score (100)'), isFalse);
     });
 
@@ -987,10 +892,7 @@ void main() {
         testInput: 'Probe_test',
       );
 
-      expect(
-        report.bugs.any((f) => f.category == 'data_binding'),
-        isFalse,
-      );
+      expect(report.bugs.any((f) => f.category == 'data_binding'), isFalse);
     });
   });
 
@@ -1072,10 +974,7 @@ void main() {
 
     test('identifies labels with TabBar ancestors as structural', () {
       final glyphs = [
-        glyph(
-          label: 'Settings',
-          ancestors: ['TabBar', 'Align', 'Padding'],
-        ),
+        glyph(label: 'Settings', ancestors: ['TabBar', 'Align', 'Padding']),
         glyph(label: 'UserName'),
       ];
 
@@ -1090,11 +989,7 @@ void main() {
       // GestureDetector (interactive). Should be structural.
       final glyphs = [
         glyph(label: 'Hero'),
-        glyph(
-          label: 'Hero',
-          interactive: true,
-          widgetType: 'GestureDetector',
-        ),
+        glyph(label: 'Hero', interactive: true, widgetType: 'GestureDetector'),
       ];
 
       final structural = auditor.extractStructuralLabels(glyphs);
@@ -1116,10 +1011,7 @@ void main() {
 
     test('labels with Drawer ancestors are structural', () {
       final glyphs = [
-        glyph(
-          label: 'Profile',
-          ancestors: ['Drawer', 'ListView', 'ListTile'],
-        ),
+        glyph(label: 'Profile', ancestors: ['Drawer', 'ListView', 'ListTile']),
       ];
 
       final structural = auditor.extractStructuralLabels(glyphs);
@@ -1129,10 +1021,7 @@ void main() {
 
     test('labels with Toolbar ancestors are structural', () {
       final glyphs = [
-        glyph(
-          label: 'Edit',
-          ancestors: ['ToolbarOptions', 'Row'],
-        ),
+        glyph(label: 'Edit', ancestors: ['ToolbarOptions', 'Row']),
       ];
 
       final structural = auditor.extractStructuralLabels(glyphs);
@@ -1141,9 +1030,7 @@ void main() {
     });
 
     test('Toolbar widget type is structural', () {
-      final glyphs = [
-        glyph(label: 'Format', widgetType: 'Toolbar'),
-      ];
+      final glyphs = [glyph(label: 'Format', widgetType: 'Toolbar')];
 
       final structural = auditor.extractStructuralLabels(glyphs);
 
@@ -1151,9 +1038,7 @@ void main() {
     });
 
     test('Drawer widget type is structural', () {
-      final glyphs = [
-        glyph(label: 'Menu', widgetType: 'Drawer'),
-      ];
+      final glyphs = [glyph(label: 'Menu', widgetType: 'Drawer')];
 
       final structural = auditor.extractStructuralLabels(glyphs);
 
@@ -1161,29 +1046,29 @@ void main() {
     });
 
     test('BottomSheet widget type is structural', () {
-      final glyphs = [
-        glyph(label: 'Options', widgetType: 'BottomSheet'),
-      ];
+      final glyphs = [glyph(label: 'Options', widgetType: 'BottomSheet')];
 
       final structural = auditor.extractStructuralLabels(glyphs);
 
       expect(structural, contains('Options'));
     });
 
-    test('plain Text widget with no structural ancestors is not structural',
-        () {
-      final glyphs = [
-        glyph(label: 'Kael'),
-        glyph(label: 'John Smith'),
-        glyph(
-          label: '0 Glory',
-          ancestors: ['Column', 'Padding', 'DecoratedBox'],
-        ),
-      ];
+    test(
+      'plain Text widget with no structural ancestors is not structural',
+      () {
+        final glyphs = [
+          glyph(label: 'Kael'),
+          glyph(label: 'John Smith'),
+          glyph(
+            label: '0 Glory',
+            ancestors: ['Column', 'Padding', 'DecoratedBox'],
+          ),
+        ];
 
-      final structural = auditor.extractStructuralLabels(glyphs);
+        final structural = auditor.extractStructuralLabels(glyphs);
 
-      expect(structural, isEmpty);
-    });
+        expect(structural, isEmpty);
+      },
+    );
   });
 }

@@ -477,10 +477,7 @@ class _BlueprintMcpServer {
                 'agent loop: observe → decide → act → observe again. '
                 'No pre-recorded stratagems needed — interact with '
                 'the live app directly.',
-            'inputSchema': {
-              'type': 'object',
-              'properties': {},
-            },
+            'inputSchema': {'type': 'object', 'properties': {}},
           },
           {
             'name': 'scry_act',
@@ -553,8 +550,7 @@ class _BlueprintMcpServer {
                       },
                       'label': {
                         'type': 'string',
-                        'description':
-                            'Target element by visible label text.',
+                        'description': 'Target element by visible label text.',
                       },
                       'fieldId': {
                         'type': 'string',
@@ -564,8 +560,7 @@ class _BlueprintMcpServer {
                       },
                       'value': {
                         'type': 'string',
-                        'description':
-                            'Text to enter or route to navigate to.',
+                        'description': 'Text to enter or route to navigate to.',
                       },
                     },
                   },
@@ -2135,9 +2130,9 @@ class _BlueprintMcpServer {
           final restoreResult = await _executeRawCampaign(restoreCampaign);
           restorationNote = restoreResult?['passRate'] == 1.0
               ? 'Original state restored (logged back in as '
-                  '"$originalName").'
+                    '"$originalName").'
               : 'Could not restore original state. Currently '
-                  'logged in as "$testValue".';
+                    'logged in as "$testValue".';
         } else {
           restorationNote =
               'Could not determine original name for restoration. '
@@ -2324,8 +2319,7 @@ class _BlueprintMcpServer {
       }
 
       // Build and execute the combined campaign
-      final campaign =
-          _scryEngine.buildMultiActionCampaign(resolvedActions);
+      final campaign = _scryEngine.buildMultiActionCampaign(resolvedActions);
       final result = await _executeRawCampaign(campaign);
 
       // Settle delay

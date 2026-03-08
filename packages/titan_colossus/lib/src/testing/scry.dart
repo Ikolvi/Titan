@@ -143,11 +143,7 @@ class ScryElement {
 /// ```
 class ScryGaze {
   /// Creates a [ScryGaze].
-  const ScryGaze({
-    required this.elements,
-    this.route,
-    this.glyphCount = 0,
-  });
+  const ScryGaze({required this.elements, this.route, this.glyphCount = 0});
 
   /// All detected elements.
   final List<ScryElement> elements;
@@ -179,15 +175,12 @@ class ScryGaze {
       elements.where((e) => e.kind == ScryElementKind.structural).toList();
 
   /// Elements that require user permission before interacting.
-  List<ScryElement> get gated =>
-      elements.where((e) => e.gated).toList();
+  List<ScryElement> get gated => elements.where((e) => e.gated).toList();
 
   /// Whether this looks like an authentication/login screen.
   bool get isAuthScreen =>
       fields.isNotEmpty &&
-      buttons.any(
-        (b) => _loginButtonPattern.hasMatch(b.label.toLowerCase()),
-      );
+      buttons.any((b) => _loginButtonPattern.hasMatch(b.label.toLowerCase()));
 
   static final _loginButtonPattern = RegExp(
     r'\b(log\s*in|sign\s*in|enter|submit|continue)\b',
@@ -366,14 +359,10 @@ class Scry {
       // Use the preferred (most representative) widget type from Pass 1.
       // For example, if "Hero Name" appears as RichText, Text, and
       // TextField, we want "TextField" — the interactive text input.
-      final wt = preferredWidgetType[label] ??
-          (glyph['wt'] as String? ?? '');
-      final sr = preferredSemanticRole[label] ??
-          (glyph['sr'] as String?);
-      final it = preferredInteractionType[label] ??
-          (glyph['it'] as String?);
-      final cv = preferredCurrentValue[label] ??
-          (glyph['cv'] as String?);
+      final wt = preferredWidgetType[label] ?? (glyph['wt'] as String? ?? '');
+      final sr = preferredSemanticRole[label] ?? (glyph['sr'] as String?);
+      final it = preferredInteractionType[label] ?? (glyph['it'] as String?);
+      final cv = preferredCurrentValue[label] ?? (glyph['cv'] as String?);
       final isEnabled = glyph['en'] as bool? ?? true;
       final fieldId = fieldIds[label];
       final isTextField = textInputLabels.contains(label);
@@ -391,8 +380,7 @@ class Scry {
       );
 
       // Check if this action is gated (destructive)
-      final gated =
-          interactiveLabels.contains(label) && _isGatedAction(label);
+      final gated = interactiveLabels.contains(label) && _isGatedAction(label);
 
       seen[label] = ScryElement(
         kind: kind,
@@ -443,16 +431,20 @@ class Scry {
 
     if (gaze.isAuthScreen) {
       buf.writeln();
-      buf.writeln('> **Login screen detected** — '
-          'this screen has text fields and a login button.');
+      buf.writeln(
+        '> **Login screen detected** — '
+        'this screen has text fields and a login button.',
+      );
     }
 
     // Gated elements warning
     if (gaze.gated.isNotEmpty) {
       buf.writeln();
-      buf.writeln('> ⚠️ **Permission required** — '
-          '${gaze.gated.length} element(s) marked as potentially '
-          'destructive. Ask the user before interacting:');
+      buf.writeln(
+        '> ⚠️ **Permission required** — '
+        '${gaze.gated.length} element(s) marked as potentially '
+        'destructive. Ask the user before interacting:',
+      );
       for (final e in gaze.gated) {
         buf.writeln('>   - "${e.label}"');
       }
@@ -464,8 +456,10 @@ class Scry {
     if (gaze.fields.isNotEmpty) {
       buf.writeln('## 📝 Text Fields (${gaze.fields.length})');
       buf.writeln();
-      buf.writeln('Use `scry_act(action: "enterText", label: "<label>", '
-          'value: "<text>")` to type into a field.');
+      buf.writeln(
+        'Use `scry_act(action: "enterText", label: "<label>", '
+        'value: "<text>")` to type into a field.',
+      );
       buf.writeln();
       for (final f in gaze.fields) {
         final parts = <String>[f.widgetType];
@@ -520,8 +514,10 @@ class Scry {
       buf.writeln('- `tap` — tap a button by label');
     }
     if (gaze.fields.isNotEmpty) {
-      buf.writeln('- `enterText` — type text into a field '
-          '(use fieldId for targeting)');
+      buf.writeln(
+        '- `enterText` — type text into a field '
+        '(use fieldId for targeting)',
+      );
       buf.writeln('- `clearText` — clear a text field');
     }
     if (gaze.navigation.isNotEmpty) {
@@ -638,11 +634,7 @@ class Scry {
       'name': '_scry_action',
       'entries': [
         {
-          'stratagem': {
-            'name': '_scry_step',
-            'startRoute': '',
-            'steps': steps,
-          },
+          'stratagem': {'name': '_scry_step', 'startRoute': '', 'steps': steps},
         },
       ],
     };
@@ -829,9 +821,11 @@ class Scry {
       final detail = value != null && action == 'enterText'
           ? ' → "$value"'
           : '';
-      buf.writeln('${i + 1}. `$action`'
-          '${target.isNotEmpty ? ' on "$target"' : ''}'
-          '$detail');
+      buf.writeln(
+        '${i + 1}. `$action`'
+        '${target.isNotEmpty ? ' on "$target"' : ''}'
+        '$detail',
+      );
     }
     buf.writeln();
 

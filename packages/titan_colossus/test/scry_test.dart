@@ -257,16 +257,8 @@ void main() {
   group('Scry.observe', () {
     test('classifies interactive elements as buttons', () {
       final glyphs = [
-        glyph(
-          label: 'Sign Out',
-          interactive: true,
-          widgetType: 'IconButton',
-        ),
-        glyph(
-          label: 'About',
-          interactive: true,
-          widgetType: 'IconButton',
-        ),
+        glyph(label: 'Sign Out', interactive: true, widgetType: 'IconButton'),
+        glyph(label: 'About', interactive: true, widgetType: 'IconButton'),
       ];
 
       final gaze = scry.observe(glyphs);
@@ -327,11 +319,7 @@ void main() {
 
     test('classifies NavigationBar widget type as navigation', () {
       final glyphs = [
-        glyph(
-          label: 'Quests',
-          interactive: true,
-          widgetType: 'NavigationBar',
-        ),
+        glyph(label: 'Quests', interactive: true, widgetType: 'NavigationBar'),
       ];
 
       final gaze = scry.observe(glyphs);
@@ -355,9 +343,7 @@ void main() {
     });
 
     test('classifies AppBar widget type as structural', () {
-      final glyphs = [
-        glyph(label: 'Questboard', widgetType: 'AppBar'),
-      ];
+      final glyphs = [glyph(label: 'Questboard', widgetType: 'AppBar')];
 
       final gaze = scry.observe(glyphs);
 
@@ -385,18 +371,11 @@ void main() {
       final gaze = scry.observe(glyphs);
 
       // Only one "Kael" element
-      expect(
-        gaze.elements.where((e) => e.label == 'Kael'),
-        hasLength(1),
-      );
+      expect(gaze.elements.where((e) => e.label == 'Kael'), hasLength(1));
     });
 
     test('excludes empty and short labels', () {
-      final glyphs = [
-        glyph(label: ''),
-        glyph(label: 'A'),
-        glyph(label: 'OK'),
-      ];
+      final glyphs = [glyph(label: ''), glyph(label: 'A'), glyph(label: 'OK')];
 
       final gaze = scry.observe(glyphs);
 
@@ -405,10 +384,7 @@ void main() {
     });
 
     test('excludes IconData labels', () {
-      final glyphs = [
-        glyph(label: 'IconData(U+0E15A)'),
-        glyph(label: 'Kael'),
-      ];
+      final glyphs = [glyph(label: 'IconData(U+0E15A)'), glyph(label: 'Kael')];
 
       final gaze = scry.observe(glyphs);
 
@@ -423,11 +399,7 @@ void main() {
           interactive: true,
           widgetType: 'ElevatedButton',
         ),
-        glyph(
-          label: 'Save',
-          interactive: true,
-          widgetType: 'ElevatedButton',
-        ),
+        glyph(label: 'Save', interactive: true, widgetType: 'ElevatedButton'),
       ];
 
       final gaze = scry.observe(glyphs);
@@ -437,9 +409,7 @@ void main() {
       );
       expect(deleteBtn.gated, isTrue);
 
-      final saveBtn = gaze.buttons.firstWhere(
-        (e) => e.label == 'Save',
-      );
+      final saveBtn = gaze.buttons.firstWhere((e) => e.label == 'Save');
       expect(saveBtn.gated, isFalse);
     });
 
@@ -456,9 +426,7 @@ void main() {
         'Terminate Session',
         'Purge Cache',
       ]) {
-        final glyphs = [
-          glyph(label: label, interactive: true),
-        ];
+        final glyphs = [glyph(label: label, interactive: true)];
         final gaze = scry.observe(glyphs);
         expect(
           gaze.buttons.first.gated,
@@ -470,9 +438,7 @@ void main() {
 
     test('non-interactive elements are not gated', () {
       // Even if label says "Delete", non-interactive labels aren't gated
-      final glyphs = [
-        glyph(label: 'Delete this file', interactive: false),
-      ];
+      final glyphs = [glyph(label: 'Delete this file', interactive: false)];
 
       final gaze = scry.observe(glyphs);
 
@@ -480,20 +446,13 @@ void main() {
     });
 
     test('preserves route information', () {
-      final gaze = scry.observe(
-        [glyph(label: 'OK')],
-        route: '/quests',
-      );
+      final gaze = scry.observe([glyph(label: 'OK')], route: '/quests');
 
       expect(gaze.route, '/quests');
     });
 
     test('tracks glyph count', () {
-      final glyphs = [
-        glyph(label: 'A'),
-        glyph(label: 'B'),
-        glyph(label: 'CC'),
-      ];
+      final glyphs = [glyph(label: 'A'), glyph(label: 'B'), glyph(label: 'CC')];
 
       final gaze = scry.observe(glyphs);
 
@@ -504,11 +463,7 @@ void main() {
       // If "Hero" is interactive AND has a nav ancestor, it's navigation
       // (navigation takes precedence over generic button)
       final glyphs = [
-        glyph(
-          label: 'Hero',
-          interactive: true,
-          widgetType: 'GestureDetector',
-        ),
+        glyph(label: 'Hero', interactive: true, widgetType: 'GestureDetector'),
         glyph(
           label: 'Hero',
           widgetType: 'Tooltip',
@@ -532,23 +487,12 @@ void main() {
         glyph(label: 'Kael'),
         glyph(label: '0 Glory \u2022 Novice'),
         // App bar title (structural)
-        glyph(
-          label: 'Questboard',
-          ancestors: ['_AppBarTitleBox', 'Semantics'],
-        ),
+        glyph(label: 'Questboard', ancestors: ['_AppBarTitleBox', 'Semantics']),
         glyph(label: 'Questboard', widgetType: 'AppBar'),
         // Buttons
-        glyph(
-          label: 'Sign Out',
-          interactive: true,
-          widgetType: 'IconButton',
-        ),
+        glyph(label: 'Sign Out', interactive: true, widgetType: 'IconButton'),
         glyph(label: 'Sign Out', widgetType: 'Tooltip'),
-        glyph(
-          label: 'About',
-          interactive: true,
-          widgetType: 'IconButton',
-        ),
+        glyph(label: 'About', interactive: true, widgetType: 'IconButton'),
         // Navigation tabs
         glyph(
           label: 'Quests',
@@ -564,11 +508,7 @@ void main() {
             '_NavigationBarDestinationSemantics',
           ],
         ),
-        glyph(
-          label: 'Hero',
-          interactive: true,
-          widgetType: 'GestureDetector',
-        ),
+        glyph(label: 'Hero', interactive: true, widgetType: 'GestureDetector'),
         glyph(
           label: 'Hero',
           widgetType: 'Tooltip',
@@ -591,10 +531,7 @@ void main() {
       final gaze = scry.observe(glyphs, route: '/quests');
 
       // Structural: Questboard (AppBar ancestor)
-      expect(
-        gaze.structural.map((e) => e.label),
-        contains('Questboard'),
-      );
+      expect(gaze.structural.map((e) => e.label), contains('Questboard'));
 
       // Navigation: Quests, Hero (nav destination ancestors)
       expect(gaze.navigation.map((e) => e.label), contains('Quests'));
@@ -603,17 +540,11 @@ void main() {
       // Buttons: Sign Out, About, Complete Quest
       expect(gaze.buttons.map((e) => e.label), contains('Sign Out'));
       expect(gaze.buttons.map((e) => e.label), contains('About'));
-      expect(
-        gaze.buttons.map((e) => e.label),
-        contains('Complete Quest'),
-      );
+      expect(gaze.buttons.map((e) => e.label), contains('Complete Quest'));
 
       // Content: Kael, quest names/scores
       expect(gaze.content.map((e) => e.label), contains('Kael'));
-      expect(
-        gaze.content.map((e) => e.label),
-        contains('Slay the Bug Dragon'),
-      );
+      expect(gaze.content.map((e) => e.label), contains('Slay the Bug Dragon'));
 
       expect(gaze.route, '/quests');
       expect(gaze.isAuthScreen, isFalse);
@@ -642,8 +573,10 @@ void main() {
       expect(gaze.fields, hasLength(1));
       expect(gaze.fields.first.fieldId, 'heroName');
       expect(gaze.buttons, hasLength(1));
-      expect(gaze.content.map((e) => e.label),
-          contains('Sign in to continue to /'));
+      expect(
+        gaze.content.map((e) => e.label),
+        contains('Sign in to continue to /'),
+      );
     });
 
     test('TextField classified correctly even when RichText appears first', () {
@@ -678,11 +611,7 @@ void main() {
   // ===================================================================
   group('Scry.formatGaze', () {
     test('includes route and glyph count in header', () {
-      const gaze = ScryGaze(
-        elements: [],
-        route: '/quests',
-        glyphCount: 177,
-      );
+      const gaze = ScryGaze(elements: [], route: '/quests', glyphCount: 177);
 
       final md = scry.formatGaze(gaze);
 
@@ -937,10 +866,7 @@ void main() {
     });
 
     test('campaign has correct structure', () {
-      final campaign = scry.buildActionCampaign(
-        action: 'tap',
-        label: 'OK',
-      );
+      final campaign = scry.buildActionCampaign(action: 'tap', label: 'OK');
 
       // Must have these keys for Relay
       expect(campaign, contains('name'));
@@ -1011,10 +937,24 @@ void main() {
   group('Scry.resolveFieldLabel', () {
     test('resolves fieldId to label', () {
       final glyphs = [
-        {'wt': 'TextField', 'l': 'Hero Name', 'fid': 'heroName',
-         'ia': true, 'x': 0.0, 'y': 0.0, 'w': 200.0, 'h': 40.0},
-        {'wt': 'Text', 'l': 'Welcome', 'x': 0.0, 'y': 50.0,
-         'w': 100.0, 'h': 20.0},
+        {
+          'wt': 'TextField',
+          'l': 'Hero Name',
+          'fid': 'heroName',
+          'ia': true,
+          'x': 0.0,
+          'y': 0.0,
+          'w': 200.0,
+          'h': 40.0,
+        },
+        {
+          'wt': 'Text',
+          'l': 'Welcome',
+          'x': 0.0,
+          'y': 50.0,
+          'w': 100.0,
+          'h': 20.0,
+        },
       ];
 
       expect(scry.resolveFieldLabel(glyphs, 'heroName'), 'Hero Name');
@@ -1022,8 +962,16 @@ void main() {
 
     test('returns null for unknown fieldId', () {
       final glyphs = [
-        {'wt': 'TextField', 'l': 'Hero Name', 'fid': 'heroName',
-         'ia': true, 'x': 0.0, 'y': 0.0, 'w': 200.0, 'h': 40.0},
+        {
+          'wt': 'TextField',
+          'l': 'Hero Name',
+          'fid': 'heroName',
+          'ia': true,
+          'x': 0.0,
+          'y': 0.0,
+          'w': 200.0,
+          'h': 40.0,
+        },
       ];
 
       expect(scry.resolveFieldLabel(glyphs, 'email'), isNull);
@@ -1159,9 +1107,7 @@ void main() {
     });
 
     test('disconnect is gated', () {
-      final glyphs = [
-        glyph(label: 'Disconnect', interactive: true),
-      ];
+      final glyphs = [glyph(label: 'Disconnect', interactive: true)];
 
       final gaze = scry.observe(glyphs);
 
@@ -1337,11 +1283,7 @@ void main() {
     });
 
     test('formats failed multi-action result with error', () {
-      final gaze = ScryGaze(
-        elements: const [],
-        route: '/login',
-        glyphCount: 0,
-      );
+      final gaze = ScryGaze(elements: const [], route: '/login', glyphCount: 0);
 
       final md = scry.formatMultiActionResult(
         actions: [
