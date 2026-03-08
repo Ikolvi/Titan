@@ -28,6 +28,7 @@ Titan provides a Model Context Protocol (MCP) server that gives AI assistants re
   - [Campaign Management](#campaign-management)
   - [Performance Monitoring](#performance-monitoring)
   - [Session & Recording](#session--recording)
+  - [Error Detection](#error-detection)
   - [Relay Bridge](#relay-bridge)
 - [Usage Examples](#usage-examples)
 - [Physical Device & Emulator Setup](#physical-device--emulator-setup)
@@ -37,7 +38,7 @@ Titan provides a Model Context Protocol (MCP) server that gives AI assistants re
 
 ## Overview
 
-The **Titan Blueprint MCP Server** (`titan-blueprint`) is a stdio-based JSON-RPC 2.0 server that exposes 27 tools to AI assistants. It connects to your running Flutter app through the **Relay** HTTP bridge (port 8642) and reads static blueprint data from `.titan/blueprint.json`.
+The **Titan Blueprint MCP Server** (`titan-blueprint`) is a stdio-based JSON-RPC 2.0 server that exposes 28 tools to AI assistants. It connects to your running Flutter app through the **Relay** HTTP bridge (port 8642) and reads static blueprint data from `.titan/blueprint.json`.
 
 ### Architecture
 
@@ -61,7 +62,7 @@ The **Titan Blueprint MCP Server** (`titan-blueprint`) is a stdio-based JSON-RPC
 
 1. **Static mode** — Read pre-exported blueprint data (`.titan/blueprint.json`). Works without a running app. Tools: `get_terrain`, `get_stratagems`, `get_ai_prompt`, `get_dead_ends`, `get_unreliable_routes`, `get_route_patterns`.
 
-2. **Live mode** — Connect to a running app via the Relay HTTP bridge. Required for real-time screen observation, action execution, and performance monitoring. Tools: `scry`, `scry_act`, `scry_diff`, `execute_campaign`, `relay_status`, `relay_terrain`, `generate_auth_stratagem`, `generate_campaign`, `audit_screen`, `get_performance`, `get_frame_history`, `get_page_loads`, `get_memory_snapshot`, `get_alerts`, `list_sessions`, `get_recording_status`.
+2. **Live mode** — Connect to a running app via the Relay HTTP bridge. Required for real-time screen observation, action execution, and performance monitoring. Tools: `scry`, `scry_act`, `scry_diff`, `execute_campaign`, `relay_status`, `relay_terrain`, `generate_auth_stratagem`, `generate_campaign`, `audit_screen`, `get_performance`, `get_frame_history`, `get_page_loads`, `get_memory_snapshot`, `get_alerts`, `list_sessions`, `get_recording_status`, `get_framework_errors`.
 
 ---
 
@@ -557,7 +558,7 @@ fvm dart run titan_colossus:blueprint_mcp_server \
 
 ## Tool Reference
 
-The server exposes **27 tools** organized into six categories.
+The server exposes **28 tools** organized into seven categories.
 
 ### Screen Observation (Scry)
 
@@ -642,6 +643,12 @@ These tools provide detailed access to Colossus performance monitors in the runn
 | **`list_sessions`** | List saved Shade recording sessions from ShadeVault. Returns summaries with IDs, names, recording dates, durations, and event counts. Sorted newest first. |
 | **`get_recording_status`** | Current Shade recording/replaying state. Shows whether recording or replaying is active, elapsed time, event count, performance recording state, and last session availability. |
 
+### Error Detection
+
+| Tool | Description |
+|------|-------------|
+| **`get_framework_errors`** | Captured Flutter framework errors (overflow, build, layout, paint, gesture). Shows errors from `FlutterError.onError` — including RenderFlex overflow, red error screen exceptions, and layout failures. Returns error category, message, library, truncated stack trace, and category breakdown. |
+
 ---
 
 ## Usage Examples
@@ -716,6 +723,15 @@ The AI will:
 The AI will:
 1. Call `get_recording_status` to check current state
 2. Call `list_sessions` to list saved ShadeVault recordings
+
+### Error detection
+
+> "Are there any overflow or build errors in the app?"
+
+The AI will:
+1. Call `get_framework_errors` to check for captured `FlutterError.onError` reports
+2. Report overflow, build, layout, paint, and gesture errors by category
+3. Call `scry` to check for any `ErrorWidget` (red error screen) on the current view
 
 ---
 
