@@ -89,9 +89,7 @@ class BlueprintExport {
     // Generate stratagems for every discovered outpost
     final stratagems = <Stratagem>[];
     for (final outpost in terrain.outposts.values) {
-      stratagems.addAll(
-        Gauntlet.generateFor(outpost, intensity: intensity),
-      );
+      stratagems.addAll(Gauntlet.generateFor(outpost, intensity: intensity));
     }
 
     return BlueprintExport(
@@ -139,9 +137,7 @@ class BlueprintExport {
     // Generate stratagems
     final stratagems = <Stratagem>[];
     for (final outpost in terrain.outposts.values) {
-      stratagems.addAll(
-        Gauntlet.generateFor(outpost, intensity: intensity),
-      );
+      stratagems.addAll(Gauntlet.generateFor(outpost, intensity: intensity));
     }
 
     return BlueprintExport(
@@ -192,10 +188,7 @@ class BlueprintExport {
     if (verdicts.isNotEmpty) {
       map['verdicts'] = verdicts.map((v) => v.toJson()).toList();
       try {
-        final debrief = Debrief(
-          verdicts: verdicts,
-          terrain: terrain,
-        );
+        final debrief = Debrief(verdicts: verdicts, terrain: terrain);
         map['debrief'] = debrief.analyze().toJson();
       } catch (_) {
         // Debrief analysis failed — skip silently
@@ -390,8 +383,9 @@ class BlueprintExportIO {
     String? filename,
     bool compact = false,
   }) async {
-    final content =
-        compact ? export.toCompactJsonString() : export.toJsonString();
+    final content = compact
+        ? export.toCompactJsonString()
+        : export.toJsonString();
     return _writeFile(
       content,
       directory: directory,

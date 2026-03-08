@@ -88,11 +88,11 @@ class Outpost {
     List<March>? entrances,
     this.screenWidth = 0,
     this.screenHeight = 0,
-  })  : interactiveElements = interactiveElements ?? [],
-        displayElements = displayElements ?? [],
-        tags = tags ?? [],
-        exits = exits ?? [],
-        entrances = entrances ?? [];
+  }) : interactiveElements = interactiveElements ?? [],
+       displayElements = displayElements ?? [],
+       tags = tags ?? [],
+       exits = exits ?? [],
+       entrances = entrances ?? [];
 
   /// Create an [Outpost] from a [Tableau] snapshot.
   ///
@@ -229,19 +229,23 @@ class Outpost {
       observationCount: json['observationCount'] as int? ?? 0,
       screenWidth: (json['screenWidth'] as num?)?.toDouble() ?? 0,
       screenHeight: (json['screenHeight'] as num?)?.toDouble() ?? 0,
-      interactiveElements: (json['interactiveElements'] as List?)
+      interactiveElements:
+          (json['interactiveElements'] as List?)
               ?.map((e) => OutpostElement.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      displayElements: (json['displayElements'] as List?)
+      displayElements:
+          (json['displayElements'] as List?)
               ?.map((e) => OutpostElement.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      exits: (json['exits'] as List?)
+      exits:
+          (json['exits'] as List?)
               ?.map((e) => March.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      entrances: (json['entrances'] as List?)
+      entrances:
+          (json['entrances'] as List?)
               ?.map((e) => March.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -259,14 +263,11 @@ class Outpost {
   // -----------------------------------------------------------------------
 
   /// Merge an element into a list, incrementing frequency if it exists.
-  static void _mergeElement(
-    List<OutpostElement> list,
-    OutpostElement element,
-  ) {
+  static void _mergeElement(List<OutpostElement> list, OutpostElement element) {
     final existing = list.cast<OutpostElement?>().firstWhere(
-          (e) => e!.matches(element),
-          orElse: () => null,
-        );
+      (e) => e!.matches(element),
+      orElse: () => null,
+    );
     if (existing != null) {
       existing.frequency++;
       // Update value if changed
@@ -347,16 +348,13 @@ class Outpost {
         .split('/')
         .where((s) => !s.startsWith(':'))
         .map((s) {
-      return s
-          .replaceAll('_', ' ')
-          .replaceAll('-', ' ')
-          .split(' ')
-          .map(
-            (w) =>
-                w.isEmpty ? w : w[0].toUpperCase() + w.substring(1),
-          )
-          .join(' ');
-    });
+          return s
+              .replaceAll('_', ' ')
+              .replaceAll('-', ' ')
+              .split(' ')
+              .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+              .join(' ');
+        });
 
     final name = segments.join(' > ');
     if (name.isEmpty) return 'Screen';
@@ -491,7 +489,8 @@ class OutpostElement {
   }
 
   @override
-  String toString() => 'OutpostElement(${toShortString()}'
+  String toString() =>
+      'OutpostElement(${toShortString()}'
       '${isInteractive ? " [$interactionType]" : ""}'
       '${!isEnabled ? " [disabled]" : ""})';
 }

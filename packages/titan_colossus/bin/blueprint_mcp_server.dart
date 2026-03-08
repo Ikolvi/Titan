@@ -28,14 +28,29 @@
 ///
 /// ## Available Tools
 ///
+/// ### Read-only (static data)
 /// - `get_terrain` — Returns the app's navigation graph (screens + transitions)
 /// - `get_stratagems` — Returns auto-generated edge-case test plans
 /// - `get_ai_prompt` — Returns a complete AI-ready testing context document
 /// - `get_dead_ends` — Returns screens with no outgoing transitions
 /// - `get_unreliable_routes` — Returns transitions with low reliability
 /// - `get_route_patterns` — Returns all known route patterns
+///
+/// ### AI-driven testing (generate + execute)
+/// - `generate_gauntlet` — Generate edge-case tests for a specific route
+/// - `get_campaign_template` — Get the Campaign JSON schema for AI to fill
+/// - `save_campaign` — Save a generated Campaign JSON to disk for execution
+/// - `get_debrief` — Get debrief report from previous campaign results
+/// - `get_full_context` — Everything in one call for AI test planning
+///
+/// ### Live Relay (connects to running app)
+/// - `execute_campaign` — Execute Campaign JSON on the running app (zero
+///   human interaction)
+/// - `relay_status` — Check if the Relay bridge is running
+/// - `relay_terrain` — Get live Terrain from the running app
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -45,6 +60,21 @@ import 'dart:io';
 /// Blueprint data as tools that AI assistants can invoke.
 Future<void> main(List<String> args) async {
   final server = _BlueprintMcpServer();
+
+  // Support CLI arguments for configuration
+  for (var i = 0; i < args.length - 1; i++) {
+    switch (args[i]) {
+      case '--blueprint-path':
+        server._blueprintPath = args[i + 1];
+      case '--relay-host':
+        server._relayHost = args[i + 1];
+      case '--relay-port':
+        server._relayPort = int.parse(args[i + 1]);
+      case '--relay-token':
+        server._relayAuthToken = args[i + 1];
+    }
+  }
+
   await server.run();
 }
 
@@ -52,12 +82,16 @@ class _BlueprintMcpServer {
   String _blueprintPath = '.titan/blueprint.json';
   Map<String, dynamic>? _cachedBlueprint;
   DateTime? _lastModified;
+  String _relayHost = '127.0.0.1';
+  int _relayPort = 8642;
+  String? _relayAuthToken;
 
   Future<void> run() async {
     // Read JSON-RPC messages from stdin, write responses to stdout
-    final lines = stdin
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
+    final lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
+
+    // Support CLI args: --relay-host, --relay-port, --relay-token
+    // (parsed in main() and set before run())
 
     await for (final line in lines) {
       if (line.trim().isEmpty) continue;
@@ -99,10 +133,7 @@ class _BlueprintMcpServer {
       default:
         return {
           'jsonrpc': '2.0',
-          'error': {
-            'code': -32601,
-            'message': 'Method not found: $method',
-          },
+          'error': {'code': -32601, 'message': 'Method not found: $method'},
           'id': id,
         };
     }
@@ -127,10 +158,7 @@ class _BlueprintMcpServer {
         'capabilities': {
           'tools': {'listChanged': false},
         },
-        'serverInfo': {
-          'name': 'titan-blueprint',
-          'version': '1.0.0',
-        },
+        'serverInfo': {'name': 'titan-blueprint', 'version': '1.0.0'},
       },
       'id': id,
     };
@@ -210,6 +238,115 @@ class _BlueprintMcpServer {
                 'RouteParameterizer (e.g. /quest/:id, /hero/:heroId).',
             'inputSchema': {'type': 'object', 'properties': {}},
           },
+          {
+            'name': 'generate_gauntlet',
+            'description':
+                'Generate edge-case test Stratagems for a specific route. '
+                'Returns generated Stratagem JSON that can be used in a '
+                'Campaign or executed directly. Requires Blueprint data.',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'route': {
+                  'type': 'string',
+                  'description':
+                      'The route pattern to generate tests for '
+                      '(e.g. /login, /quest/:id).',
+                },
+                'intensity': {
+                  'type': 'string',
+                  'enum': ['quick', 'standard', 'thorough'],
+                  'description':
+                      'Test generation intensity. "quick" generates '
+                      'minimal tests, "thorough" generates comprehensive '
+                      'edge cases. Default: standard.',
+                },
+              },
+              'required': ['route'],
+            },
+          },
+          {
+            'name': 'get_campaign_template',
+            'description':
+                'Returns the Campaign JSON schema template and instructions. '
+                'Use this to understand how to structure Campaign JSON before '
+                'calling save_campaign.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'save_campaign',
+            'description':
+                'Save a Campaign JSON to disk at .titan/campaign.json. '
+                'The running app can pick this up for execution. '
+                'Returns the path where the Campaign was saved.',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'campaign': {
+                  'type': 'object',
+                  'description':
+                      'The Campaign JSON conforming to the '
+                      'titan://campaign/v1 schema.',
+                },
+              },
+              'required': ['campaign'],
+            },
+          },
+          {
+            'name': 'get_debrief',
+            'description':
+                'Returns the debrief report from previous Campaign results. '
+                'Shows pass/fail rates, insights, failure patterns, and '
+                'suggested fixes. Reads from the Blueprint export.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'get_full_context',
+            'description':
+                'Returns EVERYTHING in one call: navigation map, dead ends, '
+                'unreliable routes, generated Stratagems, Campaign template, '
+                'previous test results, and debrief. Use this when starting '
+                'a full test planning session.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'execute_campaign',
+            'description':
+                'Execute a Campaign JSON on the running app via the Relay '
+                'HTTP bridge. The app must be running with '
+                'ColossusPlugin(enableRelay: true). Returns pass/fail '
+                'results, verdicts, and AI diagnostic report. '
+                'This is the key tool for FULLY AUTOMATED testing — '
+                'no human interaction needed.',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'campaign': {
+                  'type': 'object',
+                  'description':
+                      'The Campaign JSON conforming to the '
+                      'titan://campaign/v1 schema.',
+                },
+              },
+              'required': ['campaign'],
+            },
+          },
+          {
+            'name': 'relay_status',
+            'description':
+                'Check whether the Relay HTTP bridge is running in the '
+                'app. Returns connection status, port, and statistics.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'relay_terrain',
+            'description':
+                'Get the LIVE Terrain from the running app via Relay. '
+                'Unlike get_terrain (which reads from static '
+                'blueprint.json), this reflects the latest state '
+                'including in-session recordings.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
         ],
       },
       'id': id,
@@ -222,8 +359,7 @@ class _BlueprintMcpServer {
   ) async {
     final params = request['params'] as Map<String, dynamic>?;
     final toolName = params?['name'] as String?;
-    final toolArgs =
-        params?['arguments'] as Map<String, dynamic>? ?? const {};
+    final toolArgs = params?['arguments'] as Map<String, dynamic>? ?? const {};
 
     // Load/refresh Blueprint data
     final blueprint = await _loadBlueprint();
@@ -254,6 +390,14 @@ class _BlueprintMcpServer {
       'get_dead_ends' => _getDeadEnds(blueprint),
       'get_unreliable_routes' => _getUnreliableRoutes(blueprint),
       'get_route_patterns' => _getRoutePatterns(blueprint),
+      'generate_gauntlet' => _generateGauntlet(blueprint, toolArgs),
+      'get_campaign_template' => _getCampaignTemplate(),
+      'save_campaign' => await _saveCampaign(toolArgs),
+      'get_debrief' => _getDebrief(blueprint),
+      'get_full_context' => _getFullContext(blueprint),
+      'execute_campaign' => await _executeCampaign(toolArgs),
+      'relay_status' => await _relayStatus(),
+      'relay_terrain' => await _relayTerrain(),
       _ => 'Unknown tool: $toolName',
     };
 
@@ -281,8 +425,9 @@ class _BlueprintMcpServer {
     return switch (format) {
       'mermaid' => blueprint['mermaid'] as String? ?? 'No Mermaid data',
       'ai_map' => blueprint['aiMap'] as String? ?? 'No AI map data',
-      'json' => const JsonEncoder.withIndent('  ')
-          .convert(blueprint['terrain'] ?? {}),
+      'json' => const JsonEncoder.withIndent(
+        '  ',
+      ).convert(blueprint['terrain'] ?? {}),
       _ => 'Unknown format: $format. Use json, mermaid, or ai_map.',
     };
   }
@@ -296,19 +441,18 @@ class _BlueprintMcpServer {
 
     List<dynamic> filtered = stratagems;
     if (route != null) {
-      filtered =
-          stratagems.where((s) {
-            final startRoute = (s as Map<String, dynamic>)['startRoute'];
-            final name = s['name'] as String? ?? '';
-            return startRoute == route || name.contains(route);
-          }).toList();
+      filtered = stratagems.where((s) {
+        final startRoute = (s as Map<String, dynamic>)['startRoute'];
+        final name = s['name'] as String? ?? '';
+        return startRoute == route || name.contains(route);
+      }).toList();
     }
 
     if (filtered.isEmpty) {
       return route != null
           ? 'No Stratagems found for route: $route'
           : 'No Stratagems generated. Ensure sessions have been '
-              'recorded and analyzed.';
+                'recorded and analyzed.';
     }
 
     final buf = StringBuffer();
@@ -346,9 +490,7 @@ class _BlueprintMcpServer {
 
   String _getAiPrompt(Map<String, dynamic> blueprint) {
     // If we have a pre-generated AI prompt on disk, try loading it
-    final promptFile = File(
-      _blueprintPath.replaceAll('.json', '-prompt.md'),
-    );
+    final promptFile = File(_blueprintPath.replaceAll('.json', '-prompt.md'));
     if (promptFile.existsSync()) {
       return promptFile.readAsStringSync();
     }
@@ -491,6 +633,660 @@ class _BlueprintMcpServer {
       buf.writeln('- `$p`');
     }
     return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // AI-driven testing tools
+  // -----------------------------------------------------------------------
+
+  String _generateGauntlet(
+    Map<String, dynamic> blueprint,
+    Map<String, dynamic> args,
+  ) {
+    final route = args['route'] as String?;
+    if (route == null || route.isEmpty) {
+      return 'Error: "route" parameter is required. '
+          'Provide a route pattern like /login or /quest/:id.';
+    }
+
+    final intensity = args['intensity'] as String? ?? 'standard';
+
+    // Find the outpost in terrain data
+    final terrain = blueprint['terrain'] as Map<String, dynamic>?;
+    if (terrain == null) return 'No terrain data available.';
+
+    final outposts = terrain['outposts'] as Map<String, dynamic>?;
+    if (outposts == null || outposts.isEmpty) return 'No screens discovered.';
+
+    final outpost = outposts[route] as Map<String, dynamic>?;
+    if (outpost == null) {
+      final available = outposts.keys.take(10).join(', ');
+      return 'No screen found for route "$route". '
+          'Available routes: $available';
+    }
+
+    // Find pre-generated stratagems for this route
+    final stratagems = blueprint['stratagems'] as List<dynamic>? ?? [];
+    final matching = stratagems.where((s) {
+      final map = s as Map<String, dynamic>;
+      return map['startRoute'] == route;
+    }).toList();
+
+    if (matching.isEmpty) {
+      return 'No Gauntlet patterns found for "$route". '
+          'Re-export the blueprint with: '
+          'dart run titan_colossus:export_blueprint --intensity $intensity';
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('# Gauntlet Patterns for `$route` (${matching.length})');
+    buf.writeln();
+    buf.writeln('Intensity: $intensity');
+    buf.writeln();
+
+    for (final s in matching) {
+      final map = s as Map<String, dynamic>;
+      buf.writeln('## ${map['name']}');
+      buf.writeln();
+      buf.writeln(map['description'] ?? '');
+      buf.writeln();
+
+      final tags = map['tags'] as List<dynamic>?;
+      if (tags != null && tags.isNotEmpty) {
+        buf.writeln('**Tags:** ${tags.join(', ')}');
+      }
+
+      final steps = map['steps'] as List<dynamic>?;
+      if (steps != null) {
+        buf.writeln('**Steps:**');
+        for (var i = 0; i < steps.length; i++) {
+          final step = steps[i] as Map<String, dynamic>;
+          buf.writeln(
+            '${i + 1}. [${step['action']}] '
+            '${step['description'] ?? ''}',
+          );
+        }
+      }
+      buf.writeln();
+    }
+
+    buf.writeln('---');
+    buf.writeln();
+    buf.writeln('### Raw JSON (for Campaign use)');
+    buf.writeln();
+    buf.writeln('```json');
+    buf.writeln(const JsonEncoder.withIndent('  ').convert(matching));
+    buf.writeln('```');
+
+    return buf.toString();
+  }
+
+  String _getCampaignTemplate() {
+    final template = {
+      r'$schema': 'titan://campaign/v1',
+      'name': '<campaign_name>',
+      'description': '<description>',
+      'tags': ['<tag1>', '<tag2>'],
+      'sharedTestData': {'heroName': '<test_hero_name>'},
+      'includeGauntlet': false,
+      'gauntletIntensity': 'standard',
+      'failurePolicy': 'skipDependents',
+      'timeout': 300000,
+      'entries': [
+        {
+          'stratagem': {
+            'name': '<stratagem_name>',
+            'description': '<what_this_tests>',
+            'startRoute': '<route_pattern>',
+            'tags': ['<tag>'],
+            'steps': [
+              {
+                'action': 'tap|type|swipe|scroll|wait|navigate|assert|back',
+                'description': '<step_description>',
+                'target': {
+                  'semanticLabel': '<widget_label>',
+                  'type': '<widget_type>',
+                },
+                'value': '<text_to_type_or_amount>',
+                'expectations': {
+                  'routeAfter': '<expected_route>',
+                  'elementsPresent': [
+                    {'semanticLabel': '<expected_label>'},
+                  ],
+                },
+              },
+            ],
+          },
+          'dependsOn': <String>[],
+        },
+      ],
+    };
+
+    final buf = StringBuffer();
+    buf.writeln('# Campaign Template');
+    buf.writeln();
+    buf.writeln(
+      'A Campaign is an ordered suite of Stratagems (test plans) '
+      'with dependency resolution.',
+    );
+    buf.writeln();
+    buf.writeln('## How it works');
+    buf.writeln();
+    buf.writeln('1. Define Stratagems — each tests a specific user flow');
+    buf.writeln(
+      '2. Declare dependencies via `dependsOn` — '
+      'names of Stratagems that must pass first',
+    );
+    buf.writeln(
+      '3. The engine topologically sorts, injects prerequisites, '
+      'and executes in order',
+    );
+    buf.writeln();
+    buf.writeln('## Available actions');
+    buf.writeln();
+    buf.writeln(
+      '`tap`, `type`, `swipe`, `scroll`, `wait`, `navigate`, '
+      '`assert`, `back`, `longPress`, `doubleTap`, `drag`',
+    );
+    buf.writeln();
+    buf.writeln('## Failure policies');
+    buf.writeln();
+    buf.writeln('- `skipDependents` — skip entries that depend on a failure');
+    buf.writeln('- `abortOnFirst` — stop the entire Campaign on first failure');
+    buf.writeln('- `continueAll` — execute everything regardless of failures');
+    buf.writeln();
+    buf.writeln('## Template JSON');
+    buf.writeln();
+    buf.writeln('```json');
+    buf.writeln(const JsonEncoder.withIndent('  ').convert(template));
+    buf.writeln('```');
+    buf.writeln();
+    buf.writeln('## Instructions');
+    buf.writeln();
+    buf.writeln(
+      'Use `get_full_context` to understand the app\'s navigation, '
+      'then generate a Campaign JSON using this template. Save it '
+      'with `save_campaign` for the app to execute.',
+    );
+
+    return buf.toString();
+  }
+
+  Future<String> _saveCampaign(Map<String, dynamic> args) async {
+    final campaign = args['campaign'] as Map<String, dynamic>?;
+    if (campaign == null) {
+      return 'Error: "campaign" parameter is required. '
+          'Provide a Campaign JSON object.';
+    }
+
+    try {
+      // Validate basic structure
+      if (campaign['name'] == null) {
+        return 'Error: Campaign must have a "name" field.';
+      }
+      if (campaign['entries'] is! List) {
+        return 'Error: Campaign must have an "entries" array.';
+      }
+
+      final dir = Directory(
+        _blueprintPath.contains('/')
+            ? _blueprintPath.substring(0, _blueprintPath.lastIndexOf('/'))
+            : '.titan',
+      );
+      if (!dir.existsSync()) {
+        await dir.create(recursive: true);
+      }
+
+      final file = File('${dir.path}/campaign.json');
+      final json = const JsonEncoder.withIndent('  ').convert(campaign);
+      await file.writeAsString(json);
+
+      return 'Campaign saved to ${file.absolute.path}\n\n'
+          'The running app can load this with:\n'
+          '```dart\n'
+          "final json = jsonDecode(File('.titan/campaign.json')"
+          '.readAsStringSync());\n'
+          'final result = await Colossus.instance'
+          '.executeCampaignJson(json);\n'
+          '```\n\n'
+          'Or paste the JSON into the Lens Blueprint tab → Campaign view.';
+    } catch (e) {
+      return 'Error saving Campaign: $e';
+    }
+  }
+
+  String _getDebrief(Map<String, dynamic> blueprint) {
+    // Check for debrief data in the Blueprint
+    final debrief = blueprint['debrief'] as Map<String, dynamic>?;
+
+    if (debrief == null) {
+      // Check for verdicts without debrief
+      final verdicts = blueprint['verdicts'] as List<dynamic>?;
+      if (verdicts == null || verdicts.isEmpty) {
+        return 'No test results available yet. '
+            'Execute a Campaign first, then re-export the Blueprint '
+            'with verdicts included.';
+      }
+      return 'Verdicts exist but no debrief analysis. '
+          'Re-export the Blueprint to generate a debrief.';
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('# Debrief Report');
+    buf.writeln();
+
+    final total = debrief['totalVerdicts'] as int? ?? 0;
+    final passed = debrief['passedVerdicts'] as int? ?? 0;
+    final failed = total - passed;
+    final passRate = total > 0 ? (passed / total * 100) : 0.0;
+
+    buf.writeln('## Summary');
+    buf.writeln();
+    buf.writeln('- **Total:** $total tests');
+    buf.writeln('- **Passed:** $passed');
+    buf.writeln('- **Failed:** $failed');
+    buf.writeln('- **Pass rate:** ${passRate.toStringAsFixed(1)}%');
+    buf.writeln();
+
+    final insights = debrief['insights'] as List<dynamic>? ?? [];
+    if (insights.isNotEmpty) {
+      buf.writeln('## Insights (${insights.length})');
+      buf.writeln();
+      for (final insight in insights) {
+        final map = insight as Map<String, dynamic>;
+        buf.writeln('### ${map['title'] ?? 'Insight'}');
+        buf.writeln();
+        buf.writeln(map['description'] ?? '');
+        final severity = map['severity'] as String?;
+        if (severity != null) {
+          buf.writeln('**Severity:** $severity');
+        }
+        final suggestion = map['suggestion'] as String?;
+        if (suggestion != null) {
+          buf.writeln('**Suggestion:** $suggestion');
+        }
+        buf.writeln();
+      }
+    }
+
+    // Include raw verdicts summary
+    final verdicts = blueprint['verdicts'] as List<dynamic>? ?? [];
+    final failedVerdicts = verdicts
+        .where((v) => (v as Map)['passed'] != true)
+        .toList();
+
+    if (failedVerdicts.isNotEmpty) {
+      buf.writeln('## Failed Tests');
+      buf.writeln();
+      for (final v in failedVerdicts) {
+        final map = v as Map<String, dynamic>;
+        buf.writeln('### ${map['stratagemName'] ?? 'Unknown'}');
+        final steps = map['steps'] as List<dynamic>? ?? [];
+        final failedSteps = steps.where(
+          (s) => (s as Map)['status'] != 'passed',
+        );
+        for (final step in failedSteps) {
+          final s = step as Map<String, dynamic>;
+          final failure = s['failure'] as Map<String, dynamic>?;
+          buf.writeln(
+            '- **${s['description']}**: '
+            '${failure?['message'] ?? s['status']}',
+          );
+        }
+        buf.writeln();
+      }
+    }
+
+    return buf.toString();
+  }
+
+  String _getFullContext(Map<String, dynamic> blueprint) {
+    final buf = StringBuffer();
+
+    buf.writeln('# Full Blueprint Context for AI Test Planning');
+    buf.writeln();
+    buf.writeln(
+      '> Use this data to generate Campaign JSON. Call '
+      '`get_campaign_template` for the schema, then `save_campaign` '
+      'to save the generated tests.',
+    );
+    buf.writeln();
+
+    // 1. Navigation map
+    buf.writeln('## 1. Navigation Map');
+    buf.writeln();
+    final aiMap = blueprint['aiMap'] as String?;
+    if (aiMap != null) {
+      buf.writeln(aiMap);
+    } else {
+      buf.writeln('No navigation map available.');
+    }
+    buf.writeln();
+
+    // 2. Dead ends
+    buf.writeln('## 2. Dead Ends');
+    buf.writeln();
+    buf.writeln(_getDeadEnds(blueprint));
+    buf.writeln();
+
+    // 3. Unreliable routes
+    buf.writeln('## 3. Unreliable Routes');
+    buf.writeln();
+    buf.writeln(_getUnreliableRoutes(blueprint));
+    buf.writeln();
+
+    // 4. Existing test scenarios
+    final stratagems = blueprint['stratagems'] as List<dynamic>? ?? [];
+    buf.writeln('## 4. Available Stratagems (${stratagems.length})');
+    buf.writeln();
+    if (stratagems.isNotEmpty) {
+      for (final s in stratagems) {
+        final map = s as Map<String, dynamic>;
+        buf.writeln(
+          '- **${map['name']}** → `${map['startRoute']}` '
+          '(${(map['steps'] as List?)?.length ?? 0} steps)',
+        );
+      }
+    } else {
+      buf.writeln('No Stratagems generated yet.');
+    }
+    buf.writeln();
+
+    // 5. Previous results
+    final verdicts = blueprint['verdicts'] as List<dynamic>? ?? [];
+    if (verdicts.isNotEmpty) {
+      final passed = verdicts.where((v) => (v as Map)['passed'] == true);
+      buf.writeln('## 5. Previous Results');
+      buf.writeln();
+      buf.writeln('- Passed: ${passed.length}/${verdicts.length}');
+
+      final debrief = blueprint['debrief'] as Map<String, dynamic>?;
+      if (debrief != null) {
+        final insights = debrief['insights'] as List<dynamic>? ?? [];
+        if (insights.isNotEmpty) {
+          buf.writeln();
+          buf.writeln('### Key Insights');
+          for (final i in insights) {
+            final map = i as Map<String, dynamic>;
+            buf.writeln('- ${map['title']}: ${map['description']}');
+          }
+        }
+      }
+      buf.writeln();
+    }
+
+    // 6. Route patterns
+    buf.writeln('## 6. Route Patterns');
+    buf.writeln();
+    buf.writeln(_getRoutePatterns(blueprint));
+    buf.writeln();
+
+    // 7. Quick-start instructions
+    buf.writeln('## 7. Next Steps');
+    buf.writeln();
+    buf.writeln(
+      '1. Call `get_campaign_template` to see the Campaign JSON schema',
+    );
+    buf.writeln('2. Generate a Campaign JSON using the terrain data above');
+    buf.writeln(
+      '3. Use `generate_gauntlet` for edge-case tests on specific routes',
+    );
+    buf.writeln('4. Call `save_campaign` to save the Campaign for execution');
+    buf.writeln(
+      '5. Call `execute_campaign` to run the campaign on the live app '
+      '(zero human interaction)',
+    );
+    buf.writeln('6. After execution, call `get_debrief` to analyze results');
+
+    return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Relay — live communication with the running app
+  // -----------------------------------------------------------------------
+
+  Uri _relayUri(String path) =>
+      Uri.parse('http://$_relayHost:$_relayPort$path');
+
+  Map<String, String> get _relayHeaders => {
+    'Content-Type': 'application/json',
+    if (_relayAuthToken != null) 'Authorization': 'Bearer $_relayAuthToken',
+  };
+
+  /// Execute a Campaign on the running app via the Relay HTTP bridge.
+  ///
+  /// POST /campaign with the full Campaign JSON body. The Relay runs the
+  /// campaign through [Colossus.executeCampaignJson] on the app's main
+  /// isolate and returns structured results (pass rate, verdicts, report,
+  /// and AI diagnostic).
+  ///
+  /// Timeout is generous (10 minutes) because campaigns run UI interactions
+  /// and each step can take hundreds of milliseconds.
+  Future<String> _executeCampaign(Map<String, dynamic> args) async {
+    final campaign = args['campaign'] as Map<String, dynamic>?;
+    if (campaign == null || campaign.isEmpty) {
+      return 'Error: campaign parameter is required. '
+          'Call get_campaign_template to see the schema.';
+    }
+
+    final client = HttpClient();
+    try {
+      client.connectionTimeout = const Duration(seconds: 10);
+
+      final request = await client.postUrl(_relayUri('/campaign'));
+      _relayHeaders.forEach(request.headers.set);
+      request.write(jsonEncode(campaign));
+
+      final response = await request.close().timeout(
+        const Duration(minutes: 10),
+        onTimeout: () => throw TimeoutException(
+          'Campaign execution timed out after 10 minutes',
+        ),
+      );
+
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode == 200) {
+        // Pretty-format the result for AI consumption
+        try {
+          final result = jsonDecode(body) as Map<String, dynamic>;
+          return _formatCampaignResult(result);
+        } catch (_) {
+          return body;
+        }
+      } else {
+        return 'Relay returned ${response.statusCode}: $body';
+      }
+    } on SocketException catch (e) {
+      return 'Cannot connect to Relay at '
+          'http://$_relayHost:$_relayPort — '
+          'is the app running with ColossusPlugin(enableRelay: true)?\n'
+          'Error: $e';
+    } on TimeoutException catch (e) {
+      return 'Relay request timed out: $e';
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Format campaign execution result for AI readability.
+  String _formatCampaignResult(Map<String, dynamic> result) {
+    final buf = StringBuffer();
+
+    buf.writeln('# Campaign Execution Results');
+    buf.writeln();
+
+    final passRate = result['passRate'];
+    if (passRate != null) {
+      final pct = (passRate is double)
+          ? (passRate * 100).toStringAsFixed(1)
+          : passRate.toString();
+      buf.writeln('**Pass Rate**: $pct%');
+    }
+
+    final report = result['report'] as String?;
+    if (report != null && report.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('## Report');
+      buf.writeln(report);
+    }
+
+    final diagnostic = result['aiDiagnostic'] as String?;
+    if (diagnostic != null && diagnostic.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('## AI Diagnostic');
+      buf.writeln(diagnostic);
+    }
+
+    final verdicts = result['verdicts'] as List<dynamic>?;
+    if (verdicts != null && verdicts.isNotEmpty) {
+      buf.writeln();
+      buf.writeln('## Verdicts');
+      buf.writeln();
+
+      for (final v in verdicts) {
+        final map = v as Map<String, dynamic>;
+        final passed = map['passed'] == true;
+        final icon = passed ? '\u2705' : '\u274c';
+        buf.writeln(
+          '$icon **${map['stratagemName'] ?? 'Unknown'}** — '
+          '${passed ? 'PASSED' : 'FAILED'}',
+        );
+
+        if (!passed) {
+          final steps = map['steps'] as List<dynamic>? ?? [];
+          for (final step in steps) {
+            final s = step as Map<String, dynamic>;
+            if (s['status'] != 'passed') {
+              final failure = s['failure'] as Map<String, dynamic>?;
+              buf.writeln(
+                '  - ${s['description']}: '
+                '${failure?['message'] ?? s['status']}',
+              );
+            }
+          }
+        }
+      }
+    }
+
+    return buf.toString();
+  }
+
+  /// Check whether the Relay HTTP bridge is running in the app.
+  Future<String> _relayStatus() async {
+    final client = HttpClient();
+    try {
+      client.connectionTimeout = const Duration(seconds: 5);
+
+      final request = await client.getUrl(_relayUri('/health'));
+      _relayHeaders.forEach(request.headers.set);
+
+      final response = await request.close().timeout(
+        const Duration(seconds: 5),
+      );
+
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode == 200) {
+        try {
+          final data = jsonDecode(body) as Map<String, dynamic>;
+          final buf = StringBuffer();
+          buf.writeln('Relay is RUNNING');
+          buf.writeln('- Server: http://$_relayHost:$_relayPort');
+          buf.writeln('- Status: ${data['status'] ?? 'ok'}');
+          buf.writeln('- Uptime: ${data['uptime'] ?? 'unknown'}');
+          if (data['requestCount'] != null) {
+            buf.writeln('- Requests served: ${data['requestCount']}');
+          }
+          return buf.toString();
+        } catch (_) {
+          return 'Relay is running at '
+              'http://$_relayHost:$_relayPort\n$body';
+        }
+      } else {
+        return 'Relay returned ${response.statusCode}: $body';
+      }
+    } on SocketException {
+      return 'Relay is NOT RUNNING at '
+          'http://$_relayHost:$_relayPort\n\n'
+          'To start:\n'
+          '1. Launch your app with '
+          'ColossusPlugin(enableRelay: true)\n'
+          '2. Or call Colossus.instance.startRelay()';
+    } on TimeoutException {
+      return 'Relay at http://$_relayHost:$_relayPort '
+          'did not respond (timeout)';
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Get the live Terrain from the running app (not from static file).
+  Future<String> _relayTerrain() async {
+    final client = HttpClient();
+    try {
+      client.connectionTimeout = const Duration(seconds: 5);
+
+      final request = await client.getUrl(_relayUri('/terrain'));
+      _relayHeaders.forEach(request.headers.set);
+
+      final response = await request.close().timeout(
+        const Duration(seconds: 5),
+      );
+
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode == 200) {
+        try {
+          final data = jsonDecode(body) as Map<String, dynamic>;
+          final buf = StringBuffer();
+          buf.writeln('# Live Terrain (from running app)');
+          buf.writeln();
+
+          final outposts = data['outposts'] as List<dynamic>? ?? [];
+          final marches = data['marches'] as List<dynamic>? ?? [];
+          buf.writeln('**Screens**: ${outposts.length}');
+          buf.writeln('**Transitions**: ${marches.length}');
+          buf.writeln();
+
+          if (outposts.isNotEmpty) {
+            buf.writeln('## Screens');
+            for (final o in outposts) {
+              final map = o as Map<String, dynamic>;
+              buf.writeln(
+                '- `${map['route']}` '
+                '(${map['visitCount'] ?? 0} visits)',
+              );
+            }
+            buf.writeln();
+          }
+
+          if (marches.isNotEmpty) {
+            buf.writeln('## Transitions');
+            for (final m in marches) {
+              final map = m as Map<String, dynamic>;
+              buf.writeln(
+                '- `${map['from']}` \u2192 `${map['to']}` '
+                '(${map['count'] ?? 0}x, '
+                '${((map['reliability'] ?? 1.0) * 100).toStringAsFixed(0)}%)',
+              );
+            }
+          }
+
+          return buf.toString();
+        } catch (_) {
+          return body;
+        }
+      } else {
+        return 'Relay returned ${response.statusCode}: $body';
+      }
+    } on SocketException {
+      return 'Cannot connect to Relay — is the app running?';
+    } on TimeoutException {
+      return 'Relay did not respond (timeout)';
+    } finally {
+      client.close();
+    }
   }
 
   // -----------------------------------------------------------------------

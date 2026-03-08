@@ -18,25 +18,21 @@ void main() {
           child: SizedBox(
             width: 400,
             height: 600,
-            child: Builder(
-              builder: (context) => tab.build(context),
-            ),
+            child: Builder(builder: (context) => tab.build(context)),
           ),
         ),
       ),
     );
   }
 
-  /// Wrapper with Navigator (needed for DropdownButton interactions).
+  /// Wrapper with Navigator (needed for overlay-based dropdown interactions).
   Widget wrapTabWithNav(BlueprintLensTab tab) {
     return MaterialApp(
       home: Scaffold(
         body: SizedBox(
           width: 400,
           height: 600,
-          child: Builder(
-            builder: (context) => tab.build(context),
-          ),
+          child: Builder(builder: (context) => tab.build(context)),
         ),
       ),
     );
@@ -253,8 +249,9 @@ void main() {
       expect(find.text('Resolve Lineage'), findsOneWidget);
     });
 
-    testWidgets('shows no-routes message when terrain is empty',
-        (tester) async {
+    testWidgets('shows no-routes message when terrain is empty', (
+      tester,
+    ) async {
       await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
       await tester.pumpAndSettle();
 
@@ -478,7 +475,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Select route via dropdown
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/home').last);
       await tester.pumpAndSettle();
@@ -491,8 +488,9 @@ void main() {
       expect(find.byIcon(Icons.bolt), findsWidgets);
     });
 
-    testWidgets('shows copy stratagems button after generation',
-        (tester) async {
+    testWidgets('shows copy stratagems button after generation', (
+      tester,
+    ) async {
       await tester.pumpWidget(wrapTabWithNav(BlueprintLensTab(colossus)));
       await tester.pumpAndSettle();
 
@@ -503,7 +501,7 @@ void main() {
       expect(find.text('Copy Stratagems'), findsNothing);
 
       // Select route and generate
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/home').last);
       await tester.pumpAndSettle();
@@ -622,7 +620,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Select /settings
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/settings').last);
       await tester.pumpAndSettle();
@@ -644,7 +642,7 @@ void main() {
       await tester.tap(find.text('Lineage'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/settings').last);
       await tester.pumpAndSettle();
@@ -665,7 +663,7 @@ void main() {
       await tester.tap(find.text('Lineage'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/login').last);
       await tester.pumpAndSettle();
@@ -741,12 +739,21 @@ void main() {
         routePattern: '/form',
         displayName: 'Form',
         interactiveElements: [
-          OutpostElement(widgetType: 'TextField', label: 'Name',
-              isInteractive: true),
-          OutpostElement(widgetType: 'TextField', label: 'Email',
-              isInteractive: true),
-          OutpostElement(widgetType: 'ElevatedButton', label: 'Submit',
-              isInteractive: true),
+          OutpostElement(
+            widgetType: 'TextField',
+            label: 'Name',
+            isInteractive: true,
+          ),
+          OutpostElement(
+            widgetType: 'TextField',
+            label: 'Email',
+            isInteractive: true,
+          ),
+          OutpostElement(
+            widgetType: 'ElevatedButton',
+            label: 'Submit',
+            isInteractive: true,
+          ),
         ],
         displayElements: [],
         screenWidth: 400,
@@ -965,11 +972,9 @@ void main() {
         screenHeight: 800,
       );
       // Add an entrance so it's reachable but has no exits
-      deadEnd.entrances.add(March(
-        fromRoute: '/other',
-        toRoute: '/dead',
-        trigger: MarchTrigger.tap,
-      ));
+      deadEnd.entrances.add(
+        March(fromRoute: '/other', toRoute: '/dead', trigger: MarchTrigger.tap),
+      );
       colossus.terrain.outposts['/dead'] = deadEnd;
 
       await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
@@ -996,8 +1001,9 @@ void main() {
       Colossus.shutdown();
     });
 
-    testWidgets('generate without selecting route shows status',
-        (tester) async {
+    testWidgets('generate without selecting route shows status', (
+      tester,
+    ) async {
       await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
       await tester.pumpAndSettle();
 
@@ -1044,7 +1050,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Select route
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/page').last);
       await tester.pumpAndSettle();
@@ -1085,7 +1091,7 @@ void main() {
       await tester.tap(find.text('Gauntlet'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/page').last);
       await tester.pumpAndSettle();
@@ -1125,7 +1131,7 @@ void main() {
       await tester.tap(find.text('Gauntlet'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/page').last);
       await tester.pumpAndSettle();
@@ -1154,8 +1160,7 @@ void main() {
       Colossus.shutdown();
     });
 
-    testWidgets('resolve without selecting route shows status',
-        (tester) async {
+    testWidgets('resolve without selecting route shows status', (tester) async {
       colossus.terrain.outposts['/page'] = Outpost(
         signet: Signet(
           routePattern: '/page',
@@ -1231,7 +1236,7 @@ void main() {
       await tester.tap(find.text('Lineage'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/dashboard').last);
       await tester.pumpAndSettle();
@@ -1289,7 +1294,7 @@ void main() {
       await tester.tap(find.text('Lineage'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/dash').last);
       await tester.pumpAndSettle();
@@ -1300,8 +1305,9 @@ void main() {
       expect(find.text('PATH'), findsOneWidget);
     });
 
-    testWidgets('auth-required lineage shows Yes for auth metric',
-        (tester) async {
+    testWidgets('auth-required lineage shows Yes for auth metric', (
+      tester,
+    ) async {
       final loginOutpost = Outpost(
         signet: Signet(
           routePattern: '/login',
@@ -1350,7 +1356,7 @@ void main() {
       await tester.tap(find.text('Lineage'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/admin').last);
       await tester.pumpAndSettle();
@@ -1377,8 +1383,7 @@ void main() {
       Colossus.shutdown();
     });
 
-    testWidgets('execute with empty JSON shows error status',
-        (tester) async {
+    testWidgets('execute with empty JSON shows error status', (tester) async {
       await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
       await tester.pumpAndSettle();
 
@@ -1420,7 +1425,10 @@ void main() {
       await tester.tap(find.text('Copy Template'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Campaign template copied to clipboard'), findsOneWidget);
+      expect(
+        find.text('Campaign template copied to clipboard'),
+        findsOneWidget,
+      );
     });
   });
 
@@ -1478,8 +1486,7 @@ void main() {
       );
     }
 
-    testWidgets('shows debrief results after running debrief',
-        (tester) async {
+    testWidgets('shows debrief results after running debrief', (tester) async {
       final passVerdict = _makeVerdict(name: 'test-1', passed: true);
       final failVerdict = _makeVerdict(name: 'test-2', passed: false);
 
@@ -1525,8 +1532,9 @@ void main() {
       expect(report.allPassed, isTrue);
     });
 
-    testWidgets('debrief insights are generated for failed verdicts',
-        (tester) async {
+    testWidgets('debrief insights are generated for failed verdicts', (
+      tester,
+    ) async {
       final failVerdict = _makeVerdict(name: 'fail-test', passed: false);
       final report = colossus.debrief([failVerdict]);
 
@@ -1594,10 +1602,7 @@ void main() {
       await tester.tap(find.text('Copy Mermaid'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Terrain Mermaid copied to clipboard'),
-        findsOneWidget,
-      );
+      expect(find.text('Terrain Mermaid copied to clipboard'), findsOneWidget);
     });
 
     testWidgets('copy AI map shows status', (tester) async {
@@ -1610,8 +1615,7 @@ void main() {
       expect(find.text('AI map copied to clipboard'), findsOneWidget);
     });
 
-    testWidgets('copy gauntlet before generation shows status',
-        (tester) async {
+    testWidgets('copy gauntlet before generation shows status', (tester) async {
       await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
       await tester.pumpAndSettle();
 
@@ -1678,20 +1682,14 @@ void main() {
       // Set a status by tapping Copy Mermaid
       await tester.tap(find.text('Copy Mermaid'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('Terrain Mermaid copied to clipboard'),
-        findsOneWidget,
-      );
+      expect(find.text('Terrain Mermaid copied to clipboard'), findsOneWidget);
 
       // Switch to Lineage and back
       await tester.tap(find.text('Lineage'));
       await tester.pumpAndSettle();
 
       // Status should still be visible (it's shared across tabs)
-      expect(
-        find.text('Terrain Mermaid copied to clipboard'),
-        findsOneWidget,
-      );
+      expect(find.text('Terrain Mermaid copied to clipboard'), findsOneWidget);
     });
   });
 
@@ -1718,10 +1716,7 @@ void main() {
       await tester.tap(find.text('Lineage'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('No routes discovered yet'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('No routes discovered yet'), findsOneWidget);
     });
 
     testWidgets('empty terrain shows info card on Gauntlet', (tester) async {
@@ -1731,10 +1726,7 @@ void main() {
       await tester.tap(find.text('Gauntlet'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('No routes discovered yet'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('No routes discovered yet'), findsOneWidget);
     });
 
     testWidgets('selecting a route clears previous lineage', (tester) async {
@@ -1763,7 +1755,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Select /a
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/a').last);
       await tester.pumpAndSettle();
@@ -1776,7 +1768,7 @@ void main() {
       expect(find.textContaining('directly accessible'), findsOneWidget);
 
       // Now switch to /b — previous result should clear
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byIcon(Icons.arrow_drop_down));
       await tester.pumpAndSettle();
       await tester.tap(find.text('/b').last);
       await tester.pumpAndSettle();
@@ -1824,8 +1816,9 @@ void main() {
       expect(find.text('0 elem'), findsOneWidget);
     });
 
-    testWidgets('route card shows 0 exit for route with no exits',
-        (tester) async {
+    testWidgets('route card shows 0 exit for route with no exits', (
+      tester,
+    ) async {
       colossus.terrain.outposts['/leaf'] = Outpost(
         signet: Signet(
           routePattern: '/leaf',
@@ -1864,8 +1857,9 @@ void main() {
       Colossus.shutdown();
     });
 
-    testWidgets('Terrain view auto-updates when terrainNotifier fires',
-        (tester) async {
+    testWidgets('Terrain view auto-updates when terrainNotifier fires', (
+      tester,
+    ) async {
       // Start with empty terrain
       await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
       await tester.pumpAndSettle();
@@ -1898,26 +1892,28 @@ void main() {
     });
 
     testWidgets(
-        'Terrain view reflects data changes after terrainNotifier fires',
-        (tester) async {
-      await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
-      await tester.pumpAndSettle();
+      'Terrain view reflects data changes after terrainNotifier fires',
+      (tester) async {
+        await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
+        await tester.pumpAndSettle();
 
-      // Initially 0 discovered screens
-      expect(find.text('0'), findsWidgets);
+        // Initially 0 discovered screens
+        expect(find.text('0'), findsWidgets);
 
-      // Manually update terrain and fire notifier (simulates what
-      // learnFromSession does when it gets real data)
-      colossus.terrain.sessionsAnalyzed = 1;
-      colossus.terrainNotifier.notifyListeners();
-      await tester.pumpAndSettle();
+        // Manually update terrain and fire notifier (simulates what
+        // learnFromSession does when it gets real data)
+        colossus.terrain.sessionsAnalyzed = 1;
+        colossus.terrainNotifier.notifyListeners();
+        await tester.pumpAndSettle();
 
-      // The Vestige should have rebuilt with fresh terrain data
-      expect(find.text('1'), findsWidgets);
-    });
+        // The Vestige should have rebuilt with fresh terrain data
+        expect(find.text('1'), findsWidgets);
+      },
+    );
 
-    testWidgets('multiple notifier fires correctly refresh terrain view',
-        (tester) async {
+    testWidgets('multiple notifier fires correctly refresh terrain view', (
+      tester,
+    ) async {
       await tester.pumpWidget(wrapTab(BlueprintLensTab(colossus)));
       await tester.pumpAndSettle();
 

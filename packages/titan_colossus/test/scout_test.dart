@@ -132,10 +132,7 @@ void main() {
       duration: const Duration(seconds: 10),
       passed: passed,
       steps: stepList,
-      summary: VerdictSummary.fromSteps(
-        stepList,
-        const Duration(seconds: 10),
-      ),
+      summary: VerdictSummary.fromSteps(stepList, const Duration(seconds: 10)),
       performance: const VerdictPerformance(
         averageFps: 60,
         minFps: 58,
@@ -243,11 +240,7 @@ void main() {
       test('creates Marches from route transitions', () {
         final session = createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/login',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/login', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/home',
@@ -271,11 +264,7 @@ void main() {
       test('does not create March when route unchanged', () {
         final session = createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/login',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/login', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/login',
@@ -292,11 +281,7 @@ void main() {
         // Session that visits /home twice
         final session = createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/home',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/home', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/settings',
@@ -326,20 +311,18 @@ void main() {
       });
 
       test('increments sessionsAnalyzed', () {
-        scout.analyzeSession(createSession(
-          tableaux: [createTableau(index: 0, route: '/a')],
-        ));
-        scout.analyzeSession(createSession(
-          tableaux: [createTableau(index: 0, route: '/b')],
-        ));
+        scout.analyzeSession(
+          createSession(tableaux: [createTableau(index: 0, route: '/a')]),
+        );
+        scout.analyzeSession(
+          createSession(tableaux: [createTableau(index: 0, route: '/b')]),
+        );
         expect(scout.terrain.sessionsAnalyzed, 2);
       });
 
       test('skips Tableaux with null routes', () {
         final session = createSession(
-          tableaux: [
-            createTableau(index: 0, route: null),
-          ],
+          tableaux: [createTableau(index: 0, route: null)],
         );
         scout.analyzeSession(session);
         expect(scout.terrain.screenCount, 0);
@@ -348,11 +331,7 @@ void main() {
       test('infers tap trigger from pointerUp Imprint', () {
         final session = createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/a',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/a', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/b',
@@ -397,11 +376,7 @@ void main() {
       test('infers formSubmit trigger from textInput + pointerUp', () {
         final session = createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/login',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/login', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/home',
@@ -428,14 +403,10 @@ void main() {
       test('parameterizes dynamic routes', () {
         // First visit /quest/42, then /quest/7
         final s1 = createSession(
-          tableaux: [
-            createTableau(index: 0, route: '/quest/42'),
-          ],
+          tableaux: [createTableau(index: 0, route: '/quest/42')],
         );
         final s2 = createSession(
-          tableaux: [
-            createTableau(index: 0, route: '/quest/7'),
-          ],
+          tableaux: [createTableau(index: 0, route: '/quest/7')],
         );
 
         scout.analyzeSession(s1);
@@ -476,11 +447,7 @@ void main() {
       test('registers entrance March on destination Outpost', () {
         final session = createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/login',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/login', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/home',
@@ -540,10 +507,7 @@ void main() {
 
         scout.analyzeVerdict(verdict);
         expect(scout.terrain.outposts['/login']!.exits, hasLength(1));
-        expect(
-          scout.terrain.outposts['/login']!.exits.first.toRoute,
-          '/home',
-        );
+        expect(scout.terrain.outposts['/login']!.exits.first.toRoute, '/home');
       });
 
       test('infers trigger from original Stratagem actions', () {
@@ -634,18 +598,23 @@ void main() {
 
       test('detects auth redirect from failed wrongRoute step', () {
         // First register the auth screen in Terrain
-        scout.analyzeSession(createSession(
-          tableaux: [
-            createTableau(route: '/login', glyphs: [
-              createGlyph(
-                widgetType: 'TextField',
-                interactionType: 'textInput',
-                semanticRole: 'textField',
+        scout.analyzeSession(
+          createSession(
+            tableaux: [
+              createTableau(
+                route: '/login',
+                glyphs: [
+                  createGlyph(
+                    widgetType: 'TextField',
+                    interactionType: 'textInput',
+                    semanticRole: 'textField',
+                  ),
+                  createGlyph(label: 'Login', interactionType: 'tap'),
+                ],
               ),
-              createGlyph(label: 'Login', interactionType: 'tap'),
-            ]),
-          ],
-        ));
+            ],
+          ),
+        );
 
         final verdict = createVerdict(
           passed: false,
@@ -665,15 +634,12 @@ void main() {
         );
 
         // Register /dashboard too
-        scout.analyzeSession(createSession(
-          tableaux: [createTableau(route: '/dashboard')],
-        ));
+        scout.analyzeSession(
+          createSession(tableaux: [createTableau(route: '/dashboard')]),
+        );
 
         scout.analyzeVerdict(verdict);
-        expect(
-          scout.terrain.outposts['/dashboard']?.requiresAuth,
-          true,
-        );
+        expect(scout.terrain.outposts['/dashboard']?.requiresAuth, true);
       });
     });
 
@@ -978,11 +944,13 @@ void main() {
         );
 
         // Dashboard redirects to login
-        dashboardOutpost.exits.add(March(
-          fromRoute: '/dashboard',
-          toRoute: '/login',
-          trigger: MarchTrigger.redirect,
-        ));
+        dashboardOutpost.exits.add(
+          March(
+            fromRoute: '/dashboard',
+            toRoute: '/login',
+            trigger: MarchTrigger.redirect,
+          ),
+        );
 
         scout.terrain.outposts['/login'] = loginOutpost;
         scout.terrain.outposts['/dashboard'] = dashboardOutpost;
@@ -1013,11 +981,13 @@ void main() {
           displayName: 'About',
         );
 
-        homeOutpost.exits.add(March(
-          fromRoute: '/home',
-          toRoute: '/about',
-          trigger: MarchTrigger.redirect,
-        ));
+        homeOutpost.exits.add(
+          March(
+            fromRoute: '/home',
+            toRoute: '/about',
+            trigger: MarchTrigger.redirect,
+          ),
+        );
 
         scout.terrain.outposts['/home'] = homeOutpost;
         scout.terrain.outposts['/about'] = aboutOutpost;
@@ -1051,11 +1021,7 @@ void main() {
       test('parameterizes routes in Marches', () {
         final s1 = createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/home',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/home', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/quest/42',
@@ -1071,11 +1037,7 @@ void main() {
         );
         final s2 = createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/home',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/home', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/quest/7',
@@ -1102,11 +1064,7 @@ void main() {
       test('merges duplicate Marches across sessions', () {
         final makeSession = () => createSession(
           tableaux: [
-            createTableau(
-              index: 0,
-              route: '/login',
-              timestamp: Duration.zero,
-            ),
+            createTableau(index: 0, route: '/login', timestamp: Duration.zero),
             createTableau(
               index: 1,
               route: '/home',

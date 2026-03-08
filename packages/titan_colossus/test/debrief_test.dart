@@ -19,8 +19,12 @@ void main() {
       steps: steps,
       summary: VerdictSummary(
         totalSteps: steps.length,
-        passedSteps: steps.where((s) => s.status == VerdictStepStatus.passed).length,
-        failedSteps: steps.where((s) => s.status == VerdictStepStatus.failed).length,
+        passedSteps: steps
+            .where((s) => s.status == VerdictStepStatus.passed)
+            .length,
+        failedSteps: steps
+            .where((s) => s.status == VerdictStepStatus.failed)
+            .length,
         skippedSteps: 0,
         successRate: passed ? 1.0 : 0.0,
         duration: const Duration(seconds: 1),
@@ -80,15 +84,18 @@ void main() {
     });
 
     test('includes all expected types', () {
-      expect(InsightType.values.map((v) => v.name), containsAll([
-        'elementNotFound',
-        'unexpectedNavigation',
-        'missingPrerequisite',
-        'wrongScreen',
-        'performanceIssue',
-        'stateCorruption',
-        'general',
-      ]));
+      expect(
+        InsightType.values.map((v) => v.name),
+        containsAll([
+          'elementNotFound',
+          'unexpectedNavigation',
+          'missingPrerequisite',
+          'wrongScreen',
+          'performanceIssue',
+          'stateCorruption',
+          'general',
+        ]),
+      );
     });
   });
 
@@ -353,10 +360,7 @@ void main() {
         'test',
         passed: false,
         steps: [
-          failedStep(
-            type: VerdictFailureType.targetNotFound,
-            tableau: tableau,
-          ),
+          failedStep(type: VerdictFailureType.targetNotFound, tableau: tableau),
         ],
       );
 
@@ -405,11 +409,7 @@ void main() {
       final verdict = makeVerdict(
         'test',
         passed: false,
-        steps: [
-          failedStep(
-            type: VerdictFailureType.timeout,
-          ),
-        ],
+        steps: [failedStep(type: VerdictFailureType.timeout)],
       );
 
       final debrief = Debrief(
@@ -518,7 +518,8 @@ void main() {
       final report = debrief.analyze();
       // Should have no failure insights (only patterns/actions)
       final failureInsights = report.insights.where(
-        (i) => i.type != InsightType.missingPrerequisite &&
+        (i) =>
+            i.type != InsightType.missingPrerequisite &&
             i.type != InsightType.wrongScreen,
       );
       expect(failureInsights, isEmpty);
@@ -535,14 +536,8 @@ void main() {
         'test',
         passed: false,
         steps: [
-          failedStep(
-            stepId: 1,
-            type: VerdictFailureType.wrongRoute,
-          ),
-          failedStep(
-            stepId: 2,
-            type: VerdictFailureType.targetNotFound,
-          ),
+          failedStep(stepId: 1, type: VerdictFailureType.wrongRoute),
+          failedStep(stepId: 2, type: VerdictFailureType.targetNotFound),
         ],
       );
 
@@ -565,12 +560,7 @@ void main() {
       final verdict = makeVerdict(
         'test',
         passed: false,
-        steps: [
-          failedStep(
-            stepId: 1,
-            type: VerdictFailureType.targetNotFound,
-          ),
-        ],
+        steps: [failedStep(stepId: 1, type: VerdictFailureType.targetNotFound)],
       );
 
       final debrief = Debrief(
@@ -687,9 +677,7 @@ void main() {
       final verdict = makeVerdict(
         'test',
         passed: false,
-        steps: [
-          failedStep(type: VerdictFailureType.wrongRoute),
-        ],
+        steps: [failedStep(type: VerdictFailureType.wrongRoute)],
       );
 
       final debrief = Debrief(
@@ -709,9 +697,7 @@ void main() {
       final verdict = makeVerdict(
         'test',
         passed: false,
-        steps: [
-          failedStep(type: VerdictFailureType.targetNotFound),
-        ],
+        steps: [failedStep(type: VerdictFailureType.targetNotFound)],
       );
 
       final debrief = Debrief(
@@ -731,9 +717,7 @@ void main() {
       final verdict = makeVerdict(
         'test',
         passed: false,
-        steps: [
-          failedStep(type: VerdictFailureType.timeout),
-        ],
+        steps: [failedStep(type: VerdictFailureType.timeout)],
       );
 
       final debrief = Debrief(
@@ -743,19 +727,14 @@ void main() {
       );
 
       final report = debrief.analyze();
-      expect(
-        report.suggestedNextActions.any((a) => a.contains('TUNE')),
-        true,
-      );
+      expect(report.suggestedNextActions.any((a) => a.contains('TUNE')), true);
     });
 
     test('state corruption → INVESTIGATE action', () {
       final verdict = makeVerdict(
         'test',
         passed: false,
-        steps: [
-          failedStep(type: VerdictFailureType.wrongState),
-        ],
+        steps: [failedStep(type: VerdictFailureType.wrongState)],
       );
 
       final debrief = Debrief(
@@ -871,12 +850,16 @@ void main() {
   group('Debrief multiple verdicts', () {
     test('analyzes all verdicts', () {
       final verdicts = [
-        makeVerdict('test1', passed: false, steps: [
-          failedStep(type: VerdictFailureType.targetNotFound),
-        ]),
-        makeVerdict('test2', passed: false, steps: [
-          failedStep(type: VerdictFailureType.timeout),
-        ]),
+        makeVerdict(
+          'test1',
+          passed: false,
+          steps: [failedStep(type: VerdictFailureType.targetNotFound)],
+        ),
+        makeVerdict(
+          'test2',
+          passed: false,
+          steps: [failedStep(type: VerdictFailureType.timeout)],
+        ),
         makeVerdict('test3'),
       ];
 

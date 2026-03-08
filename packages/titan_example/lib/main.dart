@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
 import 'package:titan_argus/titan_argus.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 import 'package:titan_colossus/titan_colossus.dart';
@@ -152,12 +152,12 @@ void main() {
           tremors: [Tremor.fps(), Tremor.jankRate(), Tremor.leaks()],
           enableLensTab: true,
           enableChronicle: true,
+          enableRelay: true, // Enable HTTP bridge for AI-driven testing
           shadeStoragePath: shadeDir,
           exportDirectory: exportDir,
+          blueprintExportDirectory: '$exportDir/blueprint',
           onExport: (paths) {
-            SharePlus.instance.share(
-              ShareParams(files: paths.map((p) => XFile(p)).toList()),
-            );
+            Clipboard.setData(ClipboardData(text: paths.join('\n')));
           },
           getCurrentRoute: () {
             try {

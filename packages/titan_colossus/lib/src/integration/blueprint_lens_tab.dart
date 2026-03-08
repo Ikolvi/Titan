@@ -196,8 +196,9 @@ class _BlueprintPillar extends Pillar {
       return;
     }
 
-    final json = const JsonEncoder.withIndent('  ')
-        .convert(strats.map((s) => s.toJson()).toList());
+    final json = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(strats.map((s) => s.toJson()).toList());
     Clipboard.setData(ClipboardData(text: json));
     status.value = '${strats.length} Gauntlet Stratagems copied to clipboard';
   }
@@ -234,10 +235,13 @@ class _BlueprintPillar extends Pillar {
     status.value = 'Generating AI Blueprint...';
     try {
       final blueprint = await colossus.getAiBlueprint();
+      if (isDisposed) return;
       final json = const JsonEncoder.withIndent('  ').convert(blueprint);
       await Clipboard.setData(ClipboardData(text: json));
+      if (isDisposed) return;
       status.value = 'Full AI Blueprint copied to clipboard';
     } catch (e) {
+      if (isDisposed) return;
       status.value = 'Error: $e';
     }
   }
@@ -314,9 +318,7 @@ class _StatusBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.tealAccent.withValues(alpha: 0.07),
-        border: Border(
-          bottom: BorderSide(color: Colors.white10),
-        ),
+        border: Border(bottom: BorderSide(color: Colors.white10)),
       ),
       child: Text(
         status,
@@ -384,80 +386,83 @@ class _TerrainView extends StatelessWidget {
   Widget build(BuildContext context) {
     // Wrap in Vestige to auto-rebuild when terrainRefresh bumps
     // (triggered by Colossus.terrainNotifier after auto-learn).
-    return Vestige<_BlueprintPillar>(builder: (context, p) {
-      // Reading terrainRefresh subscribes this Vestige to terrain changes.
-      // ignore: unused_local_variable
-      final _ = p.terrainRefresh.value;
+    return Vestige<_BlueprintPillar>(
+      builder: (context, p) {
+        // Reading terrainRefresh subscribes this Vestige to terrain changes.
+        // ignore: unused_local_variable
+        final _ = p.terrainRefresh.value;
 
-      final terrain = colossus.terrain;
-      return ListView(
-        padding: const EdgeInsets.all(8),
-        children: [
-          _MetricRow(
-            label: 'Discovered screens',
-            value: '${terrain.outposts.length}',
-          ),
-          _MetricRow(
-            label: 'Transitions',
-            value: '${terrain.marches.length}',
-          ),
-          _MetricRow(
-            label: 'Sessions analyzed',
-            value: '${terrain.sessionsAnalyzed}',
-          ),
-          _MetricRow(
-            label: 'Auth-protected routes',
-            value: '${terrain.authProtectedScreens.length}',
-          ),
-          _MetricRow(
-            label: 'Dead ends',
-            value: '${terrain.deadEnds.length}',
-            color: terrain.deadEnds.isNotEmpty
-                ? Colors.orangeAccent
-                : Colors.white54,
-          ),
-          _MetricRow(
-            label: 'Unreliable transitions',
-            value: '${terrain.unreliableMarches.length}',
-            color: terrain.unreliableMarches.isNotEmpty
-                ? Colors.redAccent
-                : Colors.white54,
-          ),
-          const SizedBox(height: 8),
-          // Route list
-          if (terrain.outposts.isNotEmpty) ...[
-            const _SectionHeader(title: 'DISCOVERED ROUTES'),
-            ...terrain.outposts.entries.map((e) => _RouteCard(
-                  route: e.key,
-                  outpost: e.value,
-                )),
-          ],
-          const SizedBox(height: 8),
-          // Action buttons
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              _ActionChip(
-                label: 'Copy Mermaid',
-                icon: Icons.account_tree,
-                onTap: p.copyTerrainMermaid,
-              ),
-              _ActionChip(
-                label: 'Copy AI Map',
-                icon: Icons.map,
-                onTap: p.copyAiMap,
-              ),
-              _ActionChip(
-                label: 'Copy Blueprint',
-                icon: Icons.copy_all,
-                onTap: p.copyAiBlueprint,
+        final terrain = colossus.terrain;
+        return ListView(
+          key: const PageStorageKey('blueprint_terrain_list'),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.all(8),
+          children: [
+            _MetricRow(
+              label: 'Discovered screens',
+              value: '${terrain.outposts.length}',
+            ),
+            _MetricRow(
+              label: 'Transitions',
+              value: '${terrain.marches.length}',
+            ),
+            _MetricRow(
+              label: 'Sessions analyzed',
+              value: '${terrain.sessionsAnalyzed}',
+            ),
+            _MetricRow(
+              label: 'Auth-protected routes',
+              value: '${terrain.authProtectedScreens.length}',
+            ),
+            _MetricRow(
+              label: 'Dead ends',
+              value: '${terrain.deadEnds.length}',
+              color: terrain.deadEnds.isNotEmpty
+                  ? Colors.orangeAccent
+                  : Colors.white54,
+            ),
+            _MetricRow(
+              label: 'Unreliable transitions',
+              value: '${terrain.unreliableMarches.length}',
+              color: terrain.unreliableMarches.isNotEmpty
+                  ? Colors.redAccent
+                  : Colors.white54,
+            ),
+            const SizedBox(height: 8),
+            // Route list
+            if (terrain.outposts.isNotEmpty) ...[
+              const _SectionHeader(title: 'DISCOVERED ROUTES'),
+              ...terrain.outposts.entries.map(
+                (e) => _RouteCard(route: e.key, outpost: e.value),
               ),
             ],
-          ),
-        ],
-      );
-    });
+            const SizedBox(height: 8),
+            // Action buttons
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _ActionChip(
+                  label: 'Copy Mermaid',
+                  icon: Icons.account_tree,
+                  onTap: p.copyTerrainMermaid,
+                ),
+                _ActionChip(
+                  label: 'Copy AI Map',
+                  icon: Icons.map,
+                  onTap: p.copyAiMap,
+                ),
+                _ActionChip(
+                  label: 'Copy Blueprint',
+                  icon: Icons.copy_all,
+                  onTap: p.copyAiBlueprint,
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -471,86 +476,89 @@ class _LineageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Vestige<_BlueprintPillar>(builder: (context, p) {
-      final routes = colossus.terrain.outposts.keys.toList()..sort();
-      final lineage = p.lineageResult.value;
+    return Vestige<_BlueprintPillar>(
+      builder: (context, p) {
+        final routes = colossus.terrain.outposts.keys.toList()..sort();
+        final lineage = p.lineageResult.value;
 
-      return ListView(
-        padding: const EdgeInsets.all(8),
-        children: [
-          // Route dropdown
-          const _SectionHeader(title: 'TARGET ROUTE'),
-          _RouteDropdown(
-            routes: routes,
-            selected: p.selectedRoute.value,
-            onChanged: (route) {
-              p.selectedRoute.value = route;
-              p.lineageResult.value = null;
-            },
-          ),
-          const SizedBox(height: 8),
-          _ActionChip(
-            label: 'Resolve Lineage',
-            icon: Icons.timeline,
-            onTap: p.resolveLineage,
-          ),
-          const SizedBox(height: 12),
+        return ListView(
+          key: const PageStorageKey('blueprint_lineage_list'),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.all(8),
+          children: [
+            // Route dropdown
+            const _SectionHeader(title: 'TARGET ROUTE'),
+            _RouteDropdown(
+              routes: routes,
+              selected: p.selectedRoute.value,
+              onChanged: (route) {
+                p.selectedRoute.value = route;
+                p.lineageResult.value = null;
+              },
+            ),
+            const SizedBox(height: 8),
+            _ActionChip(
+              label: 'Resolve Lineage',
+              icon: Icons.timeline,
+              onTap: p.resolveLineage,
+            ),
+            const SizedBox(height: 12),
 
-          // Result
-          if (lineage != null) ...[
-            const _SectionHeader(title: 'PREREQUISITE CHAIN'),
-            if (lineage.isEmpty)
-              const _InfoCard(message: 'No prerequisites needed — '
-                  'route is directly accessible.')
-            else ...[
-              _MetricRow(
-                label: 'Hops',
-                value: '${lineage.hopCount}',
-              ),
-              _MetricRow(
-                label: 'Auth required',
-                value: lineage.requiresAuth ? 'Yes' : 'No',
-                color: lineage.requiresAuth
-                    ? Colors.orangeAccent
-                    : Colors.greenAccent,
-              ),
-              _MetricRow(
-                label: 'Est. setup time',
-                value:
-                    '${lineage.estimatedSetupTime.inMilliseconds}ms',
-              ),
-              const SizedBox(height: 4),
-              const _SectionHeader(title: 'PATH'),
-              ...lineage.path.map((march) => _MarchCard(march: march)),
-              if (lineage.prerequisites.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                const _SectionHeader(title: 'GATES'),
-                ...lineage.prerequisites.map(
-                  (p) => _PrerequisiteCard(prerequisite: p),
+            // Result
+            if (lineage != null) ...[
+              const _SectionHeader(title: 'PREREQUISITE CHAIN'),
+              if (lineage.isEmpty)
+                const _InfoCard(
+                  message:
+                      'No prerequisites needed — '
+                      'route is directly accessible.',
+                )
+              else ...[
+                _MetricRow(label: 'Hops', value: '${lineage.hopCount}'),
+                _MetricRow(
+                  label: 'Auth required',
+                  value: lineage.requiresAuth ? 'Yes' : 'No',
+                  color: lineage.requiresAuth
+                      ? Colors.orangeAccent
+                      : Colors.greenAccent,
                 ),
-              ],
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  _ActionChip(
-                    label: 'Copy Stratagem',
-                    icon: Icons.content_copy,
-                    onTap: p.copyLineageStratagem,
-                  ),
-                  _ActionChip(
-                    label: 'Copy Summary',
-                    icon: Icons.summarize,
-                    onTap: p.copyLineageSummary,
+                _MetricRow(
+                  label: 'Est. setup time',
+                  value: '${lineage.estimatedSetupTime.inMilliseconds}ms',
+                ),
+                const SizedBox(height: 4),
+                const _SectionHeader(title: 'PATH'),
+                ...lineage.path.map((march) => _MarchCard(march: march)),
+                if (lineage.prerequisites.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const _SectionHeader(title: 'GATES'),
+                  ...lineage.prerequisites.map(
+                    (p) => _PrerequisiteCard(prerequisite: p),
                   ),
                 ],
-              ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _ActionChip(
+                      label: 'Copy Stratagem',
+                      icon: Icons.content_copy,
+                      onTap: p.copyLineageStratagem,
+                    ),
+                    _ActionChip(
+                      label: 'Copy Summary',
+                      icon: Icons.summarize,
+                      onTap: p.copyLineageSummary,
+                    ),
+                  ],
+                ),
+              ],
             ],
           ],
-        ],
-      );
-    });
+        );
+      },
+    );
   }
 }
 
@@ -564,68 +572,70 @@ class _GauntletView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Vestige<_BlueprintPillar>(builder: (context, p) {
-      final routes = colossus.terrain.outposts.keys.toList()..sort();
+    return Vestige<_BlueprintPillar>(
+      builder: (context, p) {
+        final routes = colossus.terrain.outposts.keys.toList()..sort();
 
-      return ListView(
-        padding: const EdgeInsets.all(8),
-        children: [
-          const _SectionHeader(title: 'TARGET SCREEN'),
-          _RouteDropdown(
-            routes: routes,
-            selected: p.gauntletRoute.value,
-            onChanged: (route) => p.gauntletRoute.value = route,
-          ),
-          const SizedBox(height: 8),
-          const _SectionHeader(title: 'INTENSITY'),
-          _IntensitySelector(
-            intensity: p.gauntletIntensity.value,
-            onChanged: (i) => p.gauntletIntensity.value = i,
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              _ActionChip(
-                label: 'Generate Gauntlet',
-                icon: Icons.bolt,
-                onTap: p.generateGauntlet,
-              ),
-              if (p.gauntletStratagems.value.isNotEmpty)
-                _ActionChip(
-                  label: 'Copy Stratagems',
-                  icon: Icons.content_copy,
-                  onTap: p.copyGauntletStratagems,
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (p.gauntletStratagems.value.isNotEmpty) ...[
-            _SectionHeader(
-              title: 'GENERATED (${p.gauntletCount.value})',
-            ),
-            ...p.gauntletStratagems.value.map(
-              (s) => _StratagemCard(stratagem: s),
+        return ListView(
+          key: const PageStorageKey('blueprint_gauntlet_list'),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.all(8),
+          children: [
+            const _SectionHeader(title: 'TARGET SCREEN'),
+            _RouteDropdown(
+              routes: routes,
+              selected: p.gauntletRoute.value,
+              onChanged: (route) => p.gauntletRoute.value = route,
             ),
             const SizedBox(height: 8),
+            const _SectionHeader(title: 'INTENSITY'),
+            _IntensitySelector(
+              intensity: p.gauntletIntensity.value,
+              onChanged: (i) => p.gauntletIntensity.value = i,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _ActionChip(
+                  label: 'Generate Gauntlet',
+                  icon: Icons.bolt,
+                  onTap: p.generateGauntlet,
+                ),
+                if (p.gauntletStratagems.value.isNotEmpty)
+                  _ActionChip(
+                    label: 'Copy Stratagems',
+                    icon: Icons.content_copy,
+                    onTap: p.copyGauntletStratagems,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (p.gauntletStratagems.value.isNotEmpty) ...[
+              _SectionHeader(title: 'GENERATED (${p.gauntletCount.value})'),
+              ...p.gauntletStratagems.value.map(
+                (s) => _StratagemCard(stratagem: s),
+              ),
+              const SizedBox(height: 8),
+            ],
+            // Catalog preview
+            const _SectionHeader(title: 'PATTERN CATALOG'),
+            _MetricRow(
+              label: 'Available patterns',
+              value: '${Gauntlet.catalog.length}',
+            ),
+            ...GauntletCategory.values.map((cat) {
+              final patterns = Gauntlet.patternsForCategory(cat);
+              return _MetricRow(
+                label: cat.name,
+                value: '${patterns.length} patterns',
+              );
+            }),
           ],
-          // Catalog preview
-          const _SectionHeader(title: 'PATTERN CATALOG'),
-          _MetricRow(
-            label: 'Available patterns',
-            value: '${Gauntlet.catalog.length}',
-          ),
-          ...GauntletCategory.values.map((cat) {
-            final patterns = Gauntlet.patternsForCategory(cat);
-            return _MetricRow(
-              label: cat.name,
-              value: '${patterns.length} patterns',
-            );
-          }),
-        ],
-      );
-    });
+        );
+      },
+    );
   }
 }
 
@@ -639,190 +649,204 @@ class _CampaignView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Vestige<_BlueprintPillar>(builder: (context, p) {
-      return ListView(
-        padding: const EdgeInsets.all(8),
-        children: [
-          const _SectionHeader(title: 'CAMPAIGN JSON'),
-          Container(
-            height: 160,
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: TextField(
-              maxLines: null,
-              expands: true,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                color: Colors.white70,
+    return Vestige<_BlueprintPillar>(
+      builder: (context, p) {
+        return ListView(
+          key: const PageStorageKey('blueprint_campaign_list'),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.all(8),
+          children: [
+            const _SectionHeader(title: 'CAMPAIGN JSON'),
+            Container(
+              height: 160,
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.white10),
               ),
-              decoration: const InputDecoration(
-                hintText: 'Paste Campaign JSON here...',
-                hintStyle: TextStyle(color: Colors.white24, fontSize: 10),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.all(8),
-              ),
-              onChanged: (text) => p.campaignJson.value = text,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              _ActionChip(
-                label: 'Execute Campaign',
-                icon: Icons.play_arrow,
-                onTap: p.campaignRunning.value ? null : () async {
-                  final json = p.campaignJson.value;
-                  if (json.isEmpty) {
-                    p.status.value = 'Paste Campaign JSON first';
-                    return;
-                  }
-                  try {
-                    final map = jsonDecode(json) as Map<String, dynamic>;
-                    p.campaignRunning.value = true;
-                    p.campaignStatus.value = 'Running...';
-                    final result = await colossus.executeCampaignJson(map);
-                    p.campaignResult.value = result.toReport();
-                    p.lastCampaignResult.value = result;
-                    p.campaignStatus.value =
-                        '${result.totalExecuted} executed, '
-                        '${result.totalFailed} failed '
-                        '(${(result.passRate * 100).toStringAsFixed(1)}%)';
-                    p.campaignRunning.value = false;
-
-                    // Auto-debrief the campaign results
-                    final allVerdicts = [
-                      ...result.verdicts.values,
-                      ...result.prerequisiteVerdicts.values,
-                      ...?result.gauntletVerdicts?.values,
-                    ];
-                    p.runDebrief(allVerdicts);
-                  } catch (e) {
-                    p.campaignStatus.value = 'Error: $e';
-                    p.campaignRunning.value = false;
-                  }
-                },
-              ),
-              _ActionChip(
-                label: 'Copy Template',
-                icon: Icons.content_paste,
-                onTap: () {
-                  final template = const JsonEncoder.withIndent('  ')
-                      .convert(Campaign.template);
-                  Clipboard.setData(ClipboardData(text: template));
-                  p.status.value = 'Campaign template copied to clipboard';
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (p.campaignRunning.value)
-            const Center(
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.tealAccent,
+              child: TextField(
+                maxLines: null,
+                expands: true,
+                scrollPhysics: const NeverScrollableScrollPhysics(),
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                  color: Colors.white70,
                 ),
+                decoration: const InputDecoration(
+                  hintText: 'Paste Campaign JSON here...',
+                  hintStyle: TextStyle(color: Colors.white24, fontSize: 10),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.all(8),
+                ),
+                onChanged: (text) => p.campaignJson.value = text,
               ),
             ),
-          if (p.campaignStatus.value.isNotEmpty)
-            _InfoCard(message: p.campaignStatus.value),
-          // Campaign result details
-          if (p.lastCampaignResult.value != null) ...[
-            const SizedBox(height: 8),
-            const _SectionHeader(title: 'RESULTS'),
-            _MetricRow(
-              label: 'Total executed',
-              value: '${p.lastCampaignResult.value!.totalExecuted}',
-            ),
-            _MetricRow(
-              label: 'Passed',
-              value:
-                  '${p.lastCampaignResult.value!.totalExecuted - p.lastCampaignResult.value!.totalFailed}',
-              color: Colors.greenAccent,
-            ),
-            _MetricRow(
-              label: 'Failed',
-              value: '${p.lastCampaignResult.value!.totalFailed}',
-              color: p.lastCampaignResult.value!.totalFailed > 0
-                  ? Colors.redAccent
-                  : Colors.greenAccent,
-            ),
-            _MetricRow(
-              label: 'Pass rate',
-              value:
-                  '${(p.lastCampaignResult.value!.passRate * 100).toStringAsFixed(1)}%',
-              color: p.lastCampaignResult.value!.passRate >= 0.9
-                  ? Colors.greenAccent
-                  : Colors.redAccent,
-            ),
-            _MetricRow(
-              label: 'Duration',
-              value:
-                  '${p.lastCampaignResult.value!.duration.inMilliseconds}ms',
-            ),
-            const SizedBox(height: 4),
-            const _SectionHeader(title: 'VERDICTS'),
-            ...p.lastCampaignResult.value!.verdicts.entries.map(
-              (e) => _VerdictRow(name: e.key, verdict: e.value),
-            ),
-            if (p.lastCampaignResult.value!.prerequisiteVerdicts
-                .isNotEmpty) ...[
-              const SizedBox(height: 4),
-              const _SectionHeader(title: 'PREREQUISITE VERDICTS'),
-              ...p.lastCampaignResult.value!.prerequisiteVerdicts.entries
-                  .map(
-                (e) => _VerdictRow(name: e.key, verdict: e.value),
-              ),
-            ],
-            if (p.lastCampaignResult.value!.gauntletVerdicts
-                    ?.isNotEmpty ??
-                false) ...[
-              const SizedBox(height: 4),
-              const _SectionHeader(title: 'GAUNTLET VERDICTS'),
-              ...p.lastCampaignResult.value!.gauntletVerdicts!.entries
-                  .map(
-                (e) => _VerdictRow(name: e.key, verdict: e.value),
-              ),
-            ],
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 4,
               children: [
                 _ActionChip(
-                  label: 'Copy Report',
-                  icon: Icons.description,
-                  onTap: () {
-                    Clipboard.setData(
-                      ClipboardData(text: p.campaignResult.value),
-                    );
-                    p.status.value = 'Campaign report copied to clipboard';
-                  },
+                  label: 'Execute Campaign',
+                  icon: Icons.play_arrow,
+                  onTap: p.campaignRunning.value
+                      ? null
+                      : () async {
+                          final json = p.campaignJson.value;
+                          if (json.isEmpty) {
+                            p.status.value = 'Paste Campaign JSON first';
+                            return;
+                          }
+                          try {
+                            final map =
+                                jsonDecode(json) as Map<String, dynamic>;
+                            p.campaignRunning.value = true;
+                            p.campaignStatus.value = 'Running...';
+                            final result = await colossus.executeCampaignJson(
+                              map,
+                            );
+                            if (p.isDisposed) return;
+                            p.campaignResult.value = result.toReport();
+                            p.lastCampaignResult.value = result;
+                            p.campaignStatus.value =
+                                '${result.totalExecuted} executed, '
+                                '${result.totalFailed} failed '
+                                '(${(result.passRate * 100).toStringAsFixed(1)}%)';
+                            p.campaignRunning.value = false;
+
+                            // Auto-debrief the campaign results
+                            final allVerdicts = [
+                              ...result.verdicts.values,
+                              ...result.prerequisiteVerdicts.values,
+                              ...?result.gauntletVerdicts?.values,
+                            ];
+                            p.runDebrief(allVerdicts);
+                          } catch (e) {
+                            if (p.isDisposed) return;
+                            p.campaignStatus.value = 'Error: $e';
+                            p.campaignRunning.value = false;
+                          }
+                        },
                 ),
                 _ActionChip(
-                  label: 'Copy JSON',
-                  icon: Icons.data_object,
+                  label: 'Copy Template',
+                  icon: Icons.content_paste,
                   onTap: () {
-                    final json = const JsonEncoder.withIndent('  ')
-                        .convert(p.lastCampaignResult.value!.toJson());
-                    Clipboard.setData(ClipboardData(text: json));
-                    p.status.value = 'Campaign result JSON copied';
+                    final template = const JsonEncoder.withIndent(
+                      '  ',
+                    ).convert(Campaign.template);
+                    Clipboard.setData(ClipboardData(text: template));
+                    p.status.value = 'Campaign template copied to clipboard';
                   },
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            if (p.campaignRunning.value)
+              const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.tealAccent,
+                  ),
+                ),
+              ),
+            if (p.campaignStatus.value.isNotEmpty)
+              _InfoCard(message: p.campaignStatus.value),
+            // Campaign result details
+            if (p.lastCampaignResult.value != null) ...[
+              const SizedBox(height: 8),
+              const _SectionHeader(title: 'RESULTS'),
+              _MetricRow(
+                label: 'Total executed',
+                value: '${p.lastCampaignResult.value!.totalExecuted}',
+              ),
+              _MetricRow(
+                label: 'Passed',
+                value:
+                    '${p.lastCampaignResult.value!.totalExecuted - p.lastCampaignResult.value!.totalFailed}',
+                color: Colors.greenAccent,
+              ),
+              _MetricRow(
+                label: 'Failed',
+                value: '${p.lastCampaignResult.value!.totalFailed}',
+                color: p.lastCampaignResult.value!.totalFailed > 0
+                    ? Colors.redAccent
+                    : Colors.greenAccent,
+              ),
+              _MetricRow(
+                label: 'Pass rate',
+                value:
+                    '${(p.lastCampaignResult.value!.passRate * 100).toStringAsFixed(1)}%',
+                color: p.lastCampaignResult.value!.passRate >= 0.9
+                    ? Colors.greenAccent
+                    : Colors.redAccent,
+              ),
+              _MetricRow(
+                label: 'Duration',
+                value:
+                    '${p.lastCampaignResult.value!.duration.inMilliseconds}ms',
+              ),
+              const SizedBox(height: 4),
+              const _SectionHeader(title: 'VERDICTS'),
+              ...p.lastCampaignResult.value!.verdicts.entries.map(
+                (e) => _VerdictRow(name: e.key, verdict: e.value),
+              ),
+              if (p
+                  .lastCampaignResult
+                  .value!
+                  .prerequisiteVerdicts
+                  .isNotEmpty) ...[
+                const SizedBox(height: 4),
+                const _SectionHeader(title: 'PREREQUISITE VERDICTS'),
+                ...p.lastCampaignResult.value!.prerequisiteVerdicts.entries.map(
+                  (e) => _VerdictRow(name: e.key, verdict: e.value),
+                ),
+              ],
+              if (p.lastCampaignResult.value!.gauntletVerdicts?.isNotEmpty ??
+                  false) ...[
+                const SizedBox(height: 4),
+                const _SectionHeader(title: 'GAUNTLET VERDICTS'),
+                ...p.lastCampaignResult.value!.gauntletVerdicts!.entries.map(
+                  (e) => _VerdictRow(name: e.key, verdict: e.value),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  _ActionChip(
+                    label: 'Copy Report',
+                    icon: Icons.description,
+                    onTap: () {
+                      Clipboard.setData(
+                        ClipboardData(text: p.campaignResult.value),
+                      );
+                      p.status.value = 'Campaign report copied to clipboard';
+                    },
+                  ),
+                  _ActionChip(
+                    label: 'Copy JSON',
+                    icon: Icons.data_object,
+                    onTap: () {
+                      final json = const JsonEncoder.withIndent(
+                        '  ',
+                      ).convert(p.lastCampaignResult.value!.toJson());
+                      Clipboard.setData(ClipboardData(text: json));
+                      p.status.value = 'Campaign result JSON copied';
+                    },
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
-      );
-    });
+        );
+      },
+    );
   }
 }
 
@@ -836,45 +860,45 @@ class _DebriefView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Vestige<_BlueprintPillar>(builder: (context, p) {
-      final report = p.lastReport.value;
+    return Vestige<_BlueprintPillar>(
+      builder: (context, p) {
+        final report = p.lastReport.value;
 
-      return ListView(
-        padding: const EdgeInsets.all(8),
-        children: [
-          if (report != null) ...[
-            const _SectionHeader(title: 'DEBRIEF RESULTS'),
-            _MetricRow(
-              label: 'Verdicts',
-              value: '${report.totalVerdicts}',
-            ),
-            _MetricRow(
-              label: 'Passed',
-              value: '${report.passedVerdicts}/${report.totalVerdicts}',
-              color: report.allPassed ? Colors.greenAccent : Colors.orangeAccent,
-            ),
-            _MetricRow(
-              label: 'Pass rate',
-              value: '${(report.passRate * 100).toStringAsFixed(1)}%',
-              color: report.passRate >= 0.9
-                  ? Colors.greenAccent
-                  : Colors.redAccent,
-            ),
-            _MetricRow(
-              label: 'Insights',
-              value: '${report.insights.length}',
-            ),
-            const SizedBox(height: 8),
-            if (report.insights.isNotEmpty) ...[
-              const _SectionHeader(title: 'INSIGHTS'),
-              ...report.insights.map((insight) => _InsightCard(
-                    insight: insight,
-                  )),
-            ],
-            const SizedBox(height: 8),
-            if (report.suggestedNextActions.isNotEmpty) ...[
-              const _SectionHeader(title: 'SUGGESTED ACTIONS'),
-              ...report.suggestedNextActions.map((action) => Padding(
+        return ListView(
+          key: const PageStorageKey('blueprint_debrief_list'),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.all(8),
+          children: [
+            if (report != null) ...[
+              const _SectionHeader(title: 'DEBRIEF RESULTS'),
+              _MetricRow(label: 'Verdicts', value: '${report.totalVerdicts}'),
+              _MetricRow(
+                label: 'Passed',
+                value: '${report.passedVerdicts}/${report.totalVerdicts}',
+                color: report.allPassed
+                    ? Colors.greenAccent
+                    : Colors.orangeAccent,
+              ),
+              _MetricRow(
+                label: 'Pass rate',
+                value: '${(report.passRate * 100).toStringAsFixed(1)}%',
+                color: report.passRate >= 0.9
+                    ? Colors.greenAccent
+                    : Colors.redAccent,
+              ),
+              _MetricRow(label: 'Insights', value: '${report.insights.length}'),
+              const SizedBox(height: 8),
+              if (report.insights.isNotEmpty) ...[
+                const _SectionHeader(title: 'INSIGHTS'),
+                ...report.insights.map(
+                  (insight) => _InsightCard(insight: insight),
+                ),
+              ],
+              const SizedBox(height: 8),
+              if (report.suggestedNextActions.isNotEmpty) ...[
+                const _SectionHeader(title: 'SUGGESTED ACTIONS'),
+                ...report.suggestedNextActions.map(
+                  (action) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Text(
                       '→ $action',
@@ -883,22 +907,25 @@ class _DebriefView extends StatelessWidget {
                         fontSize: 10,
                       ),
                     ),
-                  )),
-            ],
-            const SizedBox(height: 8),
-            _ActionChip(
-              label: 'Copy AI Debrief',
-              icon: Icons.copy,
-              onTap: p.copyDebriefSummary,
-            ),
-          ] else
-            const _InfoCard(
-              message: 'No debrief data yet.\n'
-                  'Execute a Campaign or call debrief() to analyze verdicts.',
-            ),
-        ],
-      );
-    });
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              _ActionChip(
+                label: 'Copy AI Debrief',
+                icon: Icons.copy,
+                onTap: p.copyDebriefSummary,
+              ),
+            ] else
+              const _InfoCard(
+                message:
+                    'No debrief data yet.\n'
+                    'Execute a Campaign or call debrief() to analyze verdicts.',
+              ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -932,11 +959,7 @@ class _MetricRow extends StatelessWidget {
   final String value;
   final Color? color;
 
-  const _MetricRow({
-    required this.label,
-    required this.value,
-    this.color,
-  });
+  const _MetricRow({required this.label, required this.value, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -968,11 +991,7 @@ class _ActionChip extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
 
-  const _ActionChip({
-    required this.label,
-    required this.icon,
-    this.onTap,
-  });
+  const _ActionChip({required this.label, required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1037,7 +1056,7 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
-class _RouteDropdown extends StatelessWidget {
+class _RouteDropdown extends StatefulWidget {
   final List<String> routes;
   final String? selected;
   final ValueChanged<String?> onChanged;
@@ -1049,39 +1068,185 @@ class _RouteDropdown extends StatelessWidget {
   });
 
   @override
+  State<_RouteDropdown> createState() => _RouteDropdownState();
+}
+
+class _RouteDropdownState extends State<_RouteDropdown> {
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+  bool _isOpen = false;
+
+  void _toggle() {
+    if (_isOpen) {
+      _close();
+    } else {
+      _open();
+    }
+  }
+
+  void _open() {
+    final overlay = Overlay.of(context, debugRequiredFor: widget);
+    _overlayEntry = OverlayEntry(
+      builder: (context) => _RouteDropdownOverlay(
+        link: _layerLink,
+        routes: widget.routes,
+        selected: widget.selected,
+        onSelected: (value) {
+          _close();
+          widget.onChanged(value);
+        },
+        onDismiss: _close,
+      ),
+    );
+    overlay.insert(_overlayEntry!);
+    setState(() => _isOpen = true);
+  }
+
+  void _close() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    if (mounted) setState(() => _isOpen = false);
+  }
+
+  @override
+  void deactivate() {
+    // Close the dropdown before the render tree is detached.
+    // This ensures the CompositedTransformFollower is removed
+    // while its leader's RenderObject is still attached, avoiding
+    // 'attached' assertions during tab switches.
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (routes.isEmpty) {
+    if (widget.routes.isEmpty) {
       return const _InfoCard(
-        message: 'No routes discovered yet. Record sessions or '
+        message:
+            'No routes discovered yet. Record sessions or '
             'execute Stratagems to build the Terrain.',
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.black26,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: DropdownButton<String>(
-        value: selected,
-        isExpanded: true,
-        dropdownColor: const Color(0xFF1E1E1E),
-        hint: const Text(
-          'Select route...',
-          style: TextStyle(color: Colors.white24, fontSize: 10),
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: GestureDetector(
+        onTap: _toggle,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black26,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: _isOpen ? Colors.white24 : Colors.white10,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.selected ?? 'Select route...',
+                  style: TextStyle(
+                    color: widget.selected != null
+                        ? Colors.white70
+                        : Colors.white24,
+                    fontSize: 10,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(
+                _isOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                color: Colors.white38,
+                size: 16,
+              ),
+            ],
+          ),
         ),
-        style: const TextStyle(color: Colors.white70, fontSize: 10),
-        underline: const SizedBox.shrink(),
-        items: routes
-            .map((r) => DropdownMenuItem(
-                  value: r,
-                  child: Text(r, overflow: TextOverflow.ellipsis),
-                ))
-            .toList(),
-        onChanged: onChanged,
       ),
+    );
+  }
+}
+
+/// Overlay content for [_RouteDropdown], positioned below the trigger.
+class _RouteDropdownOverlay extends StatelessWidget {
+  final LayerLink link;
+  final List<String> routes;
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+  final VoidCallback onDismiss;
+
+  const _RouteDropdownOverlay({
+    required this.link,
+    required this.routes,
+    required this.selected,
+    required this.onSelected,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Dismiss area
+        GestureDetector(
+          onTap: onDismiss,
+          behavior: HitTestBehavior.opaque,
+          child: const SizedBox.expand(),
+        ),
+        // Dropdown menu
+        CompositedTransformFollower(
+          link: link,
+          targetAnchor: Alignment.bottomLeft,
+          followerAnchor: Alignment.topLeft,
+          child: Material(
+            color: const Color(0xFF1E1E1E),
+            elevation: 4,
+            borderRadius: BorderRadius.circular(4),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: routes.length,
+                itemBuilder: (context, index) {
+                  final route = routes[index];
+                  final isSelected = route == selected;
+                  return InkWell(
+                    onTap: () => onSelected(route),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      color: isSelected ? Colors.white10 : null,
+                      child: Text(
+                        route,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.white70,
+                          fontSize: 10,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1090,10 +1255,7 @@ class _IntensitySelector extends StatelessWidget {
   final GauntletIntensity intensity;
   final ValueChanged<GauntletIntensity> onChanged;
 
-  const _IntensitySelector({
-    required this.intensity,
-    required this.onChanged,
-  });
+  const _IntensitySelector({required this.intensity, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -1235,9 +1397,7 @@ class _PrerequisiteCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.orangeAccent.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: Colors.orangeAccent.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -1289,8 +1449,7 @@ class _InsightCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(2),

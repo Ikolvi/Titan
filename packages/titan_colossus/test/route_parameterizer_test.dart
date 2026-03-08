@@ -34,8 +34,7 @@ void main() {
 
       test('handles UUID-like IDs', () {
         parameterizer.parameterize('/user/a1b2c3d4e5f6');
-        final result =
-            parameterizer.parameterize('/user/f6e5d4c3b2a1');
+        final result = parameterizer.parameterize('/user/f6e5d4c3b2a1');
         expect(result, '/user/:id');
       });
 
@@ -81,8 +80,7 @@ void main() {
 
       test('handles deep nested routes', () {
         parameterizer.parameterize('/api/v1/users/42/comments/5');
-        final result =
-            parameterizer.parameterize('/api/v1/users/7/comments/3');
+        final result = parameterizer.parameterize('/api/v1/users/7/comments/3');
         expect(result, '/api/v1/users/:id/comments/:id');
       });
 

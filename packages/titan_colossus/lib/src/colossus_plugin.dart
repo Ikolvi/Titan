@@ -7,6 +7,7 @@ import 'colossus.dart';
 import 'export/blueprint_export.dart';
 import 'integration/colossus_atlas_observer.dart';
 import 'integration/lens.dart';
+import 'relay/relay.dart';
 import 'widgets/shade_listener.dart';
 import 'alerts/tremor.dart';
 
@@ -184,6 +185,41 @@ class ColossusPlugin extends TitanPlugin {
   /// ```
   final String? blueprintExportDirectory;
 
+  /// Whether to start the [Relay] HTTP server for AI-driven
+  /// campaign execution.
+  ///
+  /// When `true`, an embedded HTTP server starts on
+  /// [relayConfig.port] (default 8642) allowing AI assistants
+  /// to execute Campaigns, query Terrain, and receive Debrief
+  /// reports — all without human interaction.
+  ///
+  /// Supported on Android, iOS, macOS, Windows, and Linux.
+  /// Silently disabled on web (browsers cannot host servers).
+  ///
+  /// ```dart
+  /// ColossusPlugin(
+  ///   enableRelay: true,
+  ///   relayConfig: RelayConfig(port: 8642),
+  /// )
+  /// ```
+  final bool enableRelay;
+
+  /// Configuration for the [Relay] HTTP server.
+  ///
+  /// Only used when [enableRelay] is `true`.
+  ///
+  /// ```dart
+  /// ColossusPlugin(
+  ///   enableRelay: true,
+  ///   relayConfig: RelayConfig(
+  ///     port: 8642,
+  ///     host: '0.0.0.0',
+  ///     authToken: 'my-secret-token',
+  ///   ),
+  /// )
+  /// ```
+  final RelayConfig relayConfig;
+
   /// Creates a ColossusPlugin with the given configuration.
   ///
   /// All parameters mirror [Colossus.init] options. The plugin
@@ -206,6 +242,8 @@ class ColossusPlugin extends TitanPlugin {
     this.autoLearnSessions = true,
     this.autoAtlasIntegration = true,
     this.blueprintExportDirectory,
+    this.enableRelay = false,
+    this.relayConfig = const RelayConfig(),
   });
 
   @override
@@ -248,6 +286,14 @@ class ColossusPlugin extends TitanPlugin {
     if (autoAtlasIntegration) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         _tryAtlasIntegration(instance);
+      });
+    }
+
+    // Start Relay HTTP server for AI-driven campaign execution.
+    // Scheduled post-frame so Colossus is fully initialized first.
+    if (enableRelay) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        instance.startRelay(config: relayConfig);
       });
     }
   }
@@ -325,18 +371,12 @@ class ColossusPlugin extends TitanPlugin {
       final instance = Colossus.instance;
       final export = BlueprintExport.fromScout(
         scout: instance.scout,
-        metadata: {
-          'source': 'auto-export',
-          'plugin': 'ColossusPlugin',
-        },
+        metadata: {'source': 'auto-export', 'plugin': 'ColossusPlugin'},
       );
 
       // Fire-and-forget — don't block shutdown on file I/O.
       // Uses unawaited Future intentionally.
-      BlueprintExportIO.saveAll(
-        export,
-        directory: blueprintExportDirectory,
-      );
+      BlueprintExportIO.saveAll(export, directory: blueprintExportDirectory);
     } catch (_) {
       // Export failed — don't block shutdown.
     }
@@ -362,6 +402,7 @@ class ColossusPlugin extends TitanPlugin {
       'ColossusPlugin('
       'enableLens: $enableLens, '
       'enableShade: $enableShade, '
+      'enableRelay: $enableRelay, '
       'tremors: ${tremors.length}'
       ')';
 }

@@ -294,9 +294,11 @@ class Annals {
       if (indexed == null || indexed.isEmpty) return const [];
       if (limit != null && limit > 0) {
         final collected = <AnnalEntry>[];
-        for (var i = indexed.length - 1;
-            i >= 0 && collected.length < limit;
-            i--) {
+        for (
+          var i = indexed.length - 1;
+          i >= 0 && collected.length < limit;
+          i--
+        ) {
           if (matches(indexed[i])) collected.add(indexed[i]);
         }
         return collected.reversed.toList();

@@ -36,6 +36,7 @@ Titan's enterprise performance monitoring package provides frame tracking, page 
 | Campaign Analysis | **Debrief** | `Debrief` |
 | Screen Identifier | **Signet** | `Signet` |
 | Blueprint Overlay | **BlueprintLensTab** | `BlueprintLensTab` |
+| HTTP Bridge | **Relay** | `Relay`, `RelayConfig`, `RelayStatus`, `RelayHandler` |
 
 ## Installation
 
@@ -899,7 +900,9 @@ The CLI tool:
 
 ### Strategy 4: MCP Server
 
-The Blueprint MCP Server exposes Blueprint data directly to AI assistants via the [Model Context Protocol](https://modelcontextprotocol.io/):
+The Blueprint MCP Server exposes Blueprint data directly to AI assistants via the [Model Context Protocol](https://modelcontextprotocol.io/). This is the **recommended approach** — it enables fully AI-driven testing with zero manual steps.
+
+#### Setup
 
 ```json
 // .vscode/settings.json
@@ -914,7 +917,11 @@ The Blueprint MCP Server exposes Blueprint data directly to AI assistants via th
 }
 ```
 
-Available MCP tools:
+The MCP server reads from `.titan/blueprint.json` and caches results until the file changes on disk.
+
+#### Available MCP Tools
+
+**Read-only tools** — query terrain and test data:
 
 | Tool | Description |
 |------|-------------|
@@ -925,7 +932,64 @@ Available MCP tools:
 | `get_unreliable_routes` | Transitions with low reliability scores |
 | `get_route_patterns` | Registered parameterized route patterns |
 
-The MCP server reads from `.titan/blueprint.json` and caches results until the file changes on disk.
+**AI-driven testing tools** — generate, save, and analyze tests:
+
+| Tool | Description |
+|------|-------------|
+| `generate_gauntlet` | Generate edge-case tests for a specific route |
+| `get_campaign_template` | Get Campaign JSON schema and instructions |
+| `save_campaign` | Save Campaign JSON to `.titan/campaign.json` for app execution |
+| `get_debrief` | Get debrief report with pass/fail rates, insights, fix suggestions |
+| `get_full_context` | Everything in one call — terrain, dead ends, stratagems, results, next steps |
+
+#### AI-Driven Testing Flow
+
+With the MCP tools, the AI handles the entire test cycle without any manual Lens UI interaction:
+
+```
+1. AI calls get_full_context → understands app navigation
+2. AI calls get_campaign_template → learns the Campaign schema
+3. AI generates Campaign JSON from terrain data
+4. AI calls generate_gauntlet for edge cases on key routes
+5. AI calls save_campaign → writes .titan/campaign.json
+6. App loads and executes the Campaign
+7. AI calls get_debrief → analyzes results, suggests fixes
+```
+
+**Example AI interaction:**
+
+```
+User: "Test the entire login flow"
+
+AI:  1. Calls get_full_context → sees /login, /register, /forgot-password
+     2. Calls generate_gauntlet(route: "/login") → gets edge cases
+     3. Generates Campaign JSON with login, error, and recovery scenarios
+     4. Calls save_campaign → saved to .titan/campaign.json
+     5. "Campaign saved. Run it in your app or paste the JSON
+        into Lens → Blueprint → Campaign tab."
+     6. After execution, calls get_debrief → reports 12/15 passed,
+        3 failures in password validation, suggests fixes
+```
+
+#### Loading a Saved Campaign in the App
+
+```dart
+import 'dart:convert';
+import 'dart:io';
+
+// Load the AI-generated Campaign
+final json = jsonDecode(
+  File('.titan/campaign.json').readAsStringSync(),
+) as Map<String, dynamic>;
+
+// Execute it
+final result = await Colossus.instance.executeCampaignJson(json);
+print('Pass rate: ${(result.passRate * 100).toStringAsFixed(1)}%');
+
+// The debrief is auto-exported on next blueprint export
+```
+
+Or use the Lens Blueprint tab → Campaign sub-tab → paste the JSON → Execute.
 
 ### BlueprintExport Data Structure
 
@@ -976,10 +1040,185 @@ final export = BlueprintExport.fromSessions(
 
 ---
 
+## Relay — HTTP Bridge for AI-Driven Automation
+
+The final piece of the automation chain: **Relay** embeds a lightweight HTTP server inside the running Flutter app, enabling AI assistants to execute Campaigns, read live Terrain, and receive Debrief reports — all without any human interaction.
+
+### The Problem
+
+The MCP server and Blueprint export carry intelligence *from* the app to AI assistants. But Campaign execution still requires a human: paste JSON into Lens, tap Execute, wait, copy results. Relay closes this loop by letting the MCP server *talk back* to the running app.
+
+```
+Before Relay:
+  AI → MCP → blueprint.json (read) → AI generates Campaign
+  AI → MCP → save_campaign → .titan/campaign.json (file)
+  HUMAN → Lens → paste JSON → Execute → copy results ← ❌ manual step
+
+After Relay:
+  AI → MCP → execute_campaign → HTTP POST → Relay (in-app) → Colossus
+       → Campaign executes → results return via HTTP → MCP → AI ← ✅ zero touch
+```
+
+### Platform Support
+
+| Platform | Support | Mechanism |
+|----------|---------|-----------|
+| Android  | ✅ Full | `dart:io` HttpServer |
+| iOS      | ✅ Full | `dart:io` HttpServer |
+| macOS    | ✅ Full | `dart:io` HttpServer |
+| Windows  | ✅ Full | `dart:io` HttpServer |
+| Linux    | ✅ Full | `dart:io` HttpServer |
+| Web      | ⚠️ Stub  | Browsers cannot host HTTP servers |
+
+On web, Relay starts as a no-op — `start()` completes immediately without error. The app functions normally; AI-driven campaigns can still be run by pasting JSON into the Lens Blueprint tab.
+
+### Quick Start
+
+One parameter in ColossusPlugin enables the Relay:
+
+```dart
+ColossusPlugin(
+  enableRelay: true,
+  // Optional: customize port, auth, etc.
+  relayConfig: RelayConfig(
+    port: 8642,           // Default
+    host: '0.0.0.0',      // All interfaces (reachable from devices)
+    authToken: 'my-token', // Optional bearer auth
+  ),
+)
+```
+
+Or start manually:
+
+```dart
+await Colossus.instance.startRelay(
+  config: RelayConfig(port: 8642),
+);
+```
+
+### Network Connectivity
+
+| Scenario | How MCP reaches the app |
+|----------|-------------------------|
+| Desktop (macOS/Win/Linux) | `localhost:8642` |
+| Android emulator | `adb forward tcp:8642 tcp:8642`, then `localhost:8642` |
+| Android device | `adb forward` or device IP on same WiFi |
+| iOS simulator | `localhost:8642` |
+| iOS device | Device IP on same WiFi |
+
+For Android devices/emulators, set up port forwarding once:
+
+```bash
+adb forward tcp:8642 tcp:8642
+```
+
+### Endpoints
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/health` | No | Health check — verify Relay is running |
+| `GET` | `/status` | Yes | Relay status, port, request count, version |
+| `GET` | `/terrain` | Yes | Current Terrain graph (live from Scout) |
+| `GET` | `/blueprint` | Yes | Full AI Blueprint context |
+| `POST` | `/campaign` | Yes | Execute Campaign JSON, return results |
+| `POST` | `/debrief` | Yes | Analyze Verdicts, return Debrief report |
+
+### Security
+
+When `authToken` is set, every request (except `/health`) must include a bearer token:
+
+```bash
+curl -H "Authorization: Bearer my-token" http://localhost:8642/terrain
+```
+
+Without a valid token, requests receive HTTP 401. When no token is configured, all requests are allowed (development convenience).
+
+CORS headers are included on all responses for web-based MCP clients.
+
+### MCP Integration
+
+Three new MCP tools connect to the Relay:
+
+| Tool | Description |
+|------|-------------|
+| `execute_campaign` | Execute Campaign JSON on the running app — returns pass/fail results, Verdicts, and AI diagnostic |
+| `relay_status` | Check if the Relay is running, show port and stats |
+| `relay_terrain` | Get live Terrain from the running app (not from static file) |
+
+Configure the MCP server with Relay connection info:
+
+```json
+{
+  "github.copilot.chat.mcpServers": {
+    "titan-blueprint": {
+      "command": "dart",
+      "args": [
+        "run",
+        "titan_colossus:blueprint_mcp_server",
+        "--relay-host", "127.0.0.1",
+        "--relay-port", "8642",
+        "--relay-token", "my-token"
+      ],
+      "cwd": "${workspaceFolder}/packages/titan_colossus"
+    }
+  }
+}
+```
+
+### Fully Automated Testing Flow
+
+With Relay, the entire test cycle requires zero human interaction:
+
+```
+1. AI calls get_full_context     → understands app navigation
+2. AI calls get_campaign_template → learns Campaign schema
+3. AI generates Campaign JSON from terrain + gauntlet data
+4. AI calls execute_campaign     → HTTP POST to Relay → Colossus runs it
+5. AI receives results           → pass rates, failed steps, diagnostics
+6. AI calls get_debrief          → analyzes failures, suggests fixes
+7. AI generates fix code         → commits the fix
+8. AI calls execute_campaign     → re-run to verify the fix
+```
+
+### Programmatic Usage
+
+```dart
+// The Relay class
+final relay = Relay();
+
+await relay.start(
+  config: RelayConfig(port: 8642),
+  handler: myHandler, // implements RelayHandler
+);
+
+print(relay.status.isRunning);      // true
+print(relay.status.port);           // 8642
+print(relay.status.requestsHandled); // 0
+
+await relay.stop();
+```
+
+### RelayHandler Interface
+
+The Relay delegates all business logic to a `RelayHandler`:
+
+```dart
+abstract interface class RelayHandler {
+  Future<Map<String, dynamic>> executeCampaign(Map<String, dynamic> json);
+  Map<String, dynamic> getTerrain();
+  Future<Map<String, dynamic>> getBlueprint();
+  Map<String, dynamic> debriefVerdicts(List<Map<String, dynamic>> verdicts);
+}
+```
+
+Colossus provides a built-in handler that delegates to `executeCampaignJson`, `terrain.toJson()`, `getAiBlueprint()`, and `debrief()`. You don't need to implement this yourself.
+
+---
+
 ## Testing
 
 ```bash
-cd packages/titan_colossus && fvm flutter test  # 1197+ tests
+cd packages/titan_colossus && fvm flutter test  # 1247+ tests
 ```
 
 ---

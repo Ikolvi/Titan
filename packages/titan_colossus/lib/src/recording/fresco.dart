@@ -53,18 +53,14 @@ class Fresco {
   /// Capture takes 5-15ms depending on screen complexity and
   /// [pixelRatio]. This is acceptable since it only runs during
   /// recording (not in production) and is async.
-  static Future<Uint8List?> capture({
-    double pixelRatio = 1.0,
-  }) async {
+  static Future<Uint8List?> capture({double pixelRatio = 1.0}) async {
     try {
       final boundary = _findRepaintBoundary();
       if (boundary == null) return null;
 
       final image = await boundary.toImage(pixelRatio: pixelRatio);
       try {
-        final byteData = await image.toByteData(
-          format: ui.ImageByteFormat.png,
-        );
+        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
         return byteData?.buffer.asUint8List();
       } finally {
         image.dispose();
@@ -101,6 +97,7 @@ class Fresco {
       }
       child.visitChildren(visitor);
     }
+
     renderObject.visitChildren(visitor);
 
     return result;

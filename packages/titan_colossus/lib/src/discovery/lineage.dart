@@ -65,8 +65,7 @@ class StratagemPrerequisite {
   factory StratagemPrerequisite.fromJson(Map<String, dynamic> json) {
     return StratagemPrerequisite(
       description: json['description'] as String,
-      stratagem:
-          Stratagem.fromJson(json['stratagem'] as Map<String, dynamic>),
+      stratagem: Stratagem.fromJson(json['stratagem'] as Map<String, dynamic>),
       isAuthGate: json['isAuthGate'] as bool? ?? false,
       isFormGate: json['isFormGate'] as bool? ?? false,
       estimatedDuration: Duration(
@@ -118,10 +117,8 @@ class Lineage {
   bool get requiresAuth => prerequisites.any((p) => p.isAuthGate);
 
   /// Total estimated time to execute all prerequisites.
-  Duration get estimatedSetupTime => prerequisites.fold(
-    Duration.zero,
-    (sum, p) => sum + p.estimatedDuration,
-  );
+  Duration get estimatedSetupTime =>
+      prerequisites.fold(Duration.zero, (sum, p) => sum + p.estimatedDuration);
 
   /// Whether there are no prerequisites (target is directly reachable).
   bool get isEmpty => prerequisites.isEmpty;
@@ -153,19 +150,12 @@ class Lineage {
   /// final lineage = Lineage.resolve(terrain, targetRoute: '/dashboard');
   /// print(lineage.prerequisites); // [login_prerequisite]
   /// ```
-  factory Lineage.resolve(
-    Terrain terrain, {
-    required String targetRoute,
-  }) {
+  factory Lineage.resolve(Terrain terrain, {required String targetRoute}) {
     // Target is an entry point — no prerequisites needed
     if (terrain.outposts.containsKey(targetRoute)) {
       final outpost = terrain.outposts[targetRoute]!;
       if (outpost.entrances.isEmpty) {
-        return Lineage._(
-          targetRoute: targetRoute,
-          prerequisites: [],
-          path: [],
-        );
+        return Lineage._(targetRoute: targetRoute, prerequisites: [], path: []);
       }
     }
 
@@ -174,22 +164,14 @@ class Lineage {
     List<March>? bestPath;
 
     for (final entry in entryPoints) {
-      final path = terrain.shortestPath(
-        entry.routePattern,
-        targetRoute,
-      );
-      if (path != null &&
-          (bestPath == null || path.length < bestPath.length)) {
+      final path = terrain.shortestPath(entry.routePattern, targetRoute);
+      if (path != null && (bestPath == null || path.length < bestPath.length)) {
         bestPath = path;
       }
     }
 
     if (bestPath == null) {
-      return Lineage._(
-        targetRoute: targetRoute,
-        prerequisites: [],
-        path: [],
-      );
+      return Lineage._(targetRoute: targetRoute, prerequisites: [], path: []);
     }
 
     // Convert path to prerequisite Stratagems
@@ -222,17 +204,19 @@ class Lineage {
 
     for (final prereq in prerequisites) {
       for (final step in prereq.stratagem.steps) {
-        allSteps.add(StratagemStep(
-          id: stepId++,
-          action: step.action,
-          description: '[Setup] ${step.description}',
-          target: step.target,
-          value: step.value,
-          clearFirst: step.clearFirst,
-          expectations: step.expectations,
-          waitAfter: step.waitAfter,
-          navigateRoute: step.navigateRoute,
-        ));
+        allSteps.add(
+          StratagemStep(
+            id: stepId++,
+            action: step.action,
+            description: '[Setup] ${step.description}',
+            target: step.target,
+            value: step.value,
+            clearFirst: step.clearFirst,
+            expectations: step.expectations,
+            waitAfter: step.waitAfter,
+            navigateRoute: step.navigateRoute,
+          ),
+        );
       }
     }
 
@@ -260,9 +244,7 @@ class Lineage {
     final buffer = StringBuffer();
     buffer.writeln('LINEAGE: Reaching $targetRoute');
     buffer.writeln('AUTH REQUIRED: $requiresAuth');
-    buffer.writeln(
-      'ESTIMATED SETUP: ${estimatedSetupTime.inSeconds}s',
-    );
+    buffer.writeln('ESTIMATED SETUP: ${estimatedSetupTime.inSeconds}s');
     buffer.writeln('PREREQUISITES (${prerequisites.length}):');
     for (var i = 0; i < prerequisites.length; i++) {
       buffer.writeln('  ${i + 1}. ${prerequisites[i].description}');
@@ -287,11 +269,13 @@ class Lineage {
     'estimatedSetupMs': estimatedSetupTime.inMilliseconds,
     'hopCount': hopCount,
     'path': path
-        .map((m) => {
-              'from': m.fromRoute,
-              'to': m.toRoute,
-              'trigger': m.trigger.name,
-            })
+        .map(
+          (m) => {
+            'from': m.fromRoute,
+            'to': m.toRoute,
+            'trigger': m.trigger.name,
+          },
+        )
         .toList(),
     'prerequisites': prerequisites.map((p) => p.toJson()).toList(),
   };
@@ -301,11 +285,7 @@ class Lineage {
     return Lineage._(
       targetRoute: json['targetRoute'] as String,
       prerequisites: (json['prerequisites'] as List)
-          .map(
-            (e) => StratagemPrerequisite.fromJson(
-              e as Map<String, dynamic>,
-            ),
-          )
+          .map((e) => StratagemPrerequisite.fromJson(e as Map<String, dynamic>))
           .toList(),
       path: (json['path'] as List)
           .map(
@@ -358,24 +338,22 @@ class Lineage {
 
       final estimatedMs = _estimateDuration(march, isForm: isForm);
 
-      prerequisites.add(StratagemPrerequisite(
-        description: description,
-        stratagem: Stratagem(
-          name: _prerequisiteName(march, isAuth: isAuth),
+      prerequisites.add(
+        StratagemPrerequisite(
           description: description,
-          tags: [
-            'prerequisite',
-            if (isAuth) 'auth',
-            if (isForm) 'form',
-          ],
-          startRoute: march.fromRoute,
-          steps: steps,
-          failurePolicy: StratagemFailurePolicy.abortOnFirst,
+          stratagem: Stratagem(
+            name: _prerequisiteName(march, isAuth: isAuth),
+            description: description,
+            tags: ['prerequisite', if (isAuth) 'auth', if (isForm) 'form'],
+            startRoute: march.fromRoute,
+            steps: steps,
+            failurePolicy: StratagemFailurePolicy.abortOnFirst,
+          ),
+          isAuthGate: isAuth,
+          isFormGate: isForm,
+          estimatedDuration: Duration(milliseconds: estimatedMs),
         ),
-        isAuthGate: isAuth,
-        isFormGate: isForm,
-        estimatedDuration: Duration(milliseconds: estimatedMs),
-      ));
+      );
     }
 
     return prerequisites;
@@ -435,18 +413,20 @@ class Lineage {
       for (final element in source.interactiveElements) {
         if (element.widgetType == 'TextField' ||
             element.widgetType == 'TextFormField') {
-          steps.add(StratagemStep(
-            id: stepId++,
-            action: StratagemAction.enterText,
-            description: 'Enter ${element.label ?? "text"}',
-            target: StratagemTarget(
-              label: element.label,
-              type: element.widgetType,
-              key: element.key,
+          steps.add(
+            StratagemStep(
+              id: stepId++,
+              action: StratagemAction.enterText,
+              description: 'Enter ${element.label ?? "text"}',
+              target: StratagemTarget(
+                label: element.label,
+                type: element.widgetType,
+                key: element.key,
+              ),
+              value: _testDataPlaceholder(element.label),
+              clearFirst: true,
             ),
-            value: _testDataPlaceholder(element.label),
-            clearFirst: true,
-          ));
+          );
         }
       }
     }
@@ -455,45 +435,53 @@ class Lineage {
     switch (march.trigger) {
       case MarchTrigger.tap:
       case MarchTrigger.formSubmit:
-        steps.add(StratagemStep(
-          id: stepId++,
-          action: StratagemAction.tap,
-          description: march.triggerElementLabel != null
-              ? 'Tap "${march.triggerElementLabel}"'
-              : 'Tap to navigate to ${march.toRoute}',
-          target: StratagemTarget(
-            label: march.triggerElementLabel,
-            type: march.triggerElementType,
-            key: march.triggerElementKey,
+        steps.add(
+          StratagemStep(
+            id: stepId++,
+            action: StratagemAction.tap,
+            description: march.triggerElementLabel != null
+                ? 'Tap "${march.triggerElementLabel}"'
+                : 'Tap to navigate to ${march.toRoute}',
+            target: StratagemTarget(
+              label: march.triggerElementLabel,
+              type: march.triggerElementType,
+              key: march.triggerElementKey,
+            ),
+            expectations: StratagemExpectations(route: march.toRoute),
           ),
-          expectations: StratagemExpectations(route: march.toRoute),
-        ));
+        );
       case MarchTrigger.back:
-        steps.add(StratagemStep(
-          id: stepId++,
-          action: StratagemAction.back,
-          description: 'Navigate back to ${march.toRoute}',
-          expectations: StratagemExpectations(route: march.toRoute),
-        ));
+        steps.add(
+          StratagemStep(
+            id: stepId++,
+            action: StratagemAction.back,
+            description: 'Navigate back to ${march.toRoute}',
+            expectations: StratagemExpectations(route: march.toRoute),
+          ),
+        );
       case MarchTrigger.swipe:
-        steps.add(StratagemStep(
-          id: stepId++,
-          action: StratagemAction.swipe,
-          description: 'Swipe to ${march.toRoute}',
-          swipeDirection: 'left',
-          expectations: StratagemExpectations(route: march.toRoute),
-        ));
+        steps.add(
+          StratagemStep(
+            id: stepId++,
+            action: StratagemAction.swipe,
+            description: 'Swipe to ${march.toRoute}',
+            swipeDirection: 'left',
+            expectations: StratagemExpectations(route: march.toRoute),
+          ),
+        );
       case MarchTrigger.deepLink:
       case MarchTrigger.programmatic:
       case MarchTrigger.redirect:
       case MarchTrigger.unknown:
-        steps.add(StratagemStep(
-          id: stepId++,
-          action: StratagemAction.navigate,
-          description: 'Navigate to ${march.toRoute}',
-          navigateRoute: march.toRoute,
-          expectations: StratagemExpectations(route: march.toRoute),
-        ));
+        steps.add(
+          StratagemStep(
+            id: stepId++,
+            action: StratagemAction.navigate,
+            description: 'Navigate to ${march.toRoute}',
+            navigateRoute: march.toRoute,
+            expectations: StratagemExpectations(route: march.toRoute),
+          ),
+        );
     }
 
     return steps;
@@ -529,10 +517,7 @@ class Lineage {
   }
 
   /// Generate a unique prerequisite name.
-  static String _prerequisiteName(
-    March march, {
-    required bool isAuth,
-  }) {
+  static String _prerequisiteName(March march, {required bool isAuth}) {
     final from = march.fromRoute.replaceAll('/', '_').replaceAll(':', '');
     final to = march.toRoute.replaceAll('/', '_').replaceAll(':', '');
     if (isAuth) return 'auth_prereq$from';

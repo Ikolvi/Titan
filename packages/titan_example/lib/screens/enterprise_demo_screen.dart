@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:titan_basalt/titan_basalt.dart';
 import 'package:titan_bastion/titan_bastion.dart';
 
@@ -1806,6 +1809,118 @@ class _ToolkitTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('${Annals.length} entries recorded'),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Indexed: ${Annals.isIndexed ? "ON" : "OFF"}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Annals.isIndexed
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.outline,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Toggle indexed mode
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.tonal(
+                            onPressed: () {
+                              Annals.enable(indexed: true);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Annals indexed mode enabled — '
+                                    'pillarType queries are now O(1)!',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              (context as Element).markNeedsBuild();
+                            },
+                            child: const Text('Enable Indexed'),
+                          ),
+                          OutlinedButton(
+                            onPressed: () {
+                              Annals.enable(indexed: false);
+                              (context as Element).markNeedsBuild();
+                            },
+                            child: const Text('Disable Indexed'),
+                          ),
+                          // Query by pillarType
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.search),
+                            label: const Text('Query by Type'),
+                            onPressed: () {
+                              final sw = Stopwatch()..start();
+                              final results =
+                                  Annals.query(pillarType: 'EnterpriseDemoPillar');
+                              sw.stop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Found ${results.length} entries in '
+                                    '${sw.elapsedMicroseconds}µs '
+                                    '(indexed: ${Annals.isIndexed})',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            },
+                          ),
+                          // Export to buffer
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.content_copy),
+                            label: const Text('Export to Clipboard'),
+                            onPressed: () {
+                              final buffer = StringBuffer();
+                              Annals.exportToBuffer(buffer);
+                              final text = buffer.toString();
+                              Clipboard.setData(ClipboardData(text: text));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Exported ${Annals.length} entries to '
+                                    'clipboard (${text.length} chars)',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            },
+                          ),
+                          // Save to file
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.save_alt),
+                            label: const Text('Export to File'),
+                            onPressed: () {
+                              try {
+                                final dir = Directory.systemTemp
+                                    .createTempSync('annals_');
+                                final file = File('${dir.path}/annals.json');
+                                final sink = file.openWrite();
+                                Annals.exportToBuffer(sink);
+                                sink.close();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Annals exported to ${file.path}',
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Export failed: $e'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 8),
                       ...Annals.entries.reversed
                           .take(5)

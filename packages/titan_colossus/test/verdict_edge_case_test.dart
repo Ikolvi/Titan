@@ -73,23 +73,22 @@ void main() {
     });
 
     test('shows FAILED when a step fails', () {
-      final v = makeVerdict(steps: [
-        makeStep(
-          status: VerdictStepStatus.failed,
-          failure: const VerdictFailure(
-            type: VerdictFailureType.timeout,
-            message: 'timed out',
+      final v = makeVerdict(
+        steps: [
+          makeStep(
+            status: VerdictStepStatus.failed,
+            failure: const VerdictFailure(
+              type: VerdictFailureType.timeout,
+              message: 'timed out',
+            ),
           ),
-        ),
-      ]);
+        ],
+      );
       expect(v.toString(), contains('FAILED'));
     });
 
     test('shows step counts', () {
-      final v = makeVerdict(steps: [
-        makeStep(id: 1),
-        makeStep(id: 2),
-      ]);
+      final v = makeVerdict(steps: [makeStep(id: 1), makeStep(id: 2)]);
       expect(v.toString(), contains('2/2'));
     });
   });
@@ -178,10 +177,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('VerdictFailure — unknown type defaults to exception', () {
     test('unknown type string defaults to exception', () {
-      final json = {
-        'type': 'cosmicRay',
-        'message': 'bit flip',
-      };
+      final json = {'type': 'cosmicRay', 'message': 'bit flip'};
       final f = VerdictFailure.fromJson(json);
       expect(f.type, VerdictFailureType.exception);
     });
@@ -237,16 +233,20 @@ void main() {
       final s = VerdictFailure.generateSuggestions(
         type: VerdictFailureType.timeout,
       );
-      expect(s.any((x) => x.contains('timeout') || x.contains('long')),
-          isTrue);
+      expect(s.any((x) => x.contains('timeout') || x.contains('long')), isTrue);
     });
 
     test('notInteractive suggestion', () {
       final s = VerdictFailure.generateSuggestions(
         type: VerdictFailureType.notInteractive,
       );
-      expect(s, contains('Element found but is not interactive '
-          '(e.g., disabled button)'));
+      expect(
+        s,
+        contains(
+          'Element found but is not interactive '
+          '(e.g., disabled button)',
+        ),
+      );
     });
 
     test('targetNotFound with tableau shows elements found', () {
@@ -289,12 +289,14 @@ void main() {
       final s = VerdictFailure.generateSuggestions(
         type: VerdictFailureType.elementMissing,
       );
-      expect(s, contains(
-        'Expected element is not visible on the current screen',
-      ));
-      expect(s, contains(
-        'Check if the element requires scrolling to become visible',
-      ));
+      expect(
+        s,
+        contains('Expected element is not visible on the current screen'),
+      );
+      expect(
+        s,
+        contains('Check if the element requires scrolling to become visible'),
+      );
     });
   });
 
@@ -325,10 +327,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('VerdictSummary — fromSteps edge cases', () {
     test('empty steps yields 100% success rate', () {
-      final summary = VerdictSummary.fromSteps(
-        [],
-        const Duration(seconds: 1),
-      );
+      final summary = VerdictSummary.fromSteps([], const Duration(seconds: 1));
       expect(summary.successRate, 1.0);
       expect(summary.totalSteps, 0);
       expect(summary.failedRoutes, isEmpty);
@@ -394,10 +393,7 @@ void main() {
     });
 
     test('negative memoryDelta when end < start', () {
-      const p = VerdictPerformance(
-        startMemoryBytes: 1000,
-        endMemoryBytes: 500,
-      );
+      const p = VerdictPerformance(startMemoryBytes: 1000, endMemoryBytes: 500);
       expect(p.memoryDelta, -500);
     });
 
@@ -424,9 +420,9 @@ void main() {
   // -------------------------------------------------------------------------
   group('Verdict.toReport — edge cases', () {
     test('skipped step shows skip icon', () {
-      final v = makeVerdict(steps: [
-        VerdictStep.skipped(stepId: 1, description: 'skipped step'),
-      ]);
+      final v = makeVerdict(
+        steps: [VerdictStep.skipped(stepId: 1, description: 'skipped step')],
+      );
       final report = v.toReport();
       expect(report, contains('⏭️'));
     });
@@ -443,42 +439,44 @@ void main() {
         isInteractive: true,
         isEnabled: true,
       );
-      final v = makeVerdict(steps: [
-        makeStep(resolvedTarget: target),
-      ]);
+      final v = makeVerdict(steps: [makeStep(resolvedTarget: target)]);
       final report = v.toReport();
       expect(report, contains('Target:'));
       expect(report, contains('Login'));
     });
 
     test('step with failure suggestions shows bullets', () {
-      final v = makeVerdict(steps: [
-        makeStep(
-          status: VerdictStepStatus.failed,
-          failure: const VerdictFailure(
-            type: VerdictFailureType.timeout,
-            message: 'timed out',
-            suggestions: ['Increase timeout', 'Check network'],
+      final v = makeVerdict(
+        steps: [
+          makeStep(
+            status: VerdictStepStatus.failed,
+            failure: const VerdictFailure(
+              type: VerdictFailureType.timeout,
+              message: 'timed out',
+              suggestions: ['Increase timeout', 'Check network'],
+            ),
           ),
-        ),
-      ]);
+        ],
+      );
       final report = v.toReport();
       expect(report, contains('• Increase timeout'));
       expect(report, contains('• Check network'));
     });
 
     test('step with expected/actual shows both', () {
-      final v = makeVerdict(steps: [
-        makeStep(
-          status: VerdictStepStatus.failed,
-          failure: const VerdictFailure(
-            type: VerdictFailureType.wrongRoute,
-            message: 'wrong route',
-            expected: '/home',
-            actual: '/error',
+      final v = makeVerdict(
+        steps: [
+          makeStep(
+            status: VerdictStepStatus.failed,
+            failure: const VerdictFailure(
+              type: VerdictFailureType.wrongRoute,
+              message: 'wrong route',
+              expected: '/home',
+              actual: '/error',
+            ),
           ),
-        ),
-      ]);
+        ],
+      );
       final report = v.toReport();
       expect(report, contains('Expected: /home'));
       expect(report, contains('Actual: /error'));
@@ -529,31 +527,33 @@ void main() {
     });
 
     test('failed step with tableau shows SCREEN line', () {
-      final v = makeVerdict(steps: [
-        makeStep(
-          status: VerdictStepStatus.failed,
-          tableau: makeTableau(
-            route: '/login',
-            glyphs: [
-              Glyph(
-                label: 'Email',
-                widgetType: 'TextField',
-                left: 0,
-                top: 0,
-                width: 100,
-                height: 50,
-                ancestors: const [],
-                isInteractive: true,
-                isEnabled: true,
-              ),
-            ],
+      final v = makeVerdict(
+        steps: [
+          makeStep(
+            status: VerdictStepStatus.failed,
+            tableau: makeTableau(
+              route: '/login',
+              glyphs: [
+                Glyph(
+                  label: 'Email',
+                  widgetType: 'TextField',
+                  left: 0,
+                  top: 0,
+                  width: 100,
+                  height: 50,
+                  ancestors: const [],
+                  isInteractive: true,
+                  isEnabled: true,
+                ),
+              ],
+            ),
+            failure: const VerdictFailure(
+              type: VerdictFailureType.targetNotFound,
+              message: 'not found',
+            ),
           ),
-          failure: const VerdictFailure(
-            type: VerdictFailureType.targetNotFound,
-            message: 'not found',
-          ),
-        ),
-      ]);
+        ],
+      );
       final diag = v.toAiDiagnostic();
       expect(diag, contains('SCREEN:'));
       expect(diag, contains('/login'));
@@ -562,70 +562,76 @@ void main() {
     });
 
     test('failed step with tableau no labelled glyphs omits VISIBLE', () {
-      final v = makeVerdict(steps: [
-        makeStep(
-          status: VerdictStepStatus.failed,
-          tableau: makeTableau(
-            route: '/empty',
-            glyphs: [
-              Glyph(
-                widgetType: 'Container',
-                left: 0,
-                top: 0,
-                width: 100,
-                height: 50,
-                ancestors: const [],
-                isInteractive: false,
-                isEnabled: true,
-              ),
-            ],
+      final v = makeVerdict(
+        steps: [
+          makeStep(
+            status: VerdictStepStatus.failed,
+            tableau: makeTableau(
+              route: '/empty',
+              glyphs: [
+                Glyph(
+                  widgetType: 'Container',
+                  left: 0,
+                  top: 0,
+                  width: 100,
+                  height: 50,
+                  ancestors: const [],
+                  isInteractive: false,
+                  isEnabled: true,
+                ),
+              ],
+            ),
+            failure: const VerdictFailure(
+              type: VerdictFailureType.timeout,
+              message: 'timed out',
+            ),
           ),
-          failure: const VerdictFailure(
-            type: VerdictFailureType.timeout,
-            message: 'timed out',
-          ),
-        ),
-      ]);
+        ],
+      );
       final diag = v.toAiDiagnostic();
       expect(diag, contains('SCREEN:'));
       expect(diag, isNot(contains('VISIBLE:')));
     });
 
     test('failed step with null route shows route=?', () {
-      final v = makeVerdict(steps: [
-        VerdictStep(
-          stepId: 1,
-          description: 'Step 1',
-          status: VerdictStepStatus.failed,
-          duration: const Duration(milliseconds: 100),
-          tableau: Tableau(
-            index: 0,
-            timestamp: Duration.zero,
-            glyphs: const [],
-            screenWidth: 400,
-            screenHeight: 800,
+      final v = makeVerdict(
+        steps: [
+          VerdictStep(
+            stepId: 1,
+            description: 'Step 1',
+            status: VerdictStepStatus.failed,
+            duration: const Duration(milliseconds: 100),
+            tableau: Tableau(
+              index: 0,
+              timestamp: Duration.zero,
+              glyphs: const [],
+              screenWidth: 400,
+              screenHeight: 800,
+            ),
+            failure: const VerdictFailure(
+              type: VerdictFailureType.timeout,
+              message: 'timed out',
+            ),
           ),
-          failure: const VerdictFailure(
-            type: VerdictFailureType.timeout,
-            message: 'timed out',
-          ),
-        ),
-      ]);
+        ],
+      );
       final diag = v.toAiDiagnostic();
       expect(diag, contains('route=?'));
     });
 
     test('failed step with suggestions shows SUGGESTIONS section', () {
-      final v = makeVerdict(steps: [
-        makeStep(
-          status: VerdictStepStatus.failed,
-          failure: const VerdictFailure(
-            type: VerdictFailureType.timeout,
-            message: 'timed out',
-            suggestions: ['Try waiting longer'],
+      final v = makeVerdict(
+        steps: [
+          makeStep(
+            status: VerdictStepStatus.failed,
+            failure: const VerdictFailure(
+              type: VerdictFailureType.timeout,
+              message: 'timed out',
+              suggestions: ['Try waiting longer'],
+            ),
           ),
-        ),
-      ]);
+        ],
+      );
       final diag = v.toAiDiagnostic();
       expect(diag, contains('SUGGESTIONS:'));
       expect(diag, contains('Try waiting longer'));
@@ -634,10 +640,7 @@ void main() {
     test('performance with jank shows PERFORMANCE ALERTS', () {
       final v = makeVerdict(
         steps: [makeStep()],
-        performance: const VerdictPerformance(
-          jankFrames: 10,
-          minFps: 30,
-        ),
+        performance: const VerdictPerformance(jankFrames: 10, minFps: 30),
       );
       final diag = v.toAiDiagnostic();
       expect(diag, contains('PERFORMANCE ALERTS:'));
@@ -647,10 +650,7 @@ void main() {
     test('performance without jank or slowSteps omits alerts', () {
       final v = makeVerdict(
         steps: [makeStep()],
-        performance: const VerdictPerformance(
-          averageFps: 60,
-          jankFrames: 0,
-        ),
+        performance: const VerdictPerformance(averageFps: 60, jankFrames: 0),
       );
       final diag = v.toAiDiagnostic();
       expect(diag, isNot(contains('PERFORMANCE ALERTS:')));
@@ -659,10 +659,7 @@ void main() {
     test('performance with slowSteps but no jank', () {
       final v = makeVerdict(
         steps: [makeStep()],
-        performance: const VerdictPerformance(
-          jankFrames: 0,
-          slowSteps: [2, 5],
-        ),
+        performance: const VerdictPerformance(jankFrames: 0, slowSteps: [2, 5]),
       );
       final diag = v.toAiDiagnostic();
       expect(diag, contains('PERFORMANCE ALERTS:'));

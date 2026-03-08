@@ -130,15 +130,16 @@ class Signet {
   factory Signet.fromJson(Map<String, dynamic> json) {
     return Signet(
       routePattern: json['routePattern'] as String,
-      interactiveDescriptors:
-          (json['interactiveDescriptors'] as List).cast<String>(),
+      interactiveDescriptors: (json['interactiveDescriptors'] as List)
+          .cast<String>(),
       hash: json['hash'] as String,
       identity: json['identity'] as String,
     );
   }
 
   @override
-  String toString() => 'Signet($identity, $routePattern, '
+  String toString() =>
+      'Signet($identity, $routePattern, '
       '${interactiveDescriptors.length} interactive)';
 
   // -----------------------------------------------------------------------
@@ -158,13 +159,12 @@ class Signet {
     final routeName = route == '/'
         ? 'home'
         : route
-            .replaceAll(RegExp(r'^/'), '')
-            .replaceAll(RegExp(r'/:?\w+'), '')
-            .replaceAll('/', '_');
+              .replaceAll(RegExp(r'^/'), '')
+              .replaceAll(RegExp(r'/:?\w+'), '')
+              .replaceAll('/', '_');
 
     // Detect screen type from elements
-    final hasTextInput =
-        glyphs.any((g) => g.interactionType == 'textInput');
+    final hasTextInput = glyphs.any((g) => g.interactionType == 'textInput');
     final hasSubmitButton = glyphs.any(
       (g) =>
           g.isInteractive &&
@@ -178,17 +178,18 @@ class Signet {
           g.widgetType.contains('ListTile'),
     );
     final hasNav = glyphs.any(
-      (g) => g.widgetType.contains('NavigationDestination') ||
+      (g) =>
+          g.widgetType.contains('NavigationDestination') ||
           g.widgetType.contains('BottomNavigationBar'),
     );
 
     final suffix = isForm
         ? '_form'
         : hasList
-            ? '_list'
-            : hasNav
-                ? '_nav'
-                : '';
+        ? '_list'
+        : hasNav
+        ? '_nav'
+        : '';
 
     final name = routeName.isEmpty ? 'screen' : routeName;
     return '$name$suffix'.replaceAll(RegExp(r'_+'), '_');

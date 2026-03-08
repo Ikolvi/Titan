@@ -229,6 +229,7 @@ class Lens extends StatefulWidget {
 
 class _LensState extends State<Lens> {
   bool _visible = false;
+  bool _expanded = false;
   int _selectedTab = 0;
 
   // Data sources
@@ -267,7 +268,17 @@ class _LensState extends State<Lens> {
       plugin.onRefresh();
     }
     if (mounted && _visible) {
-      setState(() {});
+      // Only force a full rebuild when viewing a built-in tab
+      // (Pillars, Herald, Vigil, Chronicle) whose data lives in
+      // _LensState lists and requires setState to display.
+      //
+      // Plugin tabs (Shade, Blueprint, Perf) use Vestige/Core reactivity
+      // and manage their own rebuilds. Calling setState here would
+      // cause their ListViews to lose scroll position and flicker.
+      final pluginCount = Lens._plugins.length;
+      if (_selectedTab >= pluginCount) {
+        setState(() {});
+      }
     }
   }
 
@@ -339,12 +350,15 @@ class _LensState extends State<Lens> {
           // Debug panel
           if (_visible)
             Positioned(
-              left: 8,
-              right: 8,
-              bottom: 140,
+              left: _expanded ? 0 : 8,
+              right: _expanded ? 0 : 8,
+              top: _expanded ? 0 : null,
+              bottom: _expanded ? 0 : 140,
               child: _LensPanel(
                 selectedTab: _selectedTab,
                 onTabChanged: (i) => setState(() => _selectedTab = i),
+                expanded: _expanded,
+                onToggleExpanded: () => setState(() => _expanded = !_expanded),
                 instances: Titan.instances,
                 heraldEvents: _heraldEvents,
                 vigilErrors: Vigil.history,
@@ -493,6 +507,8 @@ class _PulsingIconState extends State<_PulsingIcon>
 class _LensPanel extends StatelessWidget {
   final int selectedTab;
   final ValueChanged<int> onTabChanged;
+  final bool expanded;
+  final VoidCallback onToggleExpanded;
   final Map<Type, dynamic> instances;
   final List<HeraldEvent> heraldEvents;
   final List<TitanError> vigilErrors;
@@ -505,6 +521,8 @@ class _LensPanel extends StatelessWidget {
   const _LensPanel({
     required this.selectedTab,
     required this.onTabChanged,
+    required this.expanded,
+    required this.onToggleExpanded,
     required this.instances,
     required this.heraldEvents,
     required this.vigilErrors,
@@ -517,19 +535,34 @@ class _LensPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(12),
-      color: const Color(0xFF1E1E2E),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          height: 320,
-          child: Column(
-            children: [
-              _buildTabBar(),
-              Expanded(child: _buildContent(context)),
-            ],
+    final panelHeight = expanded
+        ? MediaQuery.of(context).size.height
+        : MediaQuery.of(context).size.height * 0.55;
+
+    return Localizations(
+      locale: const Locale('en', 'US'),
+      delegates: const [
+        DefaultMaterialLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+      ],
+      child: Material(
+        elevation: 8,
+        borderRadius: expanded ? BorderRadius.zero : BorderRadius.circular(12),
+        color: const Color(0xFF1E1E2E),
+        child: ClipRRect(
+          borderRadius: expanded
+              ? BorderRadius.zero
+              : BorderRadius.circular(12),
+          child: SizedBox(
+            height: panelHeight,
+            child: _OverlayWrapper(
+              builder: (_) => Column(
+                children: [
+                  _buildTabBar(),
+                  Expanded(child: _buildContent(context)),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -544,60 +577,83 @@ class _LensPanel extends StatelessWidget {
     return Container(
       height: 40,
       color: const Color(0xFF2D2D3F),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var i = 0; i < allTabs.length; i++)
-              GestureDetector(
-                onTap: () => onTabChanged(i),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  alignment: Alignment.center,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: selectedTab == i
-                            ? (i < pluginCount
-                                  ? Colors.tealAccent
-                                  : Colors.deepPurpleAccent)
-                            : Colors.transparent,
-                        width: 2,
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (var i = 0; i < allTabs.length; i++)
+                    GestureDetector(
+                      onTap: () => onTabChanged(i),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        alignment: Alignment.center,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: selectedTab == i
+                                  ? (i < pluginCount
+                                        ? Colors.tealAccent
+                                        : Colors.deepPurpleAccent)
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (i < pluginCount) ...[
+                              Icon(
+                                plugins[i].icon,
+                                color: selectedTab == i
+                                    ? Colors.tealAccent
+                                    : Colors.white54,
+                                size: 12,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Text(
+                              allTabs[i],
+                              style: TextStyle(
+                                color: selectedTab == i
+                                    ? (i < pluginCount
+                                          ? Colors.tealAccent
+                                          : Colors.deepPurpleAccent)
+                                    : Colors.white54,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (i < pluginCount) ...[
-                        Icon(
-                          plugins[i].icon,
-                          color: selectedTab == i
-                              ? Colors.tealAccent
-                              : Colors.white54,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 4),
-                      ],
-                      Text(
-                        allTabs[i],
-                        style: TextStyle(
-                          color: selectedTab == i
-                              ? (i < pluginCount
-                                    ? Colors.tealAccent
-                                    : Colors.deepPurpleAccent)
-                              : Colors.white54,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+          // Expand / collapse toggle
+          GestureDetector(
+            onTap: onToggleExpanded,
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                border: Border(left: BorderSide(color: Colors.white12)),
+              ),
+              child: Icon(
+                expanded ? Icons.close_fullscreen : Icons.open_in_full,
+                color: Colors.white54,
+                size: 16,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -979,4 +1035,43 @@ String _formatTime(DateTime dt) {
   return '${dt.hour.toString().padLeft(2, '0')}:'
       '${dt.minute.toString().padLeft(2, '0')}:'
       '${dt.second.toString().padLeft(2, '0')}';
+}
+
+/// Provides an [Overlay] ancestor for widgets like [TextField] that
+/// require one. Used inside the Lens debug panel which renders outside
+/// the app's [MaterialApp] / [Navigator].
+class _OverlayWrapper extends StatefulWidget {
+  final WidgetBuilder builder;
+  const _OverlayWrapper({required this.builder});
+
+  @override
+  State<_OverlayWrapper> createState() => _OverlayWrapperState();
+}
+
+class _OverlayWrapperState extends State<_OverlayWrapper> {
+  late OverlayEntry _entry;
+  final GlobalKey<OverlayState> _overlayKey = GlobalKey<OverlayState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Use an indirect reference so the entry always calls the latest
+    // widget.builder without needing to be replaced.
+    _entry = OverlayEntry(builder: (ctx) => widget.builder(ctx));
+  }
+
+  @override
+  void didUpdateWidget(_OverlayWrapper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Mark the existing entry as dirty instead of removing & reinserting.
+    // This preserves the element sub-tree (and therefore any
+    // DefaultTabController / text-field state) across parent rebuilds
+    // triggered by keyboard appearance, MediaQuery changes, etc.
+    _entry.markNeedsBuild();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Overlay(key: _overlayKey, initialEntries: [_entry]);
+  }
 }

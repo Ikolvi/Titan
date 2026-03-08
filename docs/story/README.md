@@ -66,6 +66,11 @@
 | [L](chapter-50-the-tapestry-unfolds.md) | **The Tapestry Unfolds** | `Tapestry`, `TapestryStrand`, `TapestryWeave`, `TapestryFrame`, event sourcing, CQRS projections, temporal queries |
 | [LI](chapter-51-the-veil-conceals.md) | **The Veil Conceals** | `ReadCore<T>`, read-only state views, private Core convention, compile-time type narrowing, mutation methods |
 | [LII](chapter-52-the-cartographers-table.md) | **The Cartographer's Table** | Rosetta Stone (BLoC/Provider/Riverpod/GetX → Titan), Three Circles learning path, onboarding metrics, quick reference card |
+| [LIII](chapter-53-the-forge-accepts.md) | **The Forge Accepts** | `TitanPlugin`, `ColossusPlugin`, Beacon plugin architecture, `onAttach`/`buildOverlay`/`onDetach` lifecycle |
+| [LIV](chapter-54-the-scout-surveys.md) | **The Scout Surveys** | `Scout`, `Terrain`, `Outpost`, `March`, `RouteParameterizer`, passive navigation learning, Mermaid export |
+| [LV](chapter-55-the-gauntlet-awaits.md) | **The Gauntlet Awaits** | `Gauntlet`, `Campaign`, `Stratagem`, `Verdict`, `Debrief`, edge-case generation, auto-test orchestration |
+| [LVI](chapter-56-the-bridge-extends.md) | **The Bridge Extends** | `BlueprintExport`, `BlueprintExportIO`, MCP server, `blueprint.json`, AI-ready data export |
+| [LVII](chapter-57-the-relay-speaks.md) | **The Relay Speaks** | `Relay`, `RelayConfig`, `RelayStatus`, `RelayHandler`, HTTP bridge, `execute_campaign`, cross-platform AI-driven automation |
 
 ---
 

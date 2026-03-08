@@ -111,20 +111,14 @@ void main() {
       expect(parsed.steps[1].value, r'${testData.email}');
       expect(parsed.steps[1].clearFirst, true);
       // Interpolation should resolve
-      expect(
-        parsed.interpolate(parsed.steps[1].value!),
-        'admin@example.com',
-      );
+      expect(parsed.interpolate(parsed.steps[1].value!), 'admin@example.com');
 
       // Step 4: tap with waitAfter
       expect(parsed.steps[3].action, StratagemAction.tap);
       expect(parsed.steps[3].waitAfter, const Duration(seconds: 3));
 
       // Step 5: verify with absent elements
-      expect(
-        parsed.steps[4].expectations?.elementsAbsent?.length,
-        1,
-      );
+      expect(parsed.steps[4].expectations?.elementsAbsent?.length, 1);
 
       // JSON roundtrip
       final reserialized = parsed.toJson();
@@ -176,10 +170,7 @@ void main() {
               ),
             ),
           ),
-          VerdictStep.skipped(
-            stepId: 4,
-            description: 'Verify result',
-          ),
+          VerdictStep.skipped(stepId: 4, description: 'Verify result'),
         ],
       );
 
@@ -205,10 +196,15 @@ void main() {
       expect(restored.stratagemName, 'integration_test');
       expect(restored.passed, false);
       expect(restored.steps.length, 4);
-      expect(restored.steps[2].failure?.type, VerdictFailureType.targetNotFound);
+      expect(
+        restored.steps[2].failure?.type,
+        VerdictFailureType.targetNotFound,
+      );
       expect(restored.performance.averageFps, 59.8);
-      expect(restored.performance.settleTimes[1],
-          const Duration(milliseconds: 150));
+      expect(
+        restored.performance.settleTimes[1],
+        const Duration(milliseconds: 150),
+      );
     });
 
     test('Verdict report and diagnostic output', () {
@@ -312,10 +308,7 @@ void main() {
       // targetNotFound with target
       final s1 = VerdictFailure.generateSuggestions(
         type: VerdictFailureType.targetNotFound,
-        target: const StratagemTarget(
-          label: 'Submit',
-          type: 'ElevatedButton',
-        ),
+        target: const StratagemTarget(label: 'Submit', type: 'ElevatedButton'),
       );
       expect(s1, isNotEmpty);
       expect(s1.join(' ').toLowerCase(), contains('submit'));
@@ -400,10 +393,7 @@ void main() {
               message: 'HTTP 500',
             ),
           ),
-          VerdictStep.skipped(
-            stepId: 6,
-            description: 'Skipped',
-          ),
+          VerdictStep.skipped(stepId: 6, description: 'Skipped'),
         ],
       );
 

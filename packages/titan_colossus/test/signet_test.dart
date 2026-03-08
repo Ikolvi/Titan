@@ -130,22 +130,13 @@ void main() {
         final signet = Signet.fromTableau(tableau);
 
         // Sorted alphabetically
-        expect(
-          signet.interactiveDescriptors[0],
-          startsWith('ATextField:'),
-        );
-        expect(
-          signet.interactiveDescriptors[1],
-          startsWith('ZButton:'),
-        );
+        expect(signet.interactiveDescriptors[0], startsWith('ATextField:'));
+        expect(signet.interactiveDescriptors[1], startsWith('ZButton:'));
       });
 
       test('uses routePattern parameter when provided', () {
         final tableau = createTableau(route: '/quest/42');
-        final signet = Signet.fromTableau(
-          tableau,
-          routePattern: '/quest/:id',
-        );
+        final signet = Signet.fromTableau(tableau, routePattern: '/quest/:id');
         expect(signet.routePattern, '/quest/:id');
       });
 
@@ -224,10 +215,7 @@ void main() {
       });
 
       test('strips parameter segments from identity', () {
-        final tableau = createTableau(
-          route: '/quest/:id',
-          glyphs: [],
-        );
+        final tableau = createTableau(route: '/quest/:id', glyphs: []);
         final signet = Signet.fromTableau(tableau);
         expect(signet.identity, contains('quest'));
         expect(signet.identity, isNot(contains(':id')));
@@ -265,26 +253,32 @@ void main() {
         ];
 
         // Same route and interactive structure, different label (non-interactive text)
-        final t1 = createTableau(route: '/profile', glyphs: [
-          ...glyphs,
-          createGlyph(
-            widgetType: 'Text',
-            label: 'John',
-            isInteractive: false,
-            interactionType: null,
-            semanticRole: null,
-          ),
-        ]);
-        final t2 = createTableau(route: '/profile', glyphs: [
-          ...glyphs,
-          createGlyph(
-            widgetType: 'Text',
-            label: 'Jane',
-            isInteractive: false,
-            interactionType: null,
-            semanticRole: null,
-          ),
-        ]);
+        final t1 = createTableau(
+          route: '/profile',
+          glyphs: [
+            ...glyphs,
+            createGlyph(
+              widgetType: 'Text',
+              label: 'John',
+              isInteractive: false,
+              interactionType: null,
+              semanticRole: null,
+            ),
+          ],
+        );
+        final t2 = createTableau(
+          route: '/profile',
+          glyphs: [
+            ...glyphs,
+            createGlyph(
+              widgetType: 'Text',
+              label: 'Jane',
+              isInteractive: false,
+              interactionType: null,
+              semanticRole: null,
+            ),
+          ],
+        );
 
         final s1 = Signet.fromTableau(t1);
         final s2 = Signet.fromTableau(t2);
@@ -293,20 +287,26 @@ void main() {
       });
 
       test('different interactive structure → different hash', () {
-        final t1 = createTableau(route: '/page', glyphs: [
-          createGlyph(
-            widgetType: 'ElevatedButton',
-            interactionType: 'tap',
-            semanticRole: 'button',
-          ),
-        ]);
-        final t2 = createTableau(route: '/page', glyphs: [
-          createGlyph(
-            widgetType: 'TextField',
-            interactionType: 'textInput',
-            semanticRole: 'textField',
-          ),
-        ]);
+        final t1 = createTableau(
+          route: '/page',
+          glyphs: [
+            createGlyph(
+              widgetType: 'ElevatedButton',
+              interactionType: 'tap',
+              semanticRole: 'button',
+            ),
+          ],
+        );
+        final t2 = createTableau(
+          route: '/page',
+          glyphs: [
+            createGlyph(
+              widgetType: 'TextField',
+              interactionType: 'textInput',
+              semanticRole: 'textField',
+            ),
+          ],
+        );
 
         final s1 = Signet.fromTableau(t1);
         final s2 = Signet.fromTableau(t2);
@@ -350,10 +350,7 @@ void main() {
         final restored = Signet.fromJson(json);
 
         expect(restored.routePattern, signet.routePattern);
-        expect(
-          restored.interactiveDescriptors,
-          signet.interactiveDescriptors,
-        );
+        expect(restored.interactiveDescriptors, signet.interactiveDescriptors);
         expect(restored.hash, signet.hash);
         expect(restored.identity, signet.identity);
       });

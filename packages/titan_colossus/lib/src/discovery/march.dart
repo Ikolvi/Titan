@@ -85,7 +85,8 @@ class March {
   /// Merge another observation of the same transition.
   void mergeObservation(March other, {int? durationMs}) {
     final totalDuration =
-        averageDurationMs * observationCount + (durationMs ?? other.averageDurationMs);
+        averageDurationMs * observationCount +
+        (durationMs ?? other.averageDurationMs);
     observationCount++;
     averageDurationMs = totalDuration ~/ observationCount;
   }

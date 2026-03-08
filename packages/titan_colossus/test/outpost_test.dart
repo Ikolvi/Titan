@@ -118,46 +118,25 @@ void main() {
       });
 
       test('does not match different keys', () {
-        final a = OutpostElement(
-          widgetType: 'ElevatedButton',
-          key: 'btn1',
-        );
-        final b = OutpostElement(
-          widgetType: 'ElevatedButton',
-          key: 'btn2',
-        );
+        final a = OutpostElement(widgetType: 'ElevatedButton', key: 'btn1');
+        final b = OutpostElement(widgetType: 'ElevatedButton', key: 'btn2');
         expect(a.matches(b), false);
       });
 
       test('matches by widgetType + label when no keys', () {
-        final a = OutpostElement(
-          widgetType: 'ElevatedButton',
-          label: 'Login',
-        );
-        final b = OutpostElement(
-          widgetType: 'ElevatedButton',
-          label: 'Login',
-        );
+        final a = OutpostElement(widgetType: 'ElevatedButton', label: 'Login');
+        final b = OutpostElement(widgetType: 'ElevatedButton', label: 'Login');
         expect(a.matches(b), true);
       });
 
       test('no match when type differs', () {
-        final a = OutpostElement(
-          widgetType: 'ElevatedButton',
-          label: 'Login',
-        );
-        final b = OutpostElement(
-          widgetType: 'TextButton',
-          label: 'Login',
-        );
+        final a = OutpostElement(widgetType: 'ElevatedButton', label: 'Login');
+        final b = OutpostElement(widgetType: 'TextButton', label: 'Login');
         expect(a.matches(b), false);
       });
 
       test('no match when label differs', () {
-        final a = OutpostElement(
-          widgetType: 'ElevatedButton',
-          label: 'Login',
-        );
+        final a = OutpostElement(widgetType: 'ElevatedButton', label: 'Login');
         final b = OutpostElement(
           widgetType: 'ElevatedButton',
           label: 'Register',
@@ -294,50 +273,59 @@ void main() {
       });
 
       test('auto-tags auth routes', () {
-        final tableau = createTableau(route: '/login', glyphs: [
-          createGlyph(
-            widgetType: 'TextField',
-            interactionType: 'textInput',
-            semanticRole: 'textField',
-          ),
-          createGlyph(
-            widgetType: 'ElevatedButton',
-            label: 'Login',
-            interactionType: 'tap',
-          ),
-        ]);
+        final tableau = createTableau(
+          route: '/login',
+          glyphs: [
+            createGlyph(
+              widgetType: 'TextField',
+              interactionType: 'textInput',
+              semanticRole: 'textField',
+            ),
+            createGlyph(
+              widgetType: 'ElevatedButton',
+              label: 'Login',
+              interactionType: 'tap',
+            ),
+          ],
+        );
         final outpost = Outpost.fromTableau(tableau);
         expect(outpost.tags, contains('auth'));
         expect(outpost.tags, contains('form'));
       });
 
       test('auto-tags list screens', () {
-        final tableau = createTableau(route: '/quests', glyphs: [
-          createGlyph(
-            widgetType: 'ListView',
-            isInteractive: false,
-            interactionType: null,
-            semanticRole: null,
-          ),
-          createGlyph(
-            widgetType: 'ListTile',
-            label: 'Quest 1',
-            isInteractive: true,
-            interactionType: 'tap',
-          ),
-        ]);
+        final tableau = createTableau(
+          route: '/quests',
+          glyphs: [
+            createGlyph(
+              widgetType: 'ListView',
+              isInteractive: false,
+              interactionType: null,
+              semanticRole: null,
+            ),
+            createGlyph(
+              widgetType: 'ListTile',
+              label: 'Quest 1',
+              isInteractive: true,
+              interactionType: 'tap',
+            ),
+          ],
+        );
         final outpost = Outpost.fromTableau(tableau);
         expect(outpost.tags, contains('list'));
       });
 
       test('auto-tags navigation screens', () {
-        final tableau = createTableau(route: '/main', glyphs: [
-          createGlyph(
-            widgetType: 'BottomNavigationBar',
-            isInteractive: true,
-            interactionType: 'tap',
-          ),
-        ]);
+        final tableau = createTableau(
+          route: '/main',
+          glyphs: [
+            createGlyph(
+              widgetType: 'BottomNavigationBar',
+              isInteractive: true,
+              interactionType: 'tap',
+            ),
+          ],
+        );
         final outpost = Outpost.fromTableau(tableau);
         expect(outpost.tags, contains('navigation'));
       });
@@ -357,9 +345,10 @@ void main() {
 
     group('mergeObservation', () {
       test('increments observation count', () {
-        final tableau = createTableau(route: '/home', glyphs: [
-          createGlyph(label: 'OK'),
-        ]);
+        final tableau = createTableau(
+          route: '/home',
+          glyphs: [createGlyph(label: 'OK')],
+        );
         final outpost = Outpost.fromTableau(tableau);
         expect(outpost.observationCount, 1);
 
@@ -371,24 +360,29 @@ void main() {
       });
 
       test('merges new interactive elements', () {
-        final t1 = createTableau(route: '/page', glyphs: [
-          createGlyph(label: 'Button A', key: 'a'),
-        ]);
+        final t1 = createTableau(
+          route: '/page',
+          glyphs: [createGlyph(label: 'Button A', key: 'a')],
+        );
         final outpost = Outpost.fromTableau(t1);
         expect(outpost.interactiveElements, hasLength(1));
 
-        final t2 = createTableau(route: '/page', glyphs: [
-          createGlyph(label: 'Button A', key: 'a'),
-          createGlyph(label: 'Button B', key: 'b'),
-        ]);
+        final t2 = createTableau(
+          route: '/page',
+          glyphs: [
+            createGlyph(label: 'Button A', key: 'a'),
+            createGlyph(label: 'Button B', key: 'b'),
+          ],
+        );
         outpost.mergeObservation(t2);
         expect(outpost.interactiveElements, hasLength(2));
       });
 
       test('increments frequency of existing elements', () {
-        final t1 = createTableau(route: '/page', glyphs: [
-          createGlyph(label: 'OK', key: 'ok_btn'),
-        ]);
+        final t1 = createTableau(
+          route: '/page',
+          glyphs: [createGlyph(label: 'OK', key: 'ok_btn')],
+        );
         final outpost = Outpost.fromTableau(t1);
         expect(outpost.interactiveElements.first.frequency, 1);
 
@@ -416,30 +410,33 @@ void main() {
       });
 
       test('updates lastKnownValue', () {
-        final t1 = createTableau(route: '/page', glyphs: [
-          createGlyph(
-            widgetType: 'TextField',
-            label: 'Name',
-            key: 'name_field',
-            interactionType: 'textInput',
-            currentValue: 'Alice',
-          ),
-        ]);
-        final outpost = Outpost.fromTableau(t1);
-        expect(
-          outpost.interactiveElements.first.lastKnownValue,
-          'Alice',
+        final t1 = createTableau(
+          route: '/page',
+          glyphs: [
+            createGlyph(
+              widgetType: 'TextField',
+              label: 'Name',
+              key: 'name_field',
+              interactionType: 'textInput',
+              currentValue: 'Alice',
+            ),
+          ],
         );
+        final outpost = Outpost.fromTableau(t1);
+        expect(outpost.interactiveElements.first.lastKnownValue, 'Alice');
 
-        final t2 = createTableau(route: '/page', glyphs: [
-          createGlyph(
-            widgetType: 'TextField',
-            label: 'Name',
-            key: 'name_field',
-            interactionType: 'textInput',
-            currentValue: 'Bob',
-          ),
-        ]);
+        final t2 = createTableau(
+          route: '/page',
+          glyphs: [
+            createGlyph(
+              widgetType: 'TextField',
+              label: 'Name',
+              key: 'name_field',
+              interactionType: 'textInput',
+              currentValue: 'Bob',
+            ),
+          ],
+        );
         outpost.mergeObservation(t2);
         expect(outpost.interactiveElements.first.lastKnownValue, 'Bob');
       });
@@ -466,9 +463,10 @@ void main() {
 
       test('includes interactive elements', () {
         final outpost = Outpost.fromTableau(
-          createTableau(route: '/page', glyphs: [
-            createGlyph(label: 'Login', widgetType: 'ElevatedButton'),
-          ]),
+          createTableau(
+            route: '/page',
+            glyphs: [createGlyph(label: 'Login', widgetType: 'ElevatedButton')],
+          ),
         );
         final summary = outpost.toAiSummary();
         expect(summary, contains('INTERACTIVE:'));
@@ -480,12 +478,14 @@ void main() {
         final outpost = Outpost.fromTableau(
           createTableau(route: '/login', glyphs: []),
         );
-        outpost.exits.add(March(
-          fromRoute: '/login',
-          toRoute: '/home',
-          trigger: MarchTrigger.formSubmit,
-          triggerElementLabel: 'Login',
-        ));
+        outpost.exits.add(
+          March(
+            fromRoute: '/login',
+            toRoute: '/home',
+            trigger: MarchTrigger.formSubmit,
+            triggerElementLabel: 'Login',
+          ),
+        );
         final summary = outpost.toAiSummary();
         expect(summary, contains('EXITS:'));
         expect(summary, contains('/home'));
@@ -495,11 +495,13 @@ void main() {
         final outpost = Outpost.fromTableau(
           createTableau(route: '/login', glyphs: []),
         );
-        outpost.entrances.add(March(
-          fromRoute: '/dashboard',
-          toRoute: '/login',
-          trigger: MarchTrigger.redirect,
-        ));
+        outpost.entrances.add(
+          March(
+            fromRoute: '/dashboard',
+            toRoute: '/login',
+            trigger: MarchTrigger.redirect,
+          ),
+        );
         final summary = outpost.toAiSummary();
         expect(summary, contains('ENTRANCES:'));
         expect(summary, contains('/dashboard'));
@@ -507,18 +509,21 @@ void main() {
 
       test('includes tags', () {
         final outpost = Outpost.fromTableau(
-          createTableau(route: '/login', glyphs: [
-            createGlyph(
-              widgetType: 'TextField',
-              interactionType: 'textInput',
-              semanticRole: 'textField',
-            ),
-            createGlyph(
-              widgetType: 'ElevatedButton',
-              label: 'Login',
-              interactionType: 'tap',
-            ),
-          ]),
+          createTableau(
+            route: '/login',
+            glyphs: [
+              createGlyph(
+                widgetType: 'TextField',
+                interactionType: 'textInput',
+                semanticRole: 'textField',
+              ),
+              createGlyph(
+                widgetType: 'ElevatedButton',
+                label: 'Login',
+                interactionType: 'tap',
+              ),
+            ],
+          ),
         );
         final summary = outpost.toAiSummary();
         expect(summary, contains('TAGS:'));
@@ -529,23 +534,28 @@ void main() {
     group('serialization', () {
       test('round-trips through JSON', () {
         final outpost = Outpost.fromTableau(
-          createTableau(route: '/login', glyphs: [
-            createGlyph(label: 'Login', key: 'login_btn'),
-            createGlyph(
-              widgetType: 'Text',
-              label: 'Welcome',
-              isInteractive: false,
-              interactionType: null,
-              semanticRole: null,
-            ),
-          ]),
+          createTableau(
+            route: '/login',
+            glyphs: [
+              createGlyph(label: 'Login', key: 'login_btn'),
+              createGlyph(
+                widgetType: 'Text',
+                label: 'Welcome',
+                isInteractive: false,
+                interactionType: null,
+                semanticRole: null,
+              ),
+            ],
+          ),
         );
         outpost.requiresAuth = true;
-        outpost.exits.add(March(
-          fromRoute: '/login',
-          toRoute: '/home',
-          trigger: MarchTrigger.formSubmit,
-        ));
+        outpost.exits.add(
+          March(
+            fromRoute: '/login',
+            toRoute: '/home',
+            trigger: MarchTrigger.formSubmit,
+          ),
+        );
 
         final json = outpost.toJson();
         final restored = Outpost.fromJson(json);
@@ -558,10 +568,7 @@ void main() {
           restored.interactiveElements.length,
           outpost.interactiveElements.length,
         );
-        expect(
-          restored.displayElements.length,
-          outpost.displayElements.length,
-        );
+        expect(restored.displayElements.length, outpost.displayElements.length);
         expect(restored.exits.length, 1);
         expect(restored.signet.hash, outpost.signet.hash);
       });
@@ -588,9 +595,10 @@ void main() {
 
     test('toString includes key info', () {
       final outpost = Outpost.fromTableau(
-        createTableau(route: '/login', glyphs: [
-          createGlyph(label: 'Login'),
-        ]),
+        createTableau(
+          route: '/login',
+          glyphs: [createGlyph(label: 'Login')],
+        ),
       );
       final str = outpost.toString();
       expect(str, contains('/login'));

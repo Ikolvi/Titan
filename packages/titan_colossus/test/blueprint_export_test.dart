@@ -163,9 +163,7 @@ void main() {
             duration: const Duration(milliseconds: 100),
           ),
         ],
-        performance: const VerdictPerformance(
-          averageFps: 60,
-        ),
+        performance: const VerdictPerformance(averageFps: 60),
       );
 
       final export = BlueprintExport.fromScout(
@@ -216,8 +214,10 @@ void main() {
       final compactParsed = jsonDecode(compact) as Map<String, dynamic>;
       final prettyParsed = jsonDecode(pretty) as Map<String, dynamic>;
       expect(compactParsed['version'], prettyParsed['version']);
-      expect(compactParsed['terrain']['sessionsAnalyzed'],
-          prettyParsed['terrain']['sessionsAnalyzed']);
+      expect(
+        compactParsed['terrain']['sessionsAnalyzed'],
+        prettyParsed['terrain']['sessionsAnalyzed'],
+      );
 
       // Compact is smaller
       expect(compact.length, lessThan(pretty.length));
@@ -321,9 +321,7 @@ void main() {
             ),
           ),
         ],
-        performance: const VerdictPerformance(
-          averageFps: 60,
-        ),
+        performance: const VerdictPerformance(averageFps: 60),
       );
 
       final export = BlueprintExport.fromScout(
@@ -434,10 +432,7 @@ void main() {
       final export = _createExport();
       final nestedDir = '${tempDir.path}/nested/deep';
 
-      final path = await BlueprintExportIO.save(
-        export,
-        directory: nestedDir,
-      );
+      final path = await BlueprintExportIO.save(export, directory: nestedDir);
 
       expect(File(path).existsSync(), true);
     });
@@ -559,9 +554,7 @@ void main() {
     });
 
     test('accepts custom directory', () {
-      const plugin = ColossusPlugin(
-        blueprintExportDirectory: '.titan',
-      );
+      const plugin = ColossusPlugin(blueprintExportDirectory: '.titan');
       expect(plugin.blueprintExportDirectory, '.titan');
     });
   });

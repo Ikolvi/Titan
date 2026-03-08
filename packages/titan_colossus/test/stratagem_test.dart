@@ -16,10 +16,7 @@ void main() {
         description: 'Test login with valid credentials',
         tags: const ['auth', 'critical'],
         startRoute: '/login',
-        testData: const {
-          'email': 'test@example.com',
-          'password': 'Secret123!',
-        },
+        testData: const {'email': 'test@example.com', 'password': 'Secret123!'},
         timeout: const Duration(seconds: 60),
         failurePolicy: StratagemFailurePolicy.continueAll,
         steps: [
@@ -55,11 +52,7 @@ void main() {
     });
 
     test('constructs with required fields', () {
-      final simple = const Stratagem(
-        name: 'test',
-        startRoute: '/',
-        steps: [],
-      );
+      final simple = const Stratagem(name: 'test', startRoute: '/', steps: []);
       expect(simple.name, 'test');
       expect(simple.startRoute, '/');
       expect(simple.steps, isEmpty);
@@ -78,14 +71,8 @@ void main() {
 
     group('interpolation', () {
       test('interpolates testData variables', () {
-        expect(
-          stratagem.interpolate(r'${testData.email}'),
-          'test@example.com',
-        );
-        expect(
-          stratagem.interpolate(r'${testData.password}'),
-          'Secret123!',
-        );
+        expect(stratagem.interpolate(r'${testData.email}'), 'test@example.com');
+        expect(stratagem.interpolate(r'${testData.password}'), 'Secret123!');
       });
 
       test('preserves string without variables', () {
@@ -100,15 +87,8 @@ void main() {
       });
 
       test('handles null testData', () {
-        const noData = Stratagem(
-          name: 'test',
-          startRoute: '/',
-          steps: [],
-        );
-        expect(
-          noData.interpolate(r'${testData.email}'),
-          r'${testData.email}',
-        );
+        const noData = Stratagem(name: 'test', startRoute: '/', steps: []);
+        expect(noData.interpolate(r'${testData.email}'), r'${testData.email}');
       });
 
       test('interpolates multiple variables in one string', () {
@@ -259,17 +239,10 @@ void main() {
         action: StratagemAction.verify,
         expectations: StratagemExpectations(
           route: '/home',
-          elementsPresent: [
-            StratagemTarget(label: 'Welcome'),
-          ],
-          elementsAbsent: [
-            StratagemTarget(label: 'Login'),
-          ],
+          elementsPresent: [StratagemTarget(label: 'Welcome')],
+          elementsAbsent: [StratagemTarget(label: 'Login')],
           elementStates: [
-            StratagemElementState(
-              label: 'Submit',
-              enabled: true,
-            ),
+            StratagemElementState(label: 'Submit', enabled: true),
           ],
         ),
       );
@@ -280,21 +253,12 @@ void main() {
       expect(restored.expectations?.elementsPresent?.length, 1);
       expect(restored.expectations?.elementsAbsent?.length, 1);
       expect(restored.expectations?.elementStates?.length, 1);
-      expect(
-        restored.expectations?.elementStates?.first.label,
-        'Submit',
-      );
-      expect(
-        restored.expectations?.elementStates?.first.enabled,
-        true,
-      );
+      expect(restored.expectations?.elementStates?.first.label, 'Submit');
+      expect(restored.expectations?.elementStates?.first.enabled, true);
     });
 
     test('serialization omits null fields', () {
-      const step = StratagemStep(
-        id: 1,
-        action: StratagemAction.tap,
-      );
+      const step = StratagemStep(id: 1, action: StratagemAction.tap);
       final json = step.toJson();
 
       expect(json, isNot(contains('description')));
@@ -447,10 +411,7 @@ void main() {
 
       test('finds by label + type', () {
         final tableau = makeTableau([loginButton, emailField, headerText]);
-        const target = StratagemTarget(
-          label: 'Login',
-          type: 'ElevatedButton',
-        );
+        const target = StratagemTarget(label: 'Login', type: 'ElevatedButton');
         final result = target.resolve(tableau);
         expect(result, loginButton);
       });
@@ -471,10 +432,7 @@ void main() {
 
       test('finds by ancestor', () {
         final tableau = makeTableau([loginButton, emailField]);
-        const target = StratagemTarget(
-          label: 'Login',
-          ancestor: 'Scaffold',
-        );
+        const target = StratagemTarget(label: 'Login', ancestor: 'Scaffold');
         final result = target.resolve(tableau);
         expect(result, loginButton);
       });
@@ -486,10 +444,7 @@ void main() {
       });
 
       test('uses index for disambiguation', () {
-        final tableau = makeTableau([
-          duplicateButton1,
-          duplicateButton2,
-        ]);
+        final tableau = makeTableau([duplicateButton1, duplicateButton2]);
         const target0 = StratagemTarget(label: 'Action', index: 0);
         const target1 = StratagemTarget(label: 'Action', index: 1);
         expect(target0.resolve(tableau), duplicateButton1);
@@ -540,7 +495,7 @@ void main() {
         // "Log" is partial match for both loginButton "Login" and
         // not contained in headerText
         const target = StratagemTarget(label: 'Log', type: 'Text');
-        // Should NOT match loginButton (ElevatedButton), and "Log" is not in "Welcome to App"  
+        // Should NOT match loginButton (ElevatedButton), and "Log" is not in "Welcome to App"
         expect(target.fuzzyResolve(tableau), isNull);
       });
     });
@@ -593,9 +548,7 @@ void main() {
           StratagemTarget(label: 'Welcome'),
           StratagemTarget(label: 'Dashboard'),
         ],
-        elementsAbsent: [
-          StratagemTarget(label: 'Login'),
-        ],
+        elementsAbsent: [StratagemTarget(label: 'Login')],
         elementStates: [
           StratagemElementState(
             label: 'Submit',
@@ -658,10 +611,7 @@ void main() {
     });
 
     test('toString includes relevant info', () {
-      const state = StratagemElementState(
-        label: 'OK',
-        enabled: false,
-      );
+      const state = StratagemElementState(label: 'OK', enabled: false);
       expect(state.toString(), contains('OK'));
       expect(state.toString(), contains('enabled: false'));
     });

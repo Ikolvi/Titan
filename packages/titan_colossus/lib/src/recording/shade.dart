@@ -73,9 +73,14 @@ class Shade {
   String? _startRoute;
 
   // Tableau capture configuration
-  bool _enableTableauCapture = false;
-  bool _enableScreenCapture = false;
-  double _screenCapturePixelRatio = 0.5;
+  /// Whether Tableau capture is enabled for current/next session.
+  bool enableTableauCapture = false;
+
+  /// Whether to capture screenshots (Fresco) with each Tableau.
+  bool enableScreenCapture = false;
+
+  /// Pixel ratio for screenshots (lower = smaller file size).
+  double screenCapturePixelRatio = 0.5;
   int _currentTableauIndex = -1;
   bool _isCapturingTableau = false;
 
@@ -130,18 +135,6 @@ class Shade {
   /// shade.getCurrentRoute = () => Atlas.instance.currentRoute;
   /// ```
   String? Function()? getCurrentRoute;
-
-  /// Whether Tableau capture is enabled for current/next session.
-  bool get enableTableauCapture => _enableTableauCapture;
-  set enableTableauCapture(bool value) => _enableTableauCapture = value;
-
-  /// Whether to capture screenshots (Fresco) with each Tableau.
-  bool get enableScreenCapture => _enableScreenCapture;
-  set enableScreenCapture(bool value) => _enableScreenCapture = value;
-
-  /// Pixel ratio for screenshots (lower = smaller file size).
-  double get screenCapturePixelRatio => _screenCapturePixelRatio;
-  set screenCapturePixelRatio(double value) => _screenCapturePixelRatio = value;
 
   /// The Tableaux captured in the current recording session.
   List<Tableau> get tableaux => List.unmodifiable(_tableaux);
@@ -227,7 +220,7 @@ class Shade {
     onRecordingStarted?.call();
 
     // Capture initial Tableau (screen state at recording start)
-    if (_enableTableauCapture) {
+    if (enableTableauCapture) {
       _captureTableau(triggerImprintIndex: -1);
     }
   }
@@ -250,7 +243,7 @@ class Shade {
     final duration = DateTime.now().difference(_recordingStart!);
 
     // Capture final Tableau (screen state at recording end)
-    if (_enableTableauCapture) {
+    if (enableTableauCapture) {
       _captureTableau(triggerImprintIndex: _imprints.length - 1);
     }
 
@@ -330,7 +323,7 @@ class Shade {
     onImprintCaptured?.call(imprint);
 
     // Auto-capture Tableau after pointer up (interaction completed)
-    if (_enableTableauCapture && type == ImprintType.pointerUp) {
+    if (enableTableauCapture && type == ImprintType.pointerUp) {
       _scheduleTableauCapture(_imprints.length - 1);
     }
   }
@@ -513,8 +506,8 @@ class Shade {
         index: _tableaux.length,
         route: route,
         triggerImprintIndex: triggerImprintIndex,
-        enableScreenCapture: _enableScreenCapture,
-        screenCapturePixelRatio: _screenCapturePixelRatio,
+        enableScreenCapture: enableScreenCapture,
+        screenCapturePixelRatio: screenCapturePixelRatio,
       );
 
       // Update timestamp
@@ -544,7 +537,7 @@ class Shade {
   /// ```
   void captureTableau() {
     if (!isRecordingCore.peek()) return;
-    if (!_enableTableauCapture) return;
+    if (!enableTableauCapture) return;
     _captureTableau(triggerImprintIndex: _imprints.length - 1);
   }
 }

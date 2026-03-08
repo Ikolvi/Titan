@@ -168,9 +168,7 @@ class Gauntlet {
     final stratagems = <Stratagem>[];
 
     final preconditions = lineage != null && lineage.isNotEmpty
-        ? <String, dynamic>{
-            'setupStratagem': lineage.toSetupStratagem().name,
-          }
+        ? <String, dynamic>{'setupStratagem': lineage.toSetupStratagem().name}
         : null;
 
     // Category 1: Interaction Stress
@@ -204,9 +202,7 @@ class Gauntlet {
     Lineage? lineage,
   }) {
     final preconditions = lineage != null && lineage.isNotEmpty
-        ? <String, dynamic>{
-            'setupStratagem': lineage.toSetupStratagem().name,
-          }
+        ? <String, dynamic>{'setupStratagem': lineage.toSetupStratagem().name}
         : null;
 
     final results = <Stratagem>[];
@@ -215,11 +211,9 @@ class Gauntlet {
       case 'tap':
         results.add(_rapidFireTap(outpost, element, preconditions));
       case 'textInput':
-        results.addAll(_inputBoundariesForField(
-          outpost,
-          element,
-          preconditions,
-        ));
+        results.addAll(
+          _inputBoundariesForField(outpost, element, preconditions),
+        );
       case 'slider':
         results.add(_sliderExtremes(outpost, element, preconditions));
       case 'toggle':
@@ -373,18 +367,18 @@ class Gauntlet {
       preconditions: preconditions,
       steps: [
         ...textFields.asMap().entries.map(
-              (e) => StratagemStep(
-                id: e.key + 1,
-                action: StratagemAction.tap,
-                description: 'Focus ${e.value.label ?? "field ${e.key + 1}"}',
-                target: StratagemTarget(
-                  label: e.value.label,
-                  type: e.value.widgetType,
-                  key: e.value.key,
-                ),
-                waitAfter: const Duration(milliseconds: 50),
-              ),
+          (e) => StratagemStep(
+            id: e.key + 1,
+            action: StratagemAction.tap,
+            description: 'Focus ${e.value.label ?? "field ${e.key + 1}"}',
+            target: StratagemTarget(
+              label: e.value.label,
+              type: e.value.widgetType,
+              key: e.value.key,
             ),
+            waitAfter: const Duration(milliseconds: 50),
+          ),
+        ),
       ],
       failurePolicy: StratagemFailurePolicy.continueAll,
     );
@@ -408,17 +402,14 @@ class Gauntlet {
       // hollow_strike — empty submit
       final submitBtn = _findSubmitButton(outpost);
       if (submitBtn != null) {
-        results.add(_hollowStrike(outpost, textFields, submitBtn,
-            preconditions));
+        results.add(
+          _hollowStrike(outpost, textFields, submitBtn, preconditions),
+        );
       }
 
       // rune_injection — special chars per field
       for (final field in textFields) {
-        results.addAll(_inputBoundariesForField(
-          outpost,
-          field,
-          preconditions,
-        ));
+        results.addAll(_inputBoundariesForField(outpost, field, preconditions));
       }
     }
 
@@ -453,34 +444,35 @@ class Gauntlet {
     };
 
     for (final entry in specialInputs.entries) {
-      results.add(Stratagem(
-        name: 'gauntlet_rune_injection_${fieldSlug}_${entry.key}',
-        description:
-            'Enter ${entry.key} in ${field.label ?? "field"}',
-        tags: const ['gauntlet', 'input', 'special-chars'],
-        startRoute: outpost.routePattern,
-        preconditions: preconditions,
-        steps: [
-          StratagemStep(
-            id: 1,
-            action: StratagemAction.enterText,
-            description: 'Enter ${entry.key} text',
-            target: StratagemTarget(
-              label: field.label,
-              type: field.widgetType,
-              key: field.key,
+      results.add(
+        Stratagem(
+          name: 'gauntlet_rune_injection_${fieldSlug}_${entry.key}',
+          description: 'Enter ${entry.key} in ${field.label ?? "field"}',
+          tags: const ['gauntlet', 'input', 'special-chars'],
+          startRoute: outpost.routePattern,
+          preconditions: preconditions,
+          steps: [
+            StratagemStep(
+              id: 1,
+              action: StratagemAction.enterText,
+              description: 'Enter ${entry.key} text',
+              target: StratagemTarget(
+                label: field.label,
+                type: field.widgetType,
+                key: field.key,
+              ),
+              value: entry.value,
+              clearFirst: true,
             ),
-            value: entry.value,
-            clearFirst: true,
-          ),
-          const StratagemStep(
-            id: 2,
-            action: StratagemAction.verify,
-            description: 'Verify no crash after special input',
-          ),
-        ],
-        failurePolicy: StratagemFailurePolicy.continueAll,
-      ));
+            const StratagemStep(
+              id: 2,
+              action: StratagemAction.verify,
+              description: 'Verify no crash after special input',
+            ),
+          ],
+          failurePolicy: StratagemFailurePolicy.continueAll,
+        ),
+      );
     }
 
     return results;
@@ -532,8 +524,7 @@ class Gauntlet {
     Map<String, dynamic>? preconditions,
   ) {
     return Stratagem(
-      name:
-          'gauntlet_edge_of_range_${_slugify(slider.label ?? "slider")}',
+      name: 'gauntlet_edge_of_range_${_slugify(slider.label ?? "slider")}',
       description: 'Drag ${slider.label ?? "slider"} to extremes',
       tags: const ['gauntlet', 'input', 'slider-extremes'],
       startRoute: outpost.routePattern,
@@ -662,19 +653,23 @@ class Gauntlet {
     var stepId = 1;
 
     for (var i = 0; i < cycles; i++) {
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.navigate,
-        description: 'Navigate to $target (cycle ${i + 1})',
-        navigateRoute: target,
-        waitAfter: const Duration(milliseconds: 200),
-      ));
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.back,
-        description: 'Back to ${outpost.routePattern} (cycle ${i + 1})',
-        waitAfter: const Duration(milliseconds: 200),
-      ));
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.navigate,
+          description: 'Navigate to $target (cycle ${i + 1})',
+          navigateRoute: target,
+          waitAfter: const Duration(milliseconds: 200),
+        ),
+      );
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.back,
+          description: 'Back to ${outpost.routePattern} (cycle ${i + 1})',
+          waitAfter: const Duration(milliseconds: 200),
+        ),
+      );
     }
 
     return Stratagem(
@@ -778,37 +773,39 @@ class Gauntlet {
     var stepId = 1;
 
     for (var i = 0; i < cycles; i++) {
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.adjustSlider,
-        description: 'Drag to min (cycle ${i + 1})',
-        target: StratagemTarget(
-          label: slider.label,
-          type: slider.widgetType,
-          key: slider.key,
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.adjustSlider,
+          description: 'Drag to min (cycle ${i + 1})',
+          target: StratagemTarget(
+            label: slider.label,
+            type: slider.widgetType,
+            key: slider.key,
+          ),
+          value: '0',
+          waitAfter: const Duration(milliseconds: 50),
         ),
-        value: '0',
-        waitAfter: const Duration(milliseconds: 50),
-      ));
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.adjustSlider,
-        description: 'Drag to max (cycle ${i + 1})',
-        target: StratagemTarget(
-          label: slider.label,
-          type: slider.widgetType,
-          key: slider.key,
+      );
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.adjustSlider,
+          description: 'Drag to max (cycle ${i + 1})',
+          target: StratagemTarget(
+            label: slider.label,
+            type: slider.widgetType,
+            key: slider.key,
+          ),
+          value: '1',
+          waitAfter: const Duration(milliseconds: 50),
         ),
-        value: '1',
-        waitAfter: const Duration(milliseconds: 50),
-      ));
+      );
     }
 
     return Stratagem(
-      name:
-          'gauntlet_slider_tempest_${_slugify(slider.label ?? "slider")}',
-      description:
-          'Rapidly drag ${slider.label ?? "slider"} between extremes',
+      name: 'gauntlet_slider_tempest_${_slugify(slider.label ?? "slider")}',
+      description: 'Rapidly drag ${slider.label ?? "slider"} between extremes',
       tags: const ['gauntlet', 'state', 'slider-tempest'],
       startRoute: outpost.routePattern,
       preconditions: preconditions,
@@ -883,38 +880,44 @@ class Gauntlet {
     var stepId = 1;
 
     // Fill only the first field, leave rest empty
-    steps.add(StratagemStep(
-      id: stepId++,
-      action: StratagemAction.enterText,
-      description: 'Fill ${textFields.first.label ?? "first field"} only',
-      target: StratagemTarget(
-        label: textFields.first.label,
-        type: textFields.first.widgetType,
-        key: textFields.first.key,
+    steps.add(
+      StratagemStep(
+        id: stepId++,
+        action: StratagemAction.enterText,
+        description: 'Fill ${textFields.first.label ?? "first field"} only',
+        target: StratagemTarget(
+          label: textFields.first.label,
+          type: textFields.first.widgetType,
+          key: textFields.first.key,
+        ),
+        value: 'partial_data',
+        clearFirst: true,
       ),
-      value: 'partial_data',
-      clearFirst: true,
-    ));
+    );
 
     // Tap submit if available
     final submitBtn = _findSubmitButton(outpost);
     if (submitBtn != null) {
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.tap,
-        description: 'Submit partial form',
-        target: StratagemTarget(
-          label: submitBtn.label,
-          type: submitBtn.widgetType,
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.tap,
+          description: 'Submit partial form',
+          target: StratagemTarget(
+            label: submitBtn.label,
+            type: submitBtn.widgetType,
+          ),
         ),
-      ));
+      );
     }
 
-    steps.add(StratagemStep(
-      id: stepId,
-      action: StratagemAction.verify,
-      description: 'Verify validation error displayed',
-    ));
+    steps.add(
+      StratagemStep(
+        id: stepId,
+        action: StratagemAction.verify,
+        description: 'Verify validation error displayed',
+      ),
+    );
 
     return Stratagem(
       name: 'gauntlet_half_inscription_${_slugify(outpost.routePattern)}',
@@ -933,8 +936,7 @@ class Gauntlet {
   ) {
     final target = outpost.exits.first.toRoute;
     return Stratagem(
-      name:
-          'gauntlet_forgotten_outpost_${_slugify(outpost.routePattern)}',
+      name: 'gauntlet_forgotten_outpost_${_slugify(outpost.routePattern)}',
       description:
           'Navigate away from ${outpost.displayName} and back, verify state',
       tags: const ['gauntlet', 'state', 'stale-screen'],
@@ -1037,25 +1039,28 @@ class Gauntlet {
     var stepId = 1;
 
     for (var i = 0; i < cycles; i++) {
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.scroll,
-        description: 'Scroll down (cycle ${i + 1})',
-        scrollDelta: const Offset(0, 500),
-        waitAfter: const Duration(milliseconds: 50),
-      ));
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.scroll,
-        description: 'Scroll up (cycle ${i + 1})',
-        scrollDelta: const Offset(0, -500),
-        waitAfter: const Duration(milliseconds: 50),
-      ));
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.scroll,
+          description: 'Scroll down (cycle ${i + 1})',
+          scrollDelta: const Offset(0, 500),
+          waitAfter: const Duration(milliseconds: 50),
+        ),
+      );
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.scroll,
+          description: 'Scroll up (cycle ${i + 1})',
+          scrollDelta: const Offset(0, -500),
+          waitAfter: const Duration(milliseconds: 50),
+        ),
+      );
     }
 
     return Stratagem(
-      name:
-          'gauntlet_avalanche_scroll_${_slugify(outpost.routePattern)}',
+      name: 'gauntlet_avalanche_scroll_${_slugify(outpost.routePattern)}',
       description: 'Rapidly scroll up and down $cycles times',
       tags: const ['gauntlet', 'timing', 'scroll-spam'],
       startRoute: outpost.routePattern,

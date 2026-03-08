@@ -52,8 +52,8 @@ class Terrain {
     DateTime? lastUpdated,
     this.sessionsAnalyzed = 0,
     this.stratagemExecutionsAnalyzed = 0,
-  })  : outposts = outposts ?? {},
-        lastUpdated = lastUpdated ?? DateTime.now();
+  }) : outposts = outposts ?? {},
+       lastUpdated = lastUpdated ?? DateTime.now();
 
   // -----------------------------------------------------------------------
   // Cache — invalidated by [invalidateCache] whenever the graph mutates.
@@ -86,7 +86,8 @@ class Terrain {
     final result = <March>[];
     for (final outpost in outposts.values) {
       for (final march in outpost.exits) {
-        final key = '${march.fromRoute}→${march.toRoute}:'
+        final key =
+            '${march.fromRoute}→${march.toRoute}:'
             '${march.triggerElementLabel}';
         if (seen.add(key)) result.add(march);
       }
@@ -141,8 +142,7 @@ class Terrain {
     if (!outposts.containsKey(from)) return null;
 
     final visited = <String>{from};
-    final queue = Queue<_PathNode>()
-      ..add(_PathNode(route: from, path: []));
+    final queue = Queue<_PathNode>()..add(_PathNode(route: from, path: []));
 
     while (queue.isNotEmpty) {
       final node = queue.removeFirst();
@@ -154,10 +154,7 @@ class Terrain {
           return [...node.path, exit];
         }
         if (visited.add(exit.toRoute)) {
-          queue.add(_PathNode(
-            route: exit.toRoute,
-            path: [...node.path, exit],
-          ));
+          queue.add(_PathNode(route: exit.toRoute, path: [...node.path, exit]));
         }
       }
     }
@@ -176,10 +173,9 @@ class Terrain {
   /// Get screens with no observed exits (dead ends or terminal screens).
   ///
   /// The result is cached and reused until [invalidateCache] is called.
-  List<Outpost> get deadEnds =>
-      _deadEndsCache ??= List.unmodifiable(
-        outposts.values.where((o) => o.exits.isEmpty).toList(),
-      );
+  List<Outpost> get deadEnds => _deadEndsCache ??= List.unmodifiable(
+    outposts.values.where((o) => o.exits.isEmpty).toList(),
+  );
 
   /// Get screens with no observed entrances (entry points).
   ///
@@ -190,10 +186,8 @@ class Terrain {
   /// Get unreliable transitions (observed only once).
   ///
   /// The result is cached and reused until [invalidateCache] is called.
-  List<March> get unreliableMarches =>
-      _unreliableMarchesCache ??= List.unmodifiable(
-        marches.where((m) => !m.isReliable).toList(),
-      );
+  List<March> get unreliableMarches => _unreliableMarchesCache ??=
+      List.unmodifiable(marches.where((m) => !m.isReliable).toList());
 
   /// Whether a route pattern exists in the Terrain.
   bool hasRoute(String routePattern) => outposts.containsKey(routePattern);
@@ -265,8 +259,7 @@ class Terrain {
     // Declare nodes
     for (final outpost in outposts.values) {
       final id = nodeId(outpost.routePattern);
-      final label =
-          '${outpost.routePattern}<br>${outpost.displayName}';
+      final label = '${outpost.routePattern}<br>${outpost.displayName}';
       if (outpost.requiresAuth) {
         buffer.writeln('  $id(["$label 🔒"])');
       } else {

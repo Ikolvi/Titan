@@ -35,11 +35,7 @@ void main() {
     List<String> tags = const [],
   }) {
     return CampaignEntry(
-      stratagem: makeStratagem(
-        name: name,
-        startRoute: startRoute,
-        tags: tags,
-      ),
+      stratagem: makeStratagem(name: name, startRoute: startRoute, tags: tags),
       dependsOn: dependsOn,
       skipIf: skipIf,
       testDataOverride: testDataOverride,
@@ -51,8 +47,7 @@ void main() {
     List<CampaignEntry>? entries,
     bool includeGauntlet = false,
     GauntletIntensity gauntletIntensity = GauntletIntensity.standard,
-    CampaignFailurePolicy failurePolicy =
-        CampaignFailurePolicy.skipDependents,
+    CampaignFailurePolicy failurePolicy = CampaignFailurePolicy.skipDependents,
     Map<String, dynamic>? sharedTestData,
   }) {
     return Campaign(
@@ -116,9 +111,7 @@ void main() {
     });
 
     test('defaults to empty dependsOn', () {
-      final entry = CampaignEntry(
-        stratagem: makeStratagem(name: 'solo'),
-      );
+      final entry = CampaignEntry(stratagem: makeStratagem(name: 'solo'));
       expect(entry.dependsOn, isEmpty);
     });
 
@@ -149,9 +142,7 @@ void main() {
     });
 
     test('fromJson with minimal data', () {
-      final json = {
-        'stratagem': makeStratagem(name: 'basic').toJson(),
-      };
+      final json = {'stratagem': makeStratagem(name: 'basic').toJson()};
       final entry = CampaignEntry.fromJson(json);
       expect(entry.name, 'basic');
       expect(entry.dependsOn, isEmpty);
@@ -187,10 +178,7 @@ void main() {
     });
 
     test('defaults', () {
-      final campaign = Campaign(
-        name: 'default',
-        entries: [],
-      );
+      final campaign = Campaign(name: 'default', entries: []);
       expect(campaign.includeGauntlet, false);
       expect(campaign.gauntletIntensity, GauntletIntensity.standard);
       expect(campaign.failurePolicy, CampaignFailurePolicy.skipDependents);
@@ -213,22 +201,26 @@ void main() {
 
   group('Campaign topological sort', () {
     test('no dependencies → single batch', () {
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a'),
-        makeEntry(name: 'b'),
-        makeEntry(name: 'c'),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a'),
+          makeEntry(name: 'b'),
+          makeEntry(name: 'c'),
+        ],
+      );
       final batches = campaign.topologicalSort();
       expect(batches, hasLength(1));
       expect(batches[0], hasLength(3));
     });
 
     test('linear chain → 3 batches', () {
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a'),
-        makeEntry(name: 'b', dependsOn: ['a']),
-        makeEntry(name: 'c', dependsOn: ['b']),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a'),
+          makeEntry(name: 'b', dependsOn: ['a']),
+          makeEntry(name: 'c', dependsOn: ['b']),
+        ],
+      );
       final batches = campaign.topologicalSort();
       expect(batches, hasLength(3));
       expect(batches[0].map((e) => e.name), ['a']);
@@ -237,12 +229,14 @@ void main() {
     });
 
     test('diamond dependency → correct batches', () {
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a'),
-        makeEntry(name: 'b', dependsOn: ['a']),
-        makeEntry(name: 'c', dependsOn: ['a']),
-        makeEntry(name: 'd', dependsOn: ['b', 'c']),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a'),
+          makeEntry(name: 'b', dependsOn: ['a']),
+          makeEntry(name: 'c', dependsOn: ['a']),
+          makeEntry(name: 'd', dependsOn: ['b', 'c']),
+        ],
+      );
       final batches = campaign.topologicalSort();
       expect(batches, hasLength(3));
 
@@ -255,11 +249,13 @@ void main() {
     });
 
     test('circular dependency throws CampaignCycleException', () {
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a', dependsOn: ['c']),
-        makeEntry(name: 'b', dependsOn: ['a']),
-        makeEntry(name: 'c', dependsOn: ['b']),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a', dependsOn: ['c']),
+          makeEntry(name: 'b', dependsOn: ['a']),
+          makeEntry(name: 'c', dependsOn: ['b']),
+        ],
+      );
       expect(
         () => campaign.topologicalSort(),
         throwsA(isA<CampaignCycleException>()),
@@ -273,9 +269,11 @@ void main() {
     });
 
     test('self-dependency throws', () {
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a', dependsOn: ['a']),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a', dependsOn: ['a']),
+        ],
+      );
       expect(
         () => campaign.topologicalSort(),
         throwsA(isA<CampaignCycleException>()),
@@ -283,10 +281,12 @@ void main() {
     });
 
     test('external dependency ignored in sort', () {
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a', dependsOn: ['external_prereq']),
-        makeEntry(name: 'b'),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a', dependsOn: ['external_prereq']),
+          makeEntry(name: 'b'),
+        ],
+      );
       // 'external_prereq' not in entries → ignored
       final batches = campaign.topologicalSort();
       expect(batches, hasLength(1));
@@ -294,11 +294,13 @@ void main() {
     });
 
     test('executionOrder flattens batches', () {
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a'),
-        makeEntry(name: 'b', dependsOn: ['a']),
-        makeEntry(name: 'c', dependsOn: ['a']),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a'),
+          makeEntry(name: 'b', dependsOn: ['a']),
+          makeEntry(name: 'c', dependsOn: ['a']),
+        ],
+      );
       final order = campaign.executionOrder();
       expect(order.map((e) => e.name).first, 'a');
       expect(order.map((e) => e.name).toSet(), {'a', 'b', 'c'});
@@ -312,12 +314,14 @@ void main() {
 
     test('parallel branches produce correct batches', () {
       // a → d, b → d, c → d — 3 independent roots
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a'),
-        makeEntry(name: 'b'),
-        makeEntry(name: 'c'),
-        makeEntry(name: 'd', dependsOn: ['a', 'b', 'c']),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a'),
+          makeEntry(name: 'b'),
+          makeEntry(name: 'c'),
+          makeEntry(name: 'd', dependsOn: ['a', 'b', 'c']),
+        ],
+      );
       final batches = campaign.topologicalSort();
       expect(batches, hasLength(2));
       expect(batches[0], hasLength(3));
@@ -331,12 +335,12 @@ void main() {
 
   group('Campaign prerequisite injection', () {
     test('no prerequisites for entry point screens', () {
-      final terrain = Terrain(outposts: {
-        '/home': createOutpost(route: '/home'),
-      });
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'home_test', startRoute: '/home'),
-      ]);
+      final terrain = Terrain(
+        outposts: {'/home': createOutpost(route: '/home')},
+      );
+      final campaign = makeCampaign(
+        entries: [makeEntry(name: 'home_test', startRoute: '/home')],
+      );
 
       final augmented = campaign.resolvePrerequisites(terrain);
       // No prereq needed — /home is entry point (no entrances)
@@ -346,22 +350,24 @@ void main() {
 
     test('injects prerequisite for deep screen', () {
       final march = createMarch(from: '/login', to: '/dashboard');
-      final terrain = Terrain(outposts: {
-        '/login': createOutpost(
-          route: '/login',
-          displayName: 'Login',
-          exits: [march],
-        ),
-        '/dashboard': createOutpost(
-          route: '/dashboard',
-          displayName: 'Dashboard',
-          entrances: [march],
-        ),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/login': createOutpost(
+            route: '/login',
+            displayName: 'Login',
+            exits: [march],
+          ),
+          '/dashboard': createOutpost(
+            route: '/dashboard',
+            displayName: 'Dashboard',
+            entrances: [march],
+          ),
+        },
+      );
 
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'dashboard_test', startRoute: '/dashboard'),
-      ]);
+      final campaign = makeCampaign(
+        entries: [makeEntry(name: 'dashboard_test', startRoute: '/dashboard')],
+      );
 
       final augmented = campaign.resolvePrerequisites(terrain);
       expect(augmented, hasLength(2));
@@ -373,19 +379,23 @@ void main() {
 
     test('preserves original dependencies with prereq', () {
       final march = createMarch(from: '/login', to: '/deep');
-      final terrain = Terrain(outposts: {
-        '/login': createOutpost(route: '/login', exits: [march]),
-        '/deep': createOutpost(route: '/deep', entrances: [march]),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/login': createOutpost(route: '/login', exits: [march]),
+          '/deep': createOutpost(route: '/deep', entrances: [march]),
+        },
+      );
 
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'setup_step'),
-        makeEntry(
-          name: 'deep_test',
-          startRoute: '/deep',
-          dependsOn: ['setup_step'],
-        ),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'setup_step'),
+          makeEntry(
+            name: 'deep_test',
+            startRoute: '/deep',
+            dependsOn: ['setup_step'],
+          ),
+        ],
+      );
 
       final augmented = campaign.resolvePrerequisites(terrain);
       final deepEntry = augmented.firstWhere((e) => e.name == 'deep_test');
@@ -395,10 +405,12 @@ void main() {
 
     test('merges sharedTestData with entry testDataOverride', () {
       final march = createMarch(from: '/login', to: '/profile');
-      final terrain = Terrain(outposts: {
-        '/login': createOutpost(route: '/login', exits: [march]),
-        '/profile': createOutpost(route: '/profile', entrances: [march]),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/login': createOutpost(route: '/login', exits: [march]),
+          '/profile': createOutpost(route: '/profile', entrances: [march]),
+        },
+      );
 
       final campaign = Campaign(
         name: 'test',
@@ -424,32 +436,37 @@ void main() {
 
     test('skips prereq if it already exists', () {
       final march = createMarch(from: '/login', to: '/deep');
-      final terrain = Terrain(outposts: {
-        '/login': createOutpost(route: '/login', exits: [march]),
-        '/deep': createOutpost(route: '/deep', entrances: [march]),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/login': createOutpost(route: '/login', exits: [march]),
+          '/deep': createOutpost(route: '/deep', entrances: [march]),
+        },
+      );
 
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'prereq_deep_test', startRoute: '/login'),
-        makeEntry(
-          name: 'deep_test',
-          startRoute: '/deep',
-          dependsOn: ['prereq_deep_test'],
-        ),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'prereq_deep_test', startRoute: '/login'),
+          makeEntry(
+            name: 'deep_test',
+            startRoute: '/deep',
+            dependsOn: ['prereq_deep_test'],
+          ),
+        ],
+      );
 
       final augmented = campaign.resolvePrerequisites(terrain);
       // Should not duplicate the prereq
-      final prereqs =
-          augmented.where((e) => e.name == 'prereq_deep_test').toList();
+      final prereqs = augmented
+          .where((e) => e.name == 'prereq_deep_test')
+          .toList();
       expect(prereqs, hasLength(1));
     });
 
     test('unknown route returns entry unchanged', () {
       final terrain = Terrain();
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'unknown', startRoute: '/nowhere'),
-      ]);
+      final campaign = makeCampaign(
+        entries: [makeEntry(name: 'unknown', startRoute: '/nowhere')],
+      );
 
       final augmented = campaign.resolvePrerequisites(terrain);
       expect(augmented, hasLength(1));
@@ -463,12 +480,14 @@ void main() {
 
   group('Campaign gauntlet augmentation', () {
     test('generates gauntlet entries when enabled', () {
-      final terrain = Terrain(outposts: {
-        '/home': createOutpost(
-          route: '/home',
-          interactive: [button(label: 'Start')],
-        ),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/home': createOutpost(
+            route: '/home',
+            interactive: [button(label: 'Start')],
+          ),
+        },
+      );
 
       final campaign = makeCampaign(
         includeGauntlet: true,
@@ -483,12 +502,11 @@ void main() {
     });
 
     test('returns empty when gauntlet disabled', () {
-      final terrain = Terrain(outposts: {
-        '/home': createOutpost(
-          route: '/home',
-          interactive: [button()],
-        ),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/home': createOutpost(route: '/home', interactive: [button()]),
+        },
+      );
 
       final campaign = makeCampaign(includeGauntlet: false);
       final gauntletEntries = campaign.generateGauntletEntries(terrain);
@@ -497,14 +515,16 @@ void main() {
     });
 
     test('respects gauntlet intensity', () {
-      final terrain = Terrain(outposts: {
-        '/home': createOutpost(
-          route: '/home',
-          interactive: [button(label: 'Go')],
-          exits: [createMarch(from: '/home', to: '/other')],
-          tags: ['scrollable'],
-        ),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/home': createOutpost(
+            route: '/home',
+            interactive: [button(label: 'Go')],
+            exits: [createMarch(from: '/home', to: '/other')],
+            tags: ['scrollable'],
+          ),
+        },
+      );
 
       final quick = Campaign(
         name: 'q',
@@ -563,18 +583,16 @@ void main() {
     }
 
     test('passRate 1.0 with all passing', () {
-      final result = makeResult(verdicts: {
-        'a': makeVerdict('a'),
-        'b': makeVerdict('b'),
-      });
+      final result = makeResult(
+        verdicts: {'a': makeVerdict('a'), 'b': makeVerdict('b')},
+      );
       expect(result.passRate, 1.0);
     });
 
     test('passRate 0.5 with mixed', () {
-      final result = makeResult(verdicts: {
-        'a': makeVerdict('a'),
-        'b': makeVerdict('b', passed: false),
-      });
+      final result = makeResult(
+        verdicts: {'a': makeVerdict('a'), 'b': makeVerdict('b', passed: false)},
+      );
       expect(result.passRate, 0.5);
     });
 
@@ -584,9 +602,7 @@ void main() {
     });
 
     test('allPassed true when all pass and none skipped', () {
-      final result = makeResult(verdicts: {
-        'a': makeVerdict('a'),
-      });
+      final result = makeResult(verdicts: {'a': makeVerdict('a')});
       expect(result.allPassed, true);
     });
 
@@ -599,27 +615,29 @@ void main() {
     });
 
     test('allPassed false when any failed', () {
-      final result = makeResult(verdicts: {
-        'a': makeVerdict('a', passed: false),
-      });
+      final result = makeResult(
+        verdicts: {'a': makeVerdict('a', passed: false)},
+      );
       expect(result.allPassed, false);
     });
 
     test('totalExecuted and totalFailed', () {
-      final result = makeResult(verdicts: {
-        'a': makeVerdict('a'),
-        'b': makeVerdict('b', passed: false),
-        'c': makeVerdict('c'),
-      });
+      final result = makeResult(
+        verdicts: {
+          'a': makeVerdict('a'),
+          'b': makeVerdict('b', passed: false),
+          'c': makeVerdict('c'),
+        },
+      );
       expect(result.totalExecuted, 3);
       expect(result.totalFailed, 1);
     });
 
     test('toReport contains campaign info', () {
-      final result = makeResult(verdicts: {
-        'a': makeVerdict('a'),
-        'b': makeVerdict('b', passed: false),
-      }, skipped: ['c']);
+      final result = makeResult(
+        verdicts: {'a': makeVerdict('a'), 'b': makeVerdict('b', passed: false)},
+        skipped: ['c'],
+      );
 
       final report = result.toReport();
       expect(report, contains('test_campaign'));
@@ -657,9 +675,7 @@ void main() {
     });
 
     test('toAiDiagnostic contains pass rate', () {
-      final result = makeResult(verdicts: {
-        'a': makeVerdict('a'),
-      });
+      final result = makeResult(verdicts: {'a': makeVerdict('a')});
       final diag = result.toAiDiagnostic();
       expect(diag, contains('pass_rate: 1.000'));
     });
@@ -693,9 +709,7 @@ void main() {
         performance: const VerdictPerformance(),
       );
 
-      final result = makeResult(verdicts: {
-        'fail_test': failedVerdict,
-      });
+      final result = makeResult(verdicts: {'fail_test': failedVerdict});
 
       final diag = result.toAiDiagnostic();
       expect(diag, contains('failures:'));
@@ -704,9 +718,10 @@ void main() {
     });
 
     test('toJson contains all fields', () {
-      final result = makeResult(verdicts: {
-        'a': makeVerdict('a'),
-      }, skipped: ['b']);
+      final result = makeResult(
+        verdicts: {'a': makeVerdict('a')},
+        skipped: ['b'],
+      );
 
       final json = result.toJson();
       expect(json['campaign'], 'test_campaign');
@@ -766,10 +781,7 @@ void main() {
     });
 
     test('fromJson with minimal fields', () {
-      final json = {
-        'name': 'minimal',
-        'entries': <Map<String, dynamic>>[],
-      };
+      final json = {'name': 'minimal', 'entries': <Map<String, dynamic>>[]};
       final campaign = Campaign.fromJson(json);
       expect(campaign.name, 'minimal');
       expect(campaign.entries, isEmpty);
@@ -828,24 +840,26 @@ void main() {
     test('full workflow: build, sort, resolve, serialize', () {
       final march1 = createMarch(from: '/home', to: '/login');
       final march2 = createMarch(from: '/login', to: '/dashboard');
-      final terrain = Terrain(outposts: {
-        '/home': createOutpost(
-          route: '/home',
-          exits: [march1],
-          interactive: [button(label: 'Start')],
-        ),
-        '/login': createOutpost(
-          route: '/login',
-          entrances: [march1],
-          exits: [march2],
-          interactive: [button(label: 'Login')],
-        ),
-        '/dashboard': createOutpost(
-          route: '/dashboard',
-          entrances: [march2],
-          interactive: [button(label: 'View')],
-        ),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/home': createOutpost(
+            route: '/home',
+            exits: [march1],
+            interactive: [button(label: 'Start')],
+          ),
+          '/login': createOutpost(
+            route: '/login',
+            entrances: [march1],
+            exits: [march2],
+            interactive: [button(label: 'Login')],
+          ),
+          '/dashboard': createOutpost(
+            route: '/dashboard',
+            entrances: [march2],
+            interactive: [button(label: 'View')],
+          ),
+        },
+      );
 
       final campaign = Campaign(
         name: 'full_workflow',
@@ -882,19 +896,19 @@ void main() {
 
     test('prereq entry uses abortOnFirst policy', () {
       final march = createMarch(from: '/home', to: '/deep');
-      final terrain = Terrain(outposts: {
-        '/home': createOutpost(route: '/home', exits: [march]),
-        '/deep': createOutpost(route: '/deep', entrances: [march]),
-      });
+      final terrain = Terrain(
+        outposts: {
+          '/home': createOutpost(route: '/home', exits: [march]),
+          '/deep': createOutpost(route: '/deep', entrances: [march]),
+        },
+      );
 
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'deep_test', startRoute: '/deep'),
-      ]);
+      final campaign = makeCampaign(
+        entries: [makeEntry(name: 'deep_test', startRoute: '/deep')],
+      );
 
       final augmented = campaign.resolvePrerequisites(terrain);
-      final prereq = augmented.firstWhere(
-        (e) => e.name.startsWith('prereq_'),
-      );
+      final prereq = augmented.firstWhere((e) => e.name.startsWith('prereq_'));
       expect(
         prereq.stratagem.failurePolicy,
         StratagemFailurePolicy.abortOnFirst,
@@ -903,13 +917,15 @@ void main() {
 
     test('large DAG sorts correctly', () {
       // a, b independent; c depends on both; d on c; e on a
-      final campaign = makeCampaign(entries: [
-        makeEntry(name: 'a'),
-        makeEntry(name: 'b'),
-        makeEntry(name: 'c', dependsOn: ['a', 'b']),
-        makeEntry(name: 'd', dependsOn: ['c']),
-        makeEntry(name: 'e', dependsOn: ['a']),
-      ]);
+      final campaign = makeCampaign(
+        entries: [
+          makeEntry(name: 'a'),
+          makeEntry(name: 'b'),
+          makeEntry(name: 'c', dependsOn: ['a', 'b']),
+          makeEntry(name: 'd', dependsOn: ['c']),
+          makeEntry(name: 'e', dependsOn: ['a']),
+        ],
+      );
 
       final order = campaign.executionOrder();
       final names = order.map((e) => e.name).toList();

@@ -1,0 +1,587 @@
+{
+  "$schema": "titan://campaign/v1",
+  "name": "questboard_full_e2e_regression",
+  "description": "Full end-to-end regression: Login → Navigate all screens → Test key interactions → Verify core features. Runs autonomously on a real device via Relay.",
+  "tags": ["regression", "e2e", "relay", "full-coverage"],
+  "failurePolicy": "continueAll",
+  "timeout": 600000,
+  "includeGauntlet": false,
+  "entries": [
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "auth_login_flow",
+        "description": "Sign in with default hero name and verify redirect to quest list",
+        "tags": ["critical-path", "auth", "login"],
+        "startRoute": "/login",
+        "timeout": 30000,
+        "failurePolicy": "abortOnFirst",
+        "steps": [
+          {
+            "id": 1,
+            "action": "verify",
+            "description": "Verify Login screen loaded with hero name field",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Enter the Questboard"},
+                {"label": "Hero Name"}
+              ],
+              "settleTimeout": 5000
+            }
+          },
+          {
+            "id": 2,
+            "action": "clearText",
+            "description": "Clear the Hero Name field",
+            "target": {"label": "Hero Name", "type": "TextField"}
+          },
+          {
+            "id": 3,
+            "action": "enterText",
+            "description": "Enter hero name",
+            "target": {"label": "Hero Name", "type": "TextField"},
+            "value": "Kael the Brave",
+            "waitAfter": 500
+          },
+          {
+            "id": 4,
+            "action": "tap",
+            "description": "Tap Enter the Questboard button to sign in",
+            "target": {"label": "Enter the Questboard"},
+            "waitAfter": 2000,
+            "expectations": {
+              "route": "/",
+              "settleTimeout": 5000
+            }
+          },
+          {
+            "id": 5,
+            "action": "verify",
+            "description": "Verify Quest List screen loaded after login",
+            "expectations": {
+              "route": "/",
+              "elementsPresent": [
+                {"label": "Questboard"}
+              ],
+              "settleTimeout": 3000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "quest_list_browse",
+        "description": "Verify quest list loads with items and hero glory banner",
+        "tags": ["critical-path", "quest-list"],
+        "startRoute": "/",
+        "timeout": 30000,
+        "failurePolicy": "continueAll",
+        "dependsOn": ["auth_login_flow"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "verify",
+            "description": "Verify hero glory banner shows hero name",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Kael the Brave"}
+              ],
+              "settleTimeout": 3000
+            }
+          },
+          {
+            "id": 2,
+            "action": "verify",
+            "description": "Verify quest items are displayed",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Glory"}
+              ],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 3,
+            "action": "verify",
+            "description": "Verify bottom navigation is present",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Quests"},
+                {"label": "Hero"},
+                {"label": "Enterprise"}
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "navigate_hero_profile",
+        "description": "Navigate to Hero Profile via bottom nav and verify hero details",
+        "tags": ["navigation", "hero-profile"],
+        "startRoute": "/",
+        "timeout": 30000,
+        "failurePolicy": "continueAll",
+        "dependsOn": ["auth_login_flow"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "tap",
+            "description": "Tap Hero tab in bottom navigation",
+            "target": {"label": "Hero"},
+            "waitAfter": 1500,
+            "expectations": {
+              "route": "/hero",
+              "settleTimeout": 3000
+            }
+          },
+          {
+            "id": 2,
+            "action": "verify",
+            "description": "Verify Hero Profile screen shows hero stats",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Glory"},
+                {"label": "Register New Hero"}
+              ],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 3,
+            "action": "verify",
+            "description": "Verify class selector is present",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Scout"},
+                {"label": "Sentinel"}
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "hero_class_selection",
+        "description": "Change hero class via segmented button and verify state update",
+        "tags": ["interaction", "hero-profile", "segmented-button"],
+        "startRoute": "/hero",
+        "timeout": 30000,
+        "failurePolicy": "continueAll",
+        "dependsOn": ["navigate_hero_profile"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "tap",
+            "description": "Select Builder class",
+            "target": {"label": "Builder"},
+            "waitAfter": 1000,
+            "expectations": {
+              "elementsPresent": [{"label": "Builder"}],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 2,
+            "action": "tap",
+            "description": "Select Oracle class",
+            "target": {"label": "Oracle"},
+            "waitAfter": 1000,
+            "expectations": {
+              "elementsPresent": [{"label": "Oracle"}],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 3,
+            "action": "tap",
+            "description": "Select back to Scout class",
+            "target": {"label": "Scout"},
+            "waitAfter": 500
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "navigate_enterprise_demos",
+        "description": "Navigate to Enterprise tab and interact with multiple feature demos",
+        "tags": ["navigation", "enterprise", "feature-demos"],
+        "startRoute": "/",
+        "timeout": 60000,
+        "failurePolicy": "continueAll",
+        "dependsOn": ["auth_login_flow"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "tap",
+            "description": "Tap Enterprise tab in bottom navigation",
+            "target": {"label": "Enterprise"},
+            "waitAfter": 1500,
+            "expectations": {
+              "route": "/enterprise",
+              "settleTimeout": 3000
+            }
+          },
+          {
+            "id": 2,
+            "action": "verify",
+            "description": "Verify Enterprise Features screen loaded with Loom tab",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Enterprise Features"},
+                {"label": "Loom"}
+              ],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 3,
+            "action": "tap",
+            "description": "Tap Portcullis tab",
+            "target": {"label": "Portcullis"},
+            "waitAfter": 1000,
+            "expectations": {
+              "elementsPresent": [{"label": "Fetch Quest"}],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 4,
+            "action": "tap",
+            "description": "Tap Fetch Quest button in Portcullis demo",
+            "target": {"label": "Fetch Quest"},
+            "waitAfter": 2000
+          },
+          {
+            "id": 5,
+            "action": "tap",
+            "description": "Tap Saga tab",
+            "target": {"label": "Saga"},
+            "waitAfter": 1000,
+            "expectations": {
+              "elementsPresent": [{"label": "Run Publish Saga"}],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 6,
+            "action": "tap",
+            "description": "Run the Publish Saga",
+            "target": {"label": "Run Publish Saga"},
+            "waitAfter": 3000
+          },
+          {
+            "id": 7,
+            "action": "tap",
+            "description": "Tap Conduit tab",
+            "target": {"label": "Conduit"},
+            "waitAfter": 1000,
+            "expectations": {
+              "elementsPresent": [{"label": "Set 500"}],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 8,
+            "action": "tap",
+            "description": "Test Conduit by setting value to 500",
+            "target": {"label": "Set 500"},
+            "waitAfter": 500
+          },
+          {
+            "id": 9,
+            "action": "tap",
+            "description": "Tap Ledger tab",
+            "target": {"label": "Ledger"},
+            "waitAfter": 1000,
+            "expectations": {
+              "elementsPresent": [{"label": "Buy 5 items (100g)"}],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 10,
+            "action": "tap",
+            "description": "Execute a Ledger transaction",
+            "target": {"label": "Buy 5 items (100g)"},
+            "waitAfter": 2000
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "navigate_spark_demo",
+        "description": "Navigate to Spark demo and test hooks-based counter",
+        "tags": ["navigation", "spark", "hooks"],
+        "startRoute": "/",
+        "timeout": 30000,
+        "failurePolicy": "continueAll",
+        "dependsOn": ["auth_login_flow"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "tap",
+            "description": "Tap Spark tab in bottom navigation",
+            "target": {"label": "Spark"},
+            "waitAfter": 1500,
+            "expectations": {
+              "route": "/spark",
+              "settleTimeout": 3000
+            }
+          },
+          {
+            "id": 2,
+            "action": "verify",
+            "description": "Verify Spark Demo screen loaded",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Spark Demo"},
+                {"label": "Increment"}
+              ],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 3,
+            "action": "tap",
+            "description": "Tap Increment button",
+            "target": {"label": "Increment"},
+            "waitAfter": 500
+          },
+          {
+            "id": 4,
+            "action": "tap",
+            "description": "Tap Increment again",
+            "target": {"label": "Increment"},
+            "waitAfter": 500
+          },
+          {
+            "id": 5,
+            "action": "tap",
+            "description": "Tap Reset button",
+            "target": {"label": "Reset"},
+            "waitAfter": 500
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "navigate_shade_demo",
+        "description": "Navigate to Shade demo and verify recording UI elements",
+        "tags": ["navigation", "shade"],
+        "startRoute": "/",
+        "timeout": 30000,
+        "failurePolicy": "continueAll",
+        "dependsOn": ["auth_login_flow"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "tap",
+            "description": "Tap Shade tab in bottom navigation",
+            "target": {"label": "Shade"},
+            "waitAfter": 1500,
+            "expectations": {
+              "route": "/shade",
+              "settleTimeout": 3000
+            }
+          },
+          {
+            "id": 2,
+            "action": "verify",
+            "description": "Verify Shade demo screen loaded with recording controls",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Shade & Phantom"},
+                {"label": "Start Recording"}
+              ],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 3,
+            "action": "verify",
+            "description": "Verify playground elements are present",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Claim Quest"},
+                {"label": "View Hero"}
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "navigate_about_screen",
+        "description": "Navigate to About screen and verify feature list",
+        "tags": ["navigation", "about"],
+        "startRoute": "/",
+        "timeout": 30000,
+        "failurePolicy": "continueAll",
+        "dependsOn": ["auth_login_flow"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "tap",
+            "description": "Tap About icon in app bar",
+            "target": {"label": "About", "type": "IconButton"},
+            "waitAfter": 1500,
+            "expectations": {
+              "route": "/about",
+              "settleTimeout": 3000
+            }
+          },
+          {
+            "id": 2,
+            "action": "verify",
+            "description": "Verify About screen loaded",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "About Questboard"},
+                {"label": "Built by Ikolvi"}
+              ],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 3,
+            "action": "back",
+            "description": "Navigate back to quest list",
+            "waitAfter": 1000,
+            "expectations": {
+              "route": "/",
+              "settleTimeout": 2000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "hero_registration_form",
+        "description": "Navigate to hero registration form, fill fields, and test validation",
+        "tags": ["form", "registration", "scroll"],
+        "startRoute": "/hero",
+        "timeout": 45000,
+        "failurePolicy": "continueAll",
+        "dependsOn": ["navigate_hero_profile"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "tap",
+            "description": "Tap Register New Hero button",
+            "target": {"label": "Register New Hero"},
+            "waitAfter": 1500,
+            "expectations": {
+              "route": "/register",
+              "settleTimeout": 3000
+            }
+          },
+          {
+            "id": 2,
+            "action": "verify",
+            "description": "Verify registration form loaded",
+            "expectations": {
+              "elementsPresent": [
+                {"label": "Register Hero"},
+                {"label": "Hero Name", "type": "TextField"},
+                {"label": "Email", "type": "TextField"}
+              ],
+              "settleTimeout": 2000
+            }
+          },
+          {
+            "id": 3,
+            "action": "enterText",
+            "description": "Enter hero name",
+            "target": {"label": "Hero Name", "type": "TextField"},
+            "value": "Test Hero Alpha",
+            "waitAfter": 500
+          },
+          {
+            "id": 4,
+            "action": "enterText",
+            "description": "Enter email",
+            "target": {"label": "Email", "type": "TextField"},
+            "value": "hero@questboard.io",
+            "waitAfter": 500
+          },
+          {
+            "id": 5,
+            "action": "tap",
+            "description": "Select Builder class in registration",
+            "target": {"label": "Builder"},
+            "waitAfter": 500
+          },
+          {
+            "id": 6,
+            "action": "tap",
+            "description": "Tap Reset to clear the form",
+            "target": {"label": "Reset"},
+            "waitAfter": 1000
+          },
+          {
+            "id": 7,
+            "action": "back",
+            "description": "Navigate back to hero profile",
+            "waitAfter": 1000,
+            "expectations": {
+              "route": "/hero",
+              "settleTimeout": 2000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stratagem": {
+        "$schema": "titan://stratagem/v1",
+        "name": "sign_out_and_verify_redirect",
+        "description": "Sign out from the app and verify redirect to login screen",
+        "tags": ["critical-path", "auth", "sign-out"],
+        "startRoute": "/",
+        "timeout": 20000,
+        "failurePolicy": "abortOnFirst",
+        "dependsOn": ["auth_login_flow"],
+        "steps": [
+          {
+            "id": 1,
+            "action": "tap",
+            "description": "Tap Quests tab to go home first",
+            "target": {"label": "Quests"},
+            "waitAfter": 1000
+          },
+          {
+            "id": 2,
+            "action": "tap",
+            "description": "Tap Sign Out button in app bar",
+            "target": {"label": "Sign Out", "type": "IconButton"},
+            "waitAfter": 2000,
+            "expectations": {
+              "route": "/login",
+              "elementsPresent": [
+                {"label": "Enter the Questboard"}
+              ],
+              "settleTimeout": 5000
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

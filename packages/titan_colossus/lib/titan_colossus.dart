@@ -85,6 +85,9 @@ export 'src/discovery/terrain.dart';
 export 'src/colossus.dart';
 export 'src/colossus_plugin.dart';
 
+// Relay — HTTP bridge for AI-driven automation
+export 'src/relay.dart';
+
 // Integrations
 export 'src/integration/blueprint_lens_tab.dart';
 export 'src/integration/colossus_atlas_observer.dart';

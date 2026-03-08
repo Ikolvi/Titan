@@ -1,0 +1,1144 @@
+{
+  "version": "1.0.0",
+  "exportedAt": "2026-03-07T21:01:37.906791",
+  "terrain": {
+    "$schema": "titan://terrain/v1",
+    "lastUpdated": "2026-03-07T21:01:37.902389",
+    "sessionsAnalyzed": 5,
+    "stratagemExecutionsAnalyzed": 0,
+    "outposts": {
+      "/": {
+        "signet": {
+          "routePattern": "/",
+          "interactiveDescriptors": [],
+          "hash": "1a873501",
+          "identity": "screen:/"
+        },
+        "routePattern": "/",
+        "displayName": "Home (Quest List)",
+        "requiresAuth": false,
+        "tags": [],
+        "observationCount": 15,
+        "screenWidth": 0.0,
+        "screenHeight": 0.0,
+        "interactiveElements": [],
+        "displayElements": [],
+        "exits": [
+          {
+            "fromRoute": "/",
+            "toRoute": "/quest/:id",
+            "trigger": "tap",
+            "triggerElementLabel": "View Quest",
+            "observationCount": 12,
+            "averageDurationMs": 0
+          },
+          {
+            "fromRoute": "/",
+            "toRoute": "/settings",
+            "trigger": "tap",
+            "triggerElementLabel": "Settings",
+            "observationCount": 3,
+            "averageDurationMs": 0
+          },
+          {
+            "fromRoute": "/",
+            "toRoute": "/shade-demo",
+            "trigger": "tap",
+            "triggerElementLabel": "Shade Demo",
+            "observationCount": 5,
+            "averageDurationMs": 0
+          },
+          {
+            "fromRoute": "/",
+            "toRoute": "/enterprise",
+            "trigger": "tap",
+            "triggerElementLabel": "Enterprise",
+            "observationCount": 3,
+            "averageDurationMs": 0
+          },
+          {
+            "fromRoute": "/",
+            "toRoute": "/form-demo",
+            "trigger": "tap",
+            "triggerElementLabel": "Forms",
+            "observationCount": 2,
+            "averageDurationMs": 0
+          }
+        ],
+        "entrances": []
+      },
+      "/quest/:id": {
+        "signet": {
+          "routePattern": "/quest/:id",
+          "interactiveDescriptors": [],
+          "hash": "55b0b36",
+          "identity": "screen:/quest/:id"
+        },
+        "routePattern": "/quest/:id",
+        "displayName": "Quest Detail",
+        "requiresAuth": false,
+        "tags": [],
+        "observationCount": 12,
+        "screenWidth": 0.0,
+        "screenHeight": 0.0,
+        "interactiveElements": [],
+        "displayElements": [],
+        "exits": [
+          {
+            "fromRoute": "/quest/:id",
+            "toRoute": "/",
+            "trigger": "back",
+            "observationCount": 8,
+            "averageDurationMs": 0
+          },
+          {
+            "fromRoute": "/quest/:id",
+            "toRoute": "/quest/:id/edit",
+            "trigger": "tap",
+            "triggerElementLabel": "Edit",
+            "observationCount": 4,
+            "averageDurationMs": 0
+          }
+        ],
+        "entrances": []
+      },
+      "/quest/:id/edit": {
+        "signet": {
+          "routePattern": "/quest/:id/edit",
+          "interactiveDescriptors": [],
+          "hash": "13502d3e",
+          "identity": "screen:/quest/:id/edit"
+        },
+        "routePattern": "/quest/:id/edit",
+        "displayName": "Quest Edit",
+        "requiresAuth": false,
+        "tags": [],
+        "observationCount": 4,
+        "screenWidth": 0.0,
+        "screenHeight": 0.0,
+        "interactiveElements": [],
+        "displayElements": [],
+        "exits": [
+          {
+            "fromRoute": "/quest/:id/edit",
+            "toRoute": "/quest/:id",
+            "trigger": "back",
+            "observationCount": 3,
+            "averageDurationMs": 0
+          }
+        ],
+        "entrances": []
+      },
+      "/settings": {
+        "signet": {
+          "routePattern": "/settings",
+          "interactiveDescriptors": [],
+          "hash": "1f28f9f9",
+          "identity": "screen:/settings"
+        },
+        "routePattern": "/settings",
+        "displayName": "Settings",
+        "requiresAuth": false,
+        "tags": [],
+        "observationCount": 3,
+        "screenWidth": 0.0,
+        "screenHeight": 0.0,
+        "interactiveElements": [],
+        "displayElements": [],
+        "exits": [
+          {
+            "fromRoute": "/settings",
+            "toRoute": "/",
+            "trigger": "back",
+            "observationCount": 3,
+            "averageDurationMs": 0
+          }
+        ],
+        "entrances": []
+      },
+      "/shade-demo": {
+        "signet": {
+          "routePattern": "/shade-demo",
+          "interactiveDescriptors": [],
+          "hash": "32a279d4",
+          "identity": "screen:/shade-demo"
+        },
+        "routePattern": "/shade-demo",
+        "displayName": "Shade Demo",
+        "requiresAuth": false,
+        "tags": [],
+        "observationCount": 5,
+        "screenWidth": 0.0,
+        "screenHeight": 0.0,
+        "interactiveElements": [],
+        "displayElements": [],
+        "exits": [
+          {
+            "fromRoute": "/shade-demo",
+            "toRoute": "/",
+            "trigger": "back",
+            "observationCount": 4,
+            "averageDurationMs": 0
+          }
+        ],
+        "entrances": []
+      },
+      "/enterprise": {
+        "signet": {
+          "routePattern": "/enterprise",
+          "interactiveDescriptors": [],
+          "hash": "7a19d9a",
+          "identity": "screen:/enterprise"
+        },
+        "routePattern": "/enterprise",
+        "displayName": "Enterprise Demo",
+        "requiresAuth": false,
+        "tags": [],
+        "observationCount": 3,
+        "screenWidth": 0.0,
+        "screenHeight": 0.0,
+        "interactiveElements": [],
+        "displayElements": [],
+        "exits": [
+          {
+            "fromRoute": "/enterprise",
+            "toRoute": "/",
+            "trigger": "back",
+            "observationCount": 3,
+            "averageDurationMs": 0
+          }
+        ],
+        "entrances": []
+      },
+      "/form-demo": {
+        "signet": {
+          "routePattern": "/form-demo",
+          "interactiveDescriptors": [],
+          "hash": "2bbcd17f",
+          "identity": "screen:/form-demo"
+        },
+        "routePattern": "/form-demo",
+        "displayName": "Scroll & Form Demo",
+        "requiresAuth": false,
+        "tags": [],
+        "observationCount": 2,
+        "screenWidth": 0.0,
+        "screenHeight": 0.0,
+        "interactiveElements": [],
+        "displayElements": [],
+        "exits": [],
+        "entrances": []
+      }
+    }
+  },
+  "aiMap": "APP TERRAIN MAP\n===============\nScreens: 7 | Transitions: 11 | Sessions analyzed: 5\nAuth-protected: 0 | Public: 7\n\nSCREEN: Home (Quest List) (/)\nAUTH: not required\nOBSERVED: 15 times\nEXITS: → /quest/:id (tap \"View Quest\"), → /settings (tap \"Settings\"), → /shade-demo (tap \"Shade Demo\"), → /enterprise (tap \"Enterprise\"), → /form-demo (tap \"Forms\")\n\nSCREEN: Quest Detail (/quest/:id)\nAUTH: not required\nOBSERVED: 12 times\nEXITS: → / (back), → /quest/:id/edit (tap \"Edit\")\n\nSCREEN: Quest Edit (/quest/:id/edit)\nAUTH: not required\nOBSERVED: 4 times\nEXITS: → /quest/:id (back)\n\nSCREEN: Settings (/settings)\nAUTH: not required\nOBSERVED: 3 times\nEXITS: → / (back)\n\nSCREEN: Shade Demo (/shade-demo)\nAUTH: not required\nOBSERVED: 5 times\nEXITS: → / (back)\n\nSCREEN: Enterprise Demo (/enterprise)\nAUTH: not required\nOBSERVED: 3 times\nEXITS: → / (back)\n\nSCREEN: Scroll & Form Demo (/form-demo)\nAUTH: not required\nOBSERVED: 2 times\n\nDEAD ENDS: /form-demo",
+  "mermaid": "graph TD\n  n0[\"/<br>Home (Quest List)\"]\n  n1[\"/quest/:id<br>Quest Detail\"]\n  n2[\"/quest/:id/edit<br>Quest Edit\"]\n  n3[\"/settings<br>Settings\"]\n  n4[\"/shade-demo<br>Shade Demo\"]\n  n5[\"/enterprise<br>Enterprise Demo\"]\n  n6[\"/form-demo<br>Scroll & Form Demo\"]\n  n0 -->|tap \"View Quest\"| n1\n  n0 -->|tap \"Settings\"| n3\n  n0 -->|tap \"Shade Demo\"| n4\n  n0 -->|tap \"Enterprise\"| n5\n  n0 -->|tap \"Forms\"| n6\n  n1 -->|back| n0\n  n1 -->|tap \"Edit\"| n2\n  n2 -->|back| n1\n  n3 -->|back| n0\n  n4 -->|back| n0\n  n5 -->|back| n0",
+  "stratagems": [
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_bedrock_back__",
+      "description": "Press back from root screen Home (Quest List)",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "bedrock-back"
+      ],
+      "startRoute": "/",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "back",
+          "description": "Back from root"
+        },
+        {
+          "id": 2,
+          "action": "verify",
+          "description": "Verify app did not crash",
+          "expectations": {
+            "settleTimeout": 2000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_eternal_march__",
+      "description": "Circular navigation / ↔ /quest/:id (5 cycles)",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "circular"
+      ],
+      "startRoute": "/",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 1)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Back to / (cycle 1)",
+          "waitAfter": 200
+        },
+        {
+          "id": 3,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 2)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 4,
+          "action": "back",
+          "description": "Back to / (cycle 2)",
+          "waitAfter": 200
+        },
+        {
+          "id": 5,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 3)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 6,
+          "action": "back",
+          "description": "Back to / (cycle 3)",
+          "waitAfter": 200
+        },
+        {
+          "id": 7,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 4)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 8,
+          "action": "back",
+          "description": "Back to / (cycle 4)",
+          "waitAfter": 200
+        },
+        {
+          "id": 9,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 5)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 10,
+          "action": "back",
+          "description": "Back to / (cycle 5)",
+          "waitAfter": 200
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_forgotten_outpost__",
+      "description": "Navigate away from Home (Quest List) and back, verify state",
+      "tags": [
+        "gauntlet",
+        "state",
+        "stale-screen"
+      ],
+      "startRoute": "/",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate away to /quest/:id",
+          "waitAfter": 1000,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Navigate back",
+          "waitAfter": 1000
+        },
+        {
+          "id": 3,
+          "action": "verify",
+          "description": "Verify state persists after round-trip",
+          "expectations": {
+            "settleTimeout": 3000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_bedrock_back__quest__id",
+      "description": "Press back from root screen Quest Detail",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "bedrock-back"
+      ],
+      "startRoute": "/quest/:id",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "back",
+          "description": "Back from root"
+        },
+        {
+          "id": 2,
+          "action": "verify",
+          "description": "Verify app did not crash",
+          "expectations": {
+            "settleTimeout": 2000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_eternal_march__quest__id",
+      "description": "Circular navigation /quest/:id ↔ / (5 cycles)",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "circular"
+      ],
+      "startRoute": "/quest/:id",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 1)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Back to /quest/:id (cycle 1)",
+          "waitAfter": 200
+        },
+        {
+          "id": 3,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 2)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 4,
+          "action": "back",
+          "description": "Back to /quest/:id (cycle 2)",
+          "waitAfter": 200
+        },
+        {
+          "id": 5,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 3)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 6,
+          "action": "back",
+          "description": "Back to /quest/:id (cycle 3)",
+          "waitAfter": 200
+        },
+        {
+          "id": 7,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 4)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 8,
+          "action": "back",
+          "description": "Back to /quest/:id (cycle 4)",
+          "waitAfter": 200
+        },
+        {
+          "id": 9,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 5)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 10,
+          "action": "back",
+          "description": "Back to /quest/:id (cycle 5)",
+          "waitAfter": 200
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_forgotten_outpost__quest__id",
+      "description": "Navigate away from Quest Detail and back, verify state",
+      "tags": [
+        "gauntlet",
+        "state",
+        "stale-screen"
+      ],
+      "startRoute": "/quest/:id",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate away to /",
+          "waitAfter": 1000,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Navigate back",
+          "waitAfter": 1000
+        },
+        {
+          "id": 3,
+          "action": "verify",
+          "description": "Verify state persists after round-trip",
+          "expectations": {
+            "settleTimeout": 3000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_bedrock_back__quest__id_edit",
+      "description": "Press back from root screen Quest Edit",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "bedrock-back"
+      ],
+      "startRoute": "/quest/:id/edit",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "back",
+          "description": "Back from root"
+        },
+        {
+          "id": 2,
+          "action": "verify",
+          "description": "Verify app did not crash",
+          "expectations": {
+            "settleTimeout": 2000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_eternal_march__quest__id_edit",
+      "description": "Circular navigation /quest/:id/edit ↔ /quest/:id (5 cycles)",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "circular"
+      ],
+      "startRoute": "/quest/:id/edit",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 1)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Back to /quest/:id/edit (cycle 1)",
+          "waitAfter": 200
+        },
+        {
+          "id": 3,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 2)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 4,
+          "action": "back",
+          "description": "Back to /quest/:id/edit (cycle 2)",
+          "waitAfter": 200
+        },
+        {
+          "id": 5,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 3)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 6,
+          "action": "back",
+          "description": "Back to /quest/:id/edit (cycle 3)",
+          "waitAfter": 200
+        },
+        {
+          "id": 7,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 4)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 8,
+          "action": "back",
+          "description": "Back to /quest/:id/edit (cycle 4)",
+          "waitAfter": 200
+        },
+        {
+          "id": 9,
+          "action": "navigate",
+          "description": "Navigate to /quest/:id (cycle 5)",
+          "waitAfter": 200,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 10,
+          "action": "back",
+          "description": "Back to /quest/:id/edit (cycle 5)",
+          "waitAfter": 200
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_forgotten_outpost__quest__id_edit",
+      "description": "Navigate away from Quest Edit and back, verify state",
+      "tags": [
+        "gauntlet",
+        "state",
+        "stale-screen"
+      ],
+      "startRoute": "/quest/:id/edit",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate away to /quest/:id",
+          "waitAfter": 1000,
+          "navigateRoute": "/quest/:id"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Navigate back",
+          "waitAfter": 1000
+        },
+        {
+          "id": 3,
+          "action": "verify",
+          "description": "Verify state persists after round-trip",
+          "expectations": {
+            "settleTimeout": 3000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_bedrock_back__settings",
+      "description": "Press back from root screen Settings",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "bedrock-back"
+      ],
+      "startRoute": "/settings",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "back",
+          "description": "Back from root"
+        },
+        {
+          "id": 2,
+          "action": "verify",
+          "description": "Verify app did not crash",
+          "expectations": {
+            "settleTimeout": 2000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_eternal_march__settings",
+      "description": "Circular navigation /settings ↔ / (5 cycles)",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "circular"
+      ],
+      "startRoute": "/settings",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 1)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Back to /settings (cycle 1)",
+          "waitAfter": 200
+        },
+        {
+          "id": 3,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 2)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 4,
+          "action": "back",
+          "description": "Back to /settings (cycle 2)",
+          "waitAfter": 200
+        },
+        {
+          "id": 5,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 3)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 6,
+          "action": "back",
+          "description": "Back to /settings (cycle 3)",
+          "waitAfter": 200
+        },
+        {
+          "id": 7,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 4)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 8,
+          "action": "back",
+          "description": "Back to /settings (cycle 4)",
+          "waitAfter": 200
+        },
+        {
+          "id": 9,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 5)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 10,
+          "action": "back",
+          "description": "Back to /settings (cycle 5)",
+          "waitAfter": 200
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_forgotten_outpost__settings",
+      "description": "Navigate away from Settings and back, verify state",
+      "tags": [
+        "gauntlet",
+        "state",
+        "stale-screen"
+      ],
+      "startRoute": "/settings",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate away to /",
+          "waitAfter": 1000,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Navigate back",
+          "waitAfter": 1000
+        },
+        {
+          "id": 3,
+          "action": "verify",
+          "description": "Verify state persists after round-trip",
+          "expectations": {
+            "settleTimeout": 3000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_bedrock_back__shade_demo",
+      "description": "Press back from root screen Shade Demo",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "bedrock-back"
+      ],
+      "startRoute": "/shade-demo",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "back",
+          "description": "Back from root"
+        },
+        {
+          "id": 2,
+          "action": "verify",
+          "description": "Verify app did not crash",
+          "expectations": {
+            "settleTimeout": 2000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_eternal_march__shade_demo",
+      "description": "Circular navigation /shade-demo ↔ / (5 cycles)",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "circular"
+      ],
+      "startRoute": "/shade-demo",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 1)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Back to /shade-demo (cycle 1)",
+          "waitAfter": 200
+        },
+        {
+          "id": 3,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 2)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 4,
+          "action": "back",
+          "description": "Back to /shade-demo (cycle 2)",
+          "waitAfter": 200
+        },
+        {
+          "id": 5,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 3)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 6,
+          "action": "back",
+          "description": "Back to /shade-demo (cycle 3)",
+          "waitAfter": 200
+        },
+        {
+          "id": 7,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 4)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 8,
+          "action": "back",
+          "description": "Back to /shade-demo (cycle 4)",
+          "waitAfter": 200
+        },
+        {
+          "id": 9,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 5)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 10,
+          "action": "back",
+          "description": "Back to /shade-demo (cycle 5)",
+          "waitAfter": 200
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_forgotten_outpost__shade_demo",
+      "description": "Navigate away from Shade Demo and back, verify state",
+      "tags": [
+        "gauntlet",
+        "state",
+        "stale-screen"
+      ],
+      "startRoute": "/shade-demo",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate away to /",
+          "waitAfter": 1000,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Navigate back",
+          "waitAfter": 1000
+        },
+        {
+          "id": 3,
+          "action": "verify",
+          "description": "Verify state persists after round-trip",
+          "expectations": {
+            "settleTimeout": 3000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_bedrock_back__enterprise",
+      "description": "Press back from root screen Enterprise Demo",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "bedrock-back"
+      ],
+      "startRoute": "/enterprise",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "back",
+          "description": "Back from root"
+        },
+        {
+          "id": 2,
+          "action": "verify",
+          "description": "Verify app did not crash",
+          "expectations": {
+            "settleTimeout": 2000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_eternal_march__enterprise",
+      "description": "Circular navigation /enterprise ↔ / (5 cycles)",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "circular"
+      ],
+      "startRoute": "/enterprise",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 1)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Back to /enterprise (cycle 1)",
+          "waitAfter": 200
+        },
+        {
+          "id": 3,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 2)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 4,
+          "action": "back",
+          "description": "Back to /enterprise (cycle 2)",
+          "waitAfter": 200
+        },
+        {
+          "id": 5,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 3)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 6,
+          "action": "back",
+          "description": "Back to /enterprise (cycle 3)",
+          "waitAfter": 200
+        },
+        {
+          "id": 7,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 4)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 8,
+          "action": "back",
+          "description": "Back to /enterprise (cycle 4)",
+          "waitAfter": 200
+        },
+        {
+          "id": 9,
+          "action": "navigate",
+          "description": "Navigate to / (cycle 5)",
+          "waitAfter": 200,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 10,
+          "action": "back",
+          "description": "Back to /enterprise (cycle 5)",
+          "waitAfter": 200
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_forgotten_outpost__enterprise",
+      "description": "Navigate away from Enterprise Demo and back, verify state",
+      "tags": [
+        "gauntlet",
+        "state",
+        "stale-screen"
+      ],
+      "startRoute": "/enterprise",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "navigate",
+          "description": "Navigate away to /",
+          "waitAfter": 1000,
+          "navigateRoute": "/"
+        },
+        {
+          "id": 2,
+          "action": "back",
+          "description": "Navigate back",
+          "waitAfter": 1000
+        },
+        {
+          "id": 3,
+          "action": "verify",
+          "description": "Verify state persists after round-trip",
+          "expectations": {
+            "settleTimeout": 3000
+          }
+        }
+      ]
+    },
+    {
+      "$schema": "titan://stratagem/v1",
+      "name": "gauntlet_bedrock_back__form_demo",
+      "description": "Press back from root screen Scroll & Form Demo",
+      "tags": [
+        "gauntlet",
+        "navigation",
+        "bedrock-back"
+      ],
+      "startRoute": "/form-demo",
+      "timeout": 30000,
+      "failurePolicy": "continueAll",
+      "steps": [
+        {
+          "id": 1,
+          "action": "back",
+          "description": "Back from root"
+        },
+        {
+          "id": 2,
+          "action": "verify",
+          "description": "Verify app did not crash",
+          "expectations": {
+            "settleTimeout": 2000
+          }
+        }
+      ]
+    }
+  ],
+  "lineage": {
+    "patterns": [
+      "/quest/:id",
+      "/quest/:id/edit"
+    ],
+    "totalScreens": 7,
+    "totalTransitions": 11,
+    "sessionsAnalyzed": 5
+  },
+  "metadata": {
+    "appName": "Questboard",
+    "package": "titan_example",
+    "framework": "Titan + Atlas"
+  }
+}

@@ -70,19 +70,18 @@ class CampaignEntry {
 
   /// Serialize to JSON.
   Map<String, dynamic> toJson() => {
-        'stratagem': stratagem.toJson(),
-        'dependsOn': dependsOn,
-        if (skipIf != null) 'skipIf': skipIf,
-        if (testDataOverride != null) 'testDataOverride': testDataOverride,
-      };
+    'stratagem': stratagem.toJson(),
+    'dependsOn': dependsOn,
+    if (skipIf != null) 'skipIf': skipIf,
+    if (testDataOverride != null) 'testDataOverride': testDataOverride,
+  };
 
   /// Deserialize from JSON.
   factory CampaignEntry.fromJson(Map<String, dynamic> json) {
     return CampaignEntry(
-      stratagem: Stratagem.fromJson(
-        json['stratagem'] as Map<String, dynamic>,
-      ),
-      dependsOn: (json['dependsOn'] as List<dynamic>?)
+      stratagem: Stratagem.fromJson(json['stratagem'] as Map<String, dynamic>),
+      dependsOn:
+          (json['dependsOn'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
@@ -92,7 +91,8 @@ class CampaignEntry {
   }
 
   @override
-  String toString() => 'CampaignEntry(${stratagem.name}, '
+  String toString() =>
+      'CampaignEntry(${stratagem.name}, '
       'dependsOn: $dependsOn)';
 }
 
@@ -217,8 +217,9 @@ class CampaignResult {
     if (failures.isNotEmpty) {
       buf.writeln('failures:');
       for (final f in failures) {
-        final failedSteps =
-            f.value.steps.where((s) => s.status == VerdictStepStatus.failed);
+        final failedSteps = f.value.steps.where(
+          (s) => s.status == VerdictStepStatus.failed,
+        );
         buf.writeln('  - ${f.key}: ${failedSteps.length} steps failed');
         for (final step in failedSteps) {
           buf.writeln('    step ${step.stepId}: ${step.failure ?? "unknown"}');
@@ -231,27 +232,26 @@ class CampaignResult {
 
   /// Serialize to JSON.
   Map<String, dynamic> toJson() => {
-        'campaign': campaign.name,
-        'passRate': passRate,
-        'executedAt': executedAt.toIso8601String(),
-        'duration': duration.inMilliseconds,
-        'totalExecuted': totalExecuted,
-        'totalFailed': totalFailed,
-        'skipped': skipped,
-        'verdicts': verdicts.map(
-          (k, v) => MapEntry(k, v.toJson()),
-        ),
-        'prerequisiteVerdicts': prerequisiteVerdicts.map(
-          (k, v) => MapEntry(k, v.toJson()),
-        ),
-        if (gauntletVerdicts != null)
-          'gauntletVerdicts': gauntletVerdicts!.map(
-            (k, v) => MapEntry(k, v.toJson()),
-          ),
-      };
+    'campaign': campaign.name,
+    'passRate': passRate,
+    'executedAt': executedAt.toIso8601String(),
+    'duration': duration.inMilliseconds,
+    'totalExecuted': totalExecuted,
+    'totalFailed': totalFailed,
+    'skipped': skipped,
+    'verdicts': verdicts.map((k, v) => MapEntry(k, v.toJson())),
+    'prerequisiteVerdicts': prerequisiteVerdicts.map(
+      (k, v) => MapEntry(k, v.toJson()),
+    ),
+    if (gauntletVerdicts != null)
+      'gauntletVerdicts': gauntletVerdicts!.map(
+        (k, v) => MapEntry(k, v.toJson()),
+      ),
+  };
 
   @override
-  String toString() => 'CampaignResult(${campaign.name}, '
+  String toString() =>
+      'CampaignResult(${campaign.name}, '
       'passRate: ${(passRate * 100).toStringAsFixed(1)}%, '
       'executed: $totalExecuted, skipped: ${skipped.length})';
 }
@@ -269,7 +269,8 @@ class CampaignCycleException implements Exception {
   const CampaignCycleException(this.cycle);
 
   @override
-  String toString() => 'CampaignCycleException: '
+  String toString() =>
+      'CampaignCycleException: '
       'circular dependency detected: ${cycle.join(" → ")}';
 }
 
@@ -485,12 +486,14 @@ class Campaign {
       augmented.add(prereqEntry);
 
       // Augment the original entry to depend on its prerequisite
-      augmented.add(CampaignEntry(
-        stratagem: entry.stratagem,
-        dependsOn: [...entry.dependsOn, prereqName],
-        skipIf: entry.skipIf,
-        testDataOverride: entry.testDataOverride,
-      ));
+      augmented.add(
+        CampaignEntry(
+          stratagem: entry.stratagem,
+          dependsOn: [...entry.dependsOn, prereqName],
+          skipIf: entry.skipIf,
+          testDataOverride: entry.testDataOverride,
+        ),
+      );
 
       existingNames.add(prereqName);
     }
@@ -522,10 +525,9 @@ class Campaign {
       );
 
       for (final stratagem in edgeCases) {
-        gauntletEntries.add(CampaignEntry(
-          stratagem: stratagem,
-          dependsOn: const [],
-        ));
+        gauntletEntries.add(
+          CampaignEntry(stratagem: stratagem, dependsOn: const []),
+        );
       }
     }
 
@@ -590,8 +592,7 @@ class Campaign {
         }
 
         if (failurePolicy == CampaignFailurePolicy.skipDependents) {
-          final depsFailed =
-              entry.dependsOn.any((dep) => failed.contains(dep));
+          final depsFailed = entry.dependsOn.any((dep) => failed.contains(dep));
           if (depsFailed) {
             skipped.add(entry.name);
             continue;
@@ -653,8 +654,9 @@ class Campaign {
       verdicts: verdicts,
       skipped: skipped,
       prerequisiteVerdicts: prerequisiteVerdicts,
-      gauntletVerdicts:
-          gauntletVerdictMap.isNotEmpty ? gauntletVerdictMap : null,
+      gauntletVerdicts: gauntletVerdictMap.isNotEmpty
+          ? gauntletVerdictMap
+          : null,
       executedAt: executedAt,
       duration: stopwatch.elapsed,
     );
@@ -665,7 +667,8 @@ class Campaign {
   // -----------------------------------------------------------------------
 
   /// AI prompt template for generating Campaigns.
-  static String get templateDescription => '''
+  static String get templateDescription =>
+      '''
 Generate a Campaign JSON conforming to the titan://campaign/v1 schema.
 
 A Campaign is an ordered suite of Stratagems with dependency resolution.
@@ -683,22 +686,19 @@ Available actions: ${StratagemAction.values.map((a) => a.name).join(', ')}
 
   /// Template JSON for AI to fill out.
   static Map<String, dynamic> get template => {
-        r'$schema': 'titan://campaign/v1',
-        'name': '<campaign_name>',
-        'description': '<description>',
-        'tags': ['<tag1>', '<tag2>'],
-        'sharedTestData': {'heroName': '<test_hero_name>'},
-        'includeGauntlet': false,
-        'gauntletIntensity': 'standard',
-        'failurePolicy': 'skipDependents',
-        'timeout': 300000,
-        'entries': [
-          {
-            'stratagem': Stratagem.template,
-            'dependsOn': <String>[],
-          },
-        ],
-      };
+    r'$schema': 'titan://campaign/v1',
+    'name': '<campaign_name>',
+    'description': '<description>',
+    'tags': ['<tag1>', '<tag2>'],
+    'sharedTestData': {'heroName': '<test_hero_name>'},
+    'includeGauntlet': false,
+    'gauntletIntensity': 'standard',
+    'failurePolicy': 'skipDependents',
+    'timeout': 300000,
+    'entries': [
+      {'stratagem': Stratagem.template, 'dependsOn': <String>[]},
+    ],
+  };
 
   // -----------------------------------------------------------------------
   // Serialization
@@ -706,26 +706,25 @@ Available actions: ${StratagemAction.values.map((a) => a.name).join(', ')}
 
   /// Serialize to JSON.
   Map<String, dynamic> toJson() => {
-        r'$schema': 'titan://campaign/v1',
-        'name': name,
-        'description': description,
-        'tags': tags,
-        'entries': entries.map((e) => e.toJson()).toList(),
-        if (sharedTestData != null) 'sharedTestData': sharedTestData,
-        'includeGauntlet': includeGauntlet,
-        'gauntletIntensity': gauntletIntensity.name,
-        'failurePolicy': failurePolicy.name,
-        'timeout': timeout.inMilliseconds,
-      };
+    r'$schema': 'titan://campaign/v1',
+    'name': name,
+    'description': description,
+    'tags': tags,
+    'entries': entries.map((e) => e.toJson()).toList(),
+    if (sharedTestData != null) 'sharedTestData': sharedTestData,
+    'includeGauntlet': includeGauntlet,
+    'gauntletIntensity': gauntletIntensity.name,
+    'failurePolicy': failurePolicy.name,
+    'timeout': timeout.inMilliseconds,
+  };
 
   /// Deserialize from JSON.
   factory Campaign.fromJson(Map<String, dynamic> json) {
     return Campaign(
       name: json['name'] as String,
       description: json['description'] as String? ?? '',
-      tags: (json['tags'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
+      tags:
+          (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
           const [],
       entries: (json['entries'] as List<dynamic>)
           .map((e) => CampaignEntry.fromJson(e as Map<String, dynamic>))
@@ -740,14 +739,13 @@ Available actions: ${StratagemAction.values.map((a) => a.name).join(', ')}
         (v) => v.name == (json['failurePolicy'] as String? ?? 'skipDependents'),
         orElse: () => CampaignFailurePolicy.skipDependents,
       ),
-      timeout: Duration(
-        milliseconds: json['timeout'] as int? ?? 300000,
-      ),
+      timeout: Duration(milliseconds: json['timeout'] as int? ?? 300000),
     );
   }
 
   @override
-  String toString() => 'Campaign($name, '
+  String toString() =>
+      'Campaign($name, '
       '${entries.length} entries, '
       'gauntlet: $includeGauntlet)';
 }

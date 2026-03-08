@@ -1,0 +1,416 @@
+/// **Relay** — `dart:io` implementation for non-web platforms.
+///
+/// Provides a real HTTP server using `dart:io`'s [HttpServer].
+/// Supports Android, iOS, macOS, Windows, and Linux.
+library;
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/widgets.dart';
+import 'package:titan/titan.dart';
+
+import 'relay.dart';
+
+/// Platform implementation of Relay using `dart:io` [HttpServer].
+class RelayPlatform {
+  HttpServer? _server;
+  RelayConfig? _config;
+  RelayHandler? _handler;
+  Chronicle? _chronicle;
+  DateTime? _startedAt;
+  int _requestsHandled = 0;
+  int _campaignsExecuted = 0;
+
+  /// Current status of the Relay server.
+  RelayStatus get status => RelayStatus(
+    isRunning: _server != null,
+    port: _server?.port ?? _config?.port,
+    host: _config?.host,
+    requestsHandled: _requestsHandled,
+    campaignsExecuted: _campaignsExecuted,
+    startedAt: _startedAt,
+  );
+
+  /// Start the HTTP server.
+  Future<void> start({
+    required RelayConfig config,
+    required RelayHandler handler,
+  }) async {
+    if (_server != null) return; // Already running
+
+    _config = config;
+    _handler = handler;
+
+    if (config.enableLogging) {
+      _chronicle = Chronicle('Relay');
+    }
+
+    try {
+      _server = await HttpServer.bind(config.host, config.port);
+      _startedAt = DateTime.now();
+      _requestsHandled = 0;
+      _campaignsExecuted = 0;
+
+      _chronicle?.info('Relay started on ${config.host}:${config.port}');
+
+      if (config.authToken != null) {
+        _chronicle?.info('Auth token: ${config.authToken}');
+      }
+
+      // Process requests without blocking the caller
+      unawaited(_listen());
+    } on SocketException catch (e) {
+      _chronicle?.warning('Relay failed to bind: $e');
+      _server = null;
+      rethrow;
+    }
+  }
+
+  /// Stop the HTTP server.
+  Future<void> stop() async {
+    final server = _server;
+    if (server == null) return;
+
+    _chronicle?.info(
+      'Relay stopping (handled $_requestsHandled requests, '
+      '$_campaignsExecuted campaigns)',
+    );
+
+    await server.close();
+    _server = null;
+    _config = null;
+    _handler = null;
+    _chronicle = null;
+  }
+
+  // -----------------------------------------------------------------------
+  // Request loop
+  // -----------------------------------------------------------------------
+
+  Future<void> _listen() async {
+    final server = _server;
+    if (server == null) return;
+
+    await for (final request in server) {
+      // Don't block the request loop — process concurrently
+      unawaited(_handleRequest(request));
+    }
+  }
+
+  Future<void> _handleRequest(HttpRequest request) async {
+    _requestsHandled++;
+
+    try {
+      // CORS headers for web-based clients
+      _setCorsHeaders(request.response);
+
+      // Handle preflight
+      if (request.method == 'OPTIONS') {
+        request.response.statusCode = HttpStatus.noContent;
+        await request.response.close();
+        return;
+      }
+
+      final path = request.uri.path;
+      final method = request.method;
+
+      // Health check — no auth required
+      if (method == 'GET' && path == '/health') {
+        _sendJson(request.response, {
+          'status': 'ok',
+          'uptime': _startedAt != null
+              ? DateTime.now().difference(_startedAt!).inSeconds
+              : 0,
+        });
+        return;
+      }
+
+      // Auth check for all other endpoints
+      if (!_checkAuth(request)) {
+        _sendError(
+          request.response,
+          HttpStatus.unauthorized,
+          'Missing or invalid Authorization header. '
+          'Use: Authorization: Bearer <token>',
+        );
+        return;
+      }
+
+      // Route dispatch
+      switch ((method, path)) {
+        case ('GET', '/status'):
+          _sendJson(request.response, status.toJson());
+
+        case ('GET', '/terrain'):
+          await _handleGetTerrain(request);
+
+        case ('GET', '/blueprint'):
+          await _handleGetBlueprint(request);
+
+        case ('POST', '/campaign'):
+          await _handlePostCampaign(request);
+
+        case ('POST', '/debrief'):
+          await _handlePostDebrief(request);
+
+        case ('GET', '/debug/tree'):
+          await _handleDebugTree(request);
+
+        default:
+          _sendError(
+            request.response,
+            HttpStatus.notFound,
+            'Unknown endpoint: $method $path',
+          );
+      }
+    } catch (e, st) {
+      _chronicle?.warning('Request error: $e');
+      try {
+        _sendError(
+          request.response,
+          HttpStatus.internalServerError,
+          'Internal error: $e',
+          stackTrace: st.toString(),
+        );
+      } catch (_) {
+        // Response already closed — ignore
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Endpoint handlers
+  // -----------------------------------------------------------------------
+
+  Future<void> _handleGetTerrain(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getTerrain());
+  }
+
+  Future<void> _handleGetBlueprint(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    final blueprint = await handler.getBlueprint();
+    _sendJson(request.response, blueprint);
+  }
+
+  Future<void> _handlePostCampaign(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    final body = await _readJsonBody(request);
+    if (body == null) {
+      _sendError(
+        request.response,
+        HttpStatus.badRequest,
+        'Invalid JSON body. Expected a Campaign JSON object.',
+      );
+      return;
+    }
+
+    _chronicle?.info(
+      'Executing campaign: ${body['name'] ?? 'unnamed'} '
+      '(${(body['entries'] as List?)?.length ?? 0} entries)',
+    );
+
+    final timeout = _config?.requestTimeout ?? const Duration(minutes: 10);
+
+    try {
+      final result = await handler.executeCampaign(body).timeout(timeout);
+
+      _campaignsExecuted++;
+
+      _chronicle?.info('Campaign complete');
+
+      _sendJson(request.response, result);
+    } on TimeoutException {
+      _sendError(
+        request.response,
+        HttpStatus.gatewayTimeout,
+        'Campaign execution timed out after ${timeout.inMinutes} minutes',
+      );
+    }
+  }
+
+  Future<void> _handlePostDebrief(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    final body = await _readJsonBody(request);
+    if (body == null || body['verdicts'] is! List) {
+      _sendError(
+        request.response,
+        HttpStatus.badRequest,
+        'Invalid JSON body. Expected: {"verdicts": [...]}',
+      );
+      return;
+    }
+
+    final verdicts = (body['verdicts'] as List).cast<Map<String, dynamic>>();
+    final report = handler.debriefVerdicts(verdicts);
+    _sendJson(request.response, report);
+  }
+
+  // -----------------------------------------------------------------------
+  // Auth
+  // -----------------------------------------------------------------------
+
+  bool _checkAuth(HttpRequest request) {
+    final token = _config?.authToken;
+    if (token == null) return true; // No auth configured
+
+    final header = request.headers.value('authorization');
+    if (header == null) return false;
+
+    return header == 'Bearer $token';
+  }
+
+  // -----------------------------------------------------------------------
+  // Response helpers
+  // -----------------------------------------------------------------------
+
+  void _setCorsHeaders(HttpResponse response) {
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    response.headers.set(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization',
+    );
+    response.headers.set('Access-Control-Max-Age', '86400');
+  }
+
+  void _sendJson(HttpResponse response, Map<String, dynamic> data) {
+    response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(const JsonEncoder.withIndent('  ').convert(data));
+    response.close();
+  }
+
+  void _sendError(
+    HttpResponse response,
+    int statusCode,
+    String message, {
+    String? stackTrace,
+  }) {
+    final body = <String, dynamic>{'error': message, 'statusCode': statusCode};
+    if (stackTrace != null) {
+      body['stackTrace'] = stackTrace;
+    }
+
+    response
+      ..statusCode = statusCode
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode(body));
+    response.close();
+  }
+
+  Future<Map<String, dynamic>?> _readJsonBody(HttpRequest request) async {
+    try {
+      final body = await utf8.decoder.bind(request).join();
+      if (body.isEmpty) return null;
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Debug endpoint: walk the element tree and return stats.
+  ///
+  /// This is a diagnostic tool — not part of the public API.
+  Future<void> _handleDebugTree(HttpRequest request) async {
+    final rootElement = WidgetsBinding.instance.rootElement;
+    if (rootElement == null) {
+      _sendJson(request.response, {'error': 'No root element'});
+      return;
+    }
+
+    var totalElements = 0;
+    var maxDepthReached = 0;
+    final typeCounts = <String, int>{};
+    final depthSamples = <int, List<String>>{};
+
+    void walk(Element element, int depth) {
+      if (depth > 400) return; // Safety limit
+      totalElements++;
+      if (depth > maxDepthReached) maxDepthReached = depth;
+
+      final typeName = element.widget.runtimeType.toString();
+      typeCounts[typeName] = (typeCounts[typeName] ?? 0) + 1;
+
+      // Record widget types at milestone depths
+      if (depth % 20 == 0 || depth <= 5) {
+        depthSamples.putIfAbsent(depth, () => []);
+        if (depthSamples[depth]!.length < 5) {
+          depthSamples[depth]!.add(typeName);
+        }
+      }
+
+      element.visitChildren((child) => walk(child, depth + 1));
+    }
+
+    walk(rootElement, 0);
+
+    // Find key widget types
+    final hasText = typeCounts.containsKey('Text');
+    final hasTextField = typeCounts.containsKey('TextField');
+    final hasFilledButton = typeCounts.containsKey('FilledButton');
+    final buttonTypes = typeCounts.entries
+        .where((e) => e.key.contains('Button'))
+        .map((e) => '${e.key}: ${e.value}')
+        .toList();
+
+    _sendJson(request.response, {
+      'totalElements': totalElements,
+      'maxDepthReached': maxDepthReached,
+      'uniqueWidgetTypes': typeCounts.length,
+      'hasText': hasText,
+      'textCount': typeCounts['Text'] ?? 0,
+      'hasTextField': hasTextField,
+      'hasFilledButton': hasFilledButton,
+      'buttonTypes': buttonTypes,
+      'depthSamples': depthSamples.map((k, v) => MapEntry(k.toString(), v)),
+      'top20WidgetTypes':
+          (typeCounts.entries.toList()
+                ..sort((a, b) => b.value.compareTo(a.value)))
+              .take(20)
+              .map((e) => '${e.key}: ${e.value}')
+              .toList(),
+    });
+  }
+}

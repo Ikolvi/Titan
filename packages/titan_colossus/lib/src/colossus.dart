@@ -32,6 +32,7 @@ import 'discovery/lineage.dart';
 import 'discovery/scout.dart';
 import 'discovery/terrain.dart';
 import 'integration/colossus_atlas_observer.dart';
+import 'relay/relay.dart';
 import 'widgets/shade_text_controller.dart';
 
 // ---------------------------------------------------------------------------
@@ -170,6 +171,18 @@ class Colossus extends Pillar {
   ColossusLensTab? _lensTab;
   ShadeLensTab? _shadeLensTab;
   BlueprintLensTab? _blueprintLensTab;
+
+  /// The embedded HTTP server for AI-driven campaign execution.
+  ///
+  /// Relay bridges AI assistants (via MCP) to the running app,
+  /// enabling fully automated testing without human interaction.
+  /// Available on all platforms except web.
+  ///
+  /// ```dart
+  /// final relay = Colossus.instance.relay;
+  /// print(relay.status.isRunning); // true if started
+  /// ```
+  final Relay relay = Relay();
 
   /// Atlas observer auto-registered by [ColossusPlugin].
   ///
@@ -352,8 +365,22 @@ class Colossus extends Pillar {
   }
 
   /// Shut down the Colossus monitor and clean up all resources.
+  ///
+  /// Relay stop is initiated but not awaited — the server socket
+  /// is closed asynchronously. Use [shutdownAsync] if you need to
+  /// await full cleanup.
   static void shutdown() {
     if (_instance != null) {
+      Titan.remove<Colossus>();
+      _instance = null;
+    }
+  }
+
+  /// Shut down Colossus and await complete cleanup (including Relay).
+  static Future<void> shutdownAsync() async {
+    final instance = _instance;
+    if (instance != null) {
+      await instance.relay.stop();
       Titan.remove<Colossus>();
       _instance = null;
     }
@@ -435,6 +462,9 @@ class Colossus extends Pillar {
       _blueprintLensTab = null;
     }
 
+    // Stop Relay server
+    relay.stop();
+
     // Clean up auto-learn wiring
     if (_autoLearnSessions) {
       shade.onRecordingStopped = null;
@@ -446,6 +476,24 @@ class Colossus extends Pillar {
     _chronicle?.info('Colossus shut down');
     Spark.textControllerFactory = null;
     _instance = null;
+  }
+
+  // -----------------------------------------------------------------------
+  // Relay — AI Campaign Bridge
+  // -----------------------------------------------------------------------
+
+  /// Start the Relay HTTP server for AI-driven campaign execution.
+  ///
+  /// Once started, AI assistants can POST Campaign JSON to
+  /// `http://<host>:<port>/campaign` and receive results.
+  ///
+  /// ```dart
+  /// await Colossus.instance.startRelay(
+  ///   config: RelayConfig(port: 8642),
+  /// );
+  /// ```
+  Future<void> startRelay({RelayConfig config = const RelayConfig()}) async {
+    await relay.start(config: config, handler: _ColossusRelayHandler(this));
   }
 
   // -----------------------------------------------------------------------
@@ -896,10 +944,7 @@ class Colossus extends Pillar {
     final content = await file.readAsString();
     final json = jsonDecode(content) as Map<String, dynamic>;
     final stratagem = Stratagem.fromJson(json);
-    return executeStratagem(
-      stratagem,
-      captureScreenshots: captureScreenshots,
-    );
+    return executeStratagem(stratagem, captureScreenshots: captureScreenshots);
   }
 
   /// Execute all Stratagems in a directory.
@@ -926,13 +971,17 @@ class Colossus extends Pillar {
       throw ArgumentError('Stratagem directory not found: $directory');
     }
 
-    final files = dir
-        .listSync()
-        .whereType<File>()
-        .where((f) =>
-            f.path.endsWith('.stratagem.json') || f.path.endsWith('.json'))
-        .toList()
-      ..sort((a, b) => a.path.compareTo(b.path));
+    final files =
+        dir
+            .listSync()
+            .whereType<File>()
+            .where(
+              (f) =>
+                  f.path.endsWith('.stratagem.json') ||
+                  f.path.endsWith('.json'),
+            )
+            .toList()
+          ..sort((a, b) => a.path.compareTo(b.path));
 
     _chronicle?.info(
       'Running Stratagem suite: ${files.length} files in $directory',
@@ -997,10 +1046,7 @@ class Colossus extends Pillar {
   /// ```dart
   /// await Colossus.instance.saveVerdict(verdict, directory: '/tmp/verdicts');
   /// ```
-  Future<void> saveVerdict(
-    Verdict verdict, {
-    String? directory,
-  }) async {
+  Future<void> saveVerdict(Verdict verdict, {String? directory}) async {
     final dir = directory ?? 'verdicts';
     await verdict.saveToFile(dir);
     _chronicle?.info(
@@ -1018,10 +1064,7 @@ class Colossus extends Pillar {
   ///   directory: '/tmp/verdicts',
   /// );
   /// ```
-  Future<Verdict?> loadVerdict(
-    String name, {
-    String? directory,
-  }) async {
+  Future<Verdict?> loadVerdict(String name, {String? directory}) async {
     final dir = directory ?? 'verdicts';
     return Verdict.loadFromFile(name, directory: dir);
   }
@@ -1140,9 +1183,7 @@ class Colossus extends Pillar {
   }) {
     final outpost = terrain.outposts[routePattern];
     if (outpost == null) {
-      _chronicle?.warning(
-        'Gauntlet: no outpost found for "$routePattern"',
-      );
+      _chronicle?.warning('Gauntlet: no outpost found for "$routePattern"');
       return [];
     }
 
@@ -1185,10 +1226,7 @@ class Colossus extends Pillar {
       defaultStepTimeout: campaign.timeout,
     );
 
-    final result = await campaign.execute(
-      runner: runner,
-      terrain: terrain,
-    );
+    final result = await campaign.execute(runner: runner, terrain: terrain);
 
     _chronicle?.info(
       'Campaign ${campaign.name} complete: '
@@ -1212,10 +1250,7 @@ class Colossus extends Pillar {
     bool captureScreenshots = false,
   }) {
     final campaign = Campaign.fromJson(json);
-    return executeCampaign(
-      campaign,
-      captureScreenshots: captureScreenshots,
-    );
+    return executeCampaign(campaign, captureScreenshots: captureScreenshots);
   }
 
   /// Analyze verdicts and produce a [DebriefReport].
@@ -1230,10 +1265,7 @@ class Colossus extends Pillar {
   DebriefReport debrief(List<Verdict> verdicts) {
     _chronicle?.info('Debriefing ${verdicts.length} verdicts');
 
-    final report = Debrief(
-      verdicts: verdicts,
-      terrain: terrain,
-    ).analyze();
+    final report = Debrief(verdicts: verdicts, terrain: terrain).analyze();
 
     _chronicle?.info(
       'Debrief complete: ${report.passedVerdicts}/${report.totalVerdicts} '
@@ -1264,22 +1296,23 @@ class Colossus extends Pillar {
       'terrainMap': terrain.toAiMap(),
       'terrainMermaid': terrain.toMermaid(),
       'campaignTemplate': Campaign.templateDescription,
-      'gauntletCatalog':
-          Gauntlet.catalog.map((p) => p.toJson()).toList(),
-      'discoveredScreens':
-          terrain.outposts.values.map((o) => o.toAiSummary()).toList(),
-      'authProtectedRoutes':
-          terrain.authProtectedScreens.map((o) => o.routePattern).toList(),
-      'publicRoutes':
-          terrain.publicScreens.map((o) => o.routePattern).toList(),
-      'deadEnds':
-          terrain.deadEnds.map((o) => o.routePattern).toList(),
+      'gauntletCatalog': Gauntlet.catalog.map((p) => p.toJson()).toList(),
+      'discoveredScreens': terrain.outposts.values
+          .map((o) => o.toAiSummary())
+          .toList(),
+      'authProtectedRoutes': terrain.authProtectedScreens
+          .map((o) => o.routePattern)
+          .toList(),
+      'publicRoutes': terrain.publicScreens.map((o) => o.routePattern).toList(),
+      'deadEnds': terrain.deadEnds.map((o) => o.routePattern).toList(),
       'unreliableTransitions': terrain.unreliableMarches
-          .map((m) => {
-                'from': m.fromRoute,
-                'to': m.toRoute,
-                'observations': m.observationCount,
-              })
+          .map(
+            (m) => {
+              'from': m.fromRoute,
+              'to': m.toRoute,
+              'observations': m.observationCount,
+            },
+          )
           .toList(),
     };
   }
@@ -1315,4 +1348,66 @@ class VesselConfig {
     this.leakThreshold = const Duration(minutes: 5),
     this.exemptTypes = const {},
   });
+}
+
+// ---------------------------------------------------------------------------
+// _ColossusRelayHandler — Bridges Relay HTTP to Colossus
+// ---------------------------------------------------------------------------
+
+/// Implements [RelayHandler] by delegating to the [Colossus] instance.
+///
+/// This decouples Relay's HTTP layer from Colossus internals.
+/// All method calls are dispatched on the main isolate (same
+/// event loop as Flutter's UI), which is required for
+/// `StratagemRunner` to synthesize pointer events.
+class _ColossusRelayHandler implements RelayHandler {
+  final Colossus _colossus;
+
+  _ColossusRelayHandler(this._colossus);
+
+  @override
+  Future<Map<String, dynamic>> executeCampaign(
+    Map<String, dynamic> json,
+  ) async {
+    final result = await _colossus.executeCampaignJson(json);
+    return {
+      'campaign': result.campaign.name,
+      'passRate': result.passRate,
+      'totalExecuted': result.totalExecuted,
+      'totalFailed': result.totalFailed,
+      'totalSkipped': result.skipped.length,
+      'report': result.toReport(),
+      'aiDiagnostic': result.toAiDiagnostic(),
+      'verdicts': result.verdicts.entries
+          .map(
+            (e) => {
+              'stratagem': e.key,
+              'passed': e.value.passed,
+              'summary': e.value.summary.toJson(),
+            },
+          )
+          .toList(),
+    };
+  }
+
+  @override
+  Map<String, dynamic> getTerrain() => _colossus.terrain.toJson();
+
+  @override
+  Future<Map<String, dynamic>> getBlueprint() => _colossus.getAiBlueprint();
+
+  @override
+  Map<String, dynamic> debriefVerdicts(List<Map<String, dynamic>> verdicts) {
+    final parsedVerdicts = verdicts.map((v) => Verdict.fromJson(v)).toList();
+
+    final report = _colossus.debrief(parsedVerdicts);
+    return {
+      'totalVerdicts': report.totalVerdicts,
+      'passedVerdicts': report.passedVerdicts,
+      'failedVerdicts': report.failedVerdicts,
+      'insights': report.insights.map((i) => i.toJson()).toList(),
+      'suggestedNextActions': report.suggestedNextActions,
+      'aiSummary': report.toAiSummary(),
+    };
+  }
 }

@@ -134,10 +134,9 @@ void main() {
       });
 
       test('creates with provided outposts', () {
-        final terrain = Terrain(outposts: {
-          '/a': createOutpost('/a'),
-          '/b': createOutpost('/b'),
-        });
+        final terrain = Terrain(
+          outposts: {'/a': createOutpost('/a'), '/b': createOutpost('/b')},
+        );
         expect(terrain.screenCount, 2);
       });
     });
@@ -175,10 +174,7 @@ void main() {
         final terrain = buildLinearTerrain();
         final reachable = terrain.reachableFrom('/b');
         expect(reachable, hasLength(2));
-        expect(
-          reachable.map((o) => o.routePattern),
-          containsAll(['/b', '/c']),
-        );
+        expect(reachable.map((o) => o.routePattern), containsAll(['/b', '/c']));
       });
 
       test('returns only self for dead end', () {
@@ -275,20 +271,24 @@ void main() {
 
     group('graph queries', () {
       test('authProtectedScreens', () {
-        final terrain = Terrain(outposts: {
-          '/public': createOutpost('/public'),
-          '/protected': createOutpost('/protected', requiresAuth: true),
-          '/admin': createOutpost('/admin', requiresAuth: true),
-        });
+        final terrain = Terrain(
+          outposts: {
+            '/public': createOutpost('/public'),
+            '/protected': createOutpost('/protected', requiresAuth: true),
+            '/admin': createOutpost('/admin', requiresAuth: true),
+          },
+        );
 
         expect(terrain.authProtectedScreens, hasLength(2));
       });
 
       test('publicScreens', () {
-        final terrain = Terrain(outposts: {
-          '/public': createOutpost('/public'),
-          '/protected': createOutpost('/protected', requiresAuth: true),
-        });
+        final terrain = Terrain(
+          outposts: {
+            '/public': createOutpost('/public'),
+            '/protected': createOutpost('/protected', requiresAuth: true),
+          },
+        );
 
         expect(terrain.publicScreens, hasLength(1));
         expect(terrain.publicScreens.first.routePattern, '/public');
@@ -311,18 +311,22 @@ void main() {
       test('unreliableMarches returns transitions with < 2 observations', () {
         final terrain = Terrain();
         final a = createOutpost('/a');
-        a.exits.add(March(
-          fromRoute: '/a',
-          toRoute: '/b',
-          trigger: MarchTrigger.tap,
-          observationCount: 1,
-        ));
-        a.exits.add(March(
-          fromRoute: '/a',
-          toRoute: '/c',
-          trigger: MarchTrigger.tap,
-          observationCount: 5,
-        ));
+        a.exits.add(
+          March(
+            fromRoute: '/a',
+            toRoute: '/b',
+            trigger: MarchTrigger.tap,
+            observationCount: 1,
+          ),
+        );
+        a.exits.add(
+          March(
+            fromRoute: '/a',
+            toRoute: '/c',
+            trigger: MarchTrigger.tap,
+            observationCount: 5,
+          ),
+        );
 
         terrain.outposts['/a'] = a;
         terrain.outposts['/b'] = createOutpost('/b');
@@ -360,12 +364,14 @@ void main() {
       test('includes unreliable transitions', () {
         final terrain = Terrain();
         final a = createOutpost('/a');
-        a.exits.add(March(
-          fromRoute: '/a',
-          toRoute: '/b',
-          trigger: MarchTrigger.tap,
-          observationCount: 1,
-        ));
+        a.exits.add(
+          March(
+            fromRoute: '/a',
+            toRoute: '/b',
+            trigger: MarchTrigger.tap,
+            observationCount: 1,
+          ),
+        );
         terrain.outposts['/a'] = a;
         terrain.outposts['/b'] = createOutpost('/b');
 
@@ -383,16 +389,20 @@ void main() {
       });
 
       test('marks auth-protected screens', () {
-        final terrain = Terrain(outposts: {
-          '/login': createOutpost('/login'),
-          '/dashboard': createOutpost('/dashboard', requiresAuth: true),
-        });
+        final terrain = Terrain(
+          outposts: {
+            '/login': createOutpost('/login'),
+            '/dashboard': createOutpost('/dashboard', requiresAuth: true),
+          },
+        );
         final a = terrain.outposts['/login']!;
-        a.exits.add(March(
-          fromRoute: '/login',
-          toRoute: '/dashboard',
-          trigger: MarchTrigger.formSubmit,
-        ));
+        a.exits.add(
+          March(
+            fromRoute: '/login',
+            toRoute: '/dashboard',
+            trigger: MarchTrigger.formSubmit,
+          ),
+        );
 
         final mermaid = terrain.toMermaid();
         expect(mermaid, contains('🔒'));
@@ -401,12 +411,14 @@ void main() {
       test('includes edge labels', () {
         final terrain = Terrain();
         final a = createOutpost('/a');
-        a.exits.add(March(
-          fromRoute: '/a',
-          toRoute: '/b',
-          trigger: MarchTrigger.tap,
-          triggerElementLabel: 'Next',
-        ));
+        a.exits.add(
+          March(
+            fromRoute: '/a',
+            toRoute: '/b',
+            trigger: MarchTrigger.tap,
+            triggerElementLabel: 'Next',
+          ),
+        );
         terrain.outposts['/a'] = a;
         terrain.outposts['/b'] = createOutpost('/b');
 
@@ -557,8 +569,10 @@ void main() {
 
         // Same keys
         expect(compactParsed.keys.toSet(), prettyJson.keys.toSet());
-        expect(compactParsed['sessionsAnalyzed'],
-            prettyJson['sessionsAnalyzed']);
+        expect(
+          compactParsed['sessionsAnalyzed'],
+          prettyJson['sessionsAnalyzed'],
+        );
       });
 
       test('does not contain indentation', () {

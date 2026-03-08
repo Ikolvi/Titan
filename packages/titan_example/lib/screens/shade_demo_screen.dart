@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +27,11 @@ class _ShadeDemoScreenState extends State<ShadeDemoScreen> {
   _ShadeStatus _status = _ShadeStatus.idle;
   int _replayProgress = 0;
   int _replayTotal = 0;
+  // Blueprint state
+  String? _blueprintStatus;
+  int _terrainScreens = 0;
+  int _terrainTransitions = 0;
+  int _stratagemCount = 0;
   // ShadeTextControllers for text input tracking
   late final ShadeTextController _sessionNameController;
   late final ShadeTextController _heroNameController;
@@ -117,6 +123,10 @@ class _ShadeDemoScreenState extends State<ShadeDemoScreen> {
               _buildResultsCard(theme, colors),
               const SizedBox(height: 16),
             ],
+
+            // --- AI Blueprint ---
+            _buildBlueprintCard(theme, colors),
+            const SizedBox(height: 16),
 
             // --- Interaction Playground ---
             _buildPlayground(theme, colors),
@@ -573,6 +583,319 @@ class _ShadeDemoScreenState extends State<ShadeDemoScreen> {
           ),
         ),
       );
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // AI Blueprint — Scout, Terrain, Gauntlet, BlueprintExport
+  // -----------------------------------------------------------------------
+
+  Widget _buildBlueprintCard(ThemeData theme, ColorScheme colors) {
+    final terrain = Colossus.isActive ? Colossus.instance.terrain : null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.map_outlined, color: colors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'AI Blueprint',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'The Scout maps the Terrain. The Gauntlet generates '
+              'edge-case test plans. Export to feed AI assistants.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.outline,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Terrain stats
+            if (terrain != null) ...[
+              _InfoRow(
+                label: 'Screens discovered',
+                value: '${terrain.screenCount}',
+                icon: Icons.screen_search_desktop_outlined,
+              ),
+              _InfoRow(
+                label: 'Transitions',
+                value: '${terrain.transitionCount}',
+                icon: Icons.swap_horiz,
+              ),
+              _InfoRow(
+                label: 'Sessions analyzed',
+                value: '${terrain.sessionsAnalyzed}',
+                icon: Icons.analytics_outlined,
+              ),
+              _InfoRow(
+                label: 'Dead ends',
+                value: '${terrain.deadEnds.length}',
+                icon: Icons.dangerous_outlined,
+              ),
+              _InfoRow(
+                label: 'Unreliable marches',
+                value: '${terrain.unreliableMarches.length}',
+                icon: Icons.warning_amber,
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Blueprint status
+            if (_blueprintStatus != null) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _blueprintStatus!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Action buttons
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                // Analyze current session
+                if (_lastSession != null)
+                  FilledButton.tonal(
+                    onPressed: _analyzeSession,
+                    child: const Text('Analyze Session'),
+                  ),
+
+                // Generate Stratagems
+                if (terrain != null && terrain.screenCount > 0)
+                  FilledButton.tonal(
+                    onPressed: _generateStratagems,
+                    child: const Text('Generate Stratagems'),
+                  ),
+
+                // Export Blueprint (pretty JSON)
+                if (terrain != null && terrain.screenCount > 0)
+                  FilledButton.icon(
+                    icon: const Icon(Icons.save_alt),
+                    label: const Text('Export Blueprint'),
+                    onPressed: _exportBlueprint,
+                  ),
+
+                // Export Blueprint (compact JSON)
+                if (terrain != null && terrain.screenCount > 0)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.compress),
+                    label: const Text('Export Compact'),
+                    onPressed: _exportBlueprintCompact,
+                  ),
+
+                // Copy AI Prompt
+                if (terrain != null && terrain.screenCount > 0)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.content_copy),
+                    label: const Text('Copy AI Prompt'),
+                    onPressed: _copyAiPrompt,
+                  ),
+
+                // View Terrain Map
+                if (terrain != null && terrain.screenCount > 0)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.article_outlined),
+                    label: const Text('View Terrain Map'),
+                    onPressed: () => _showTerrainMap(context),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _analyzeSession() {
+    final session = _lastSession;
+    if (session == null) return;
+
+    if (!Colossus.isActive) return;
+
+    Scout.instance.analyzeSession(session);
+    final terrain = Colossus.instance.terrain;
+
+    setState(() {
+      _terrainScreens = terrain.screenCount;
+      _terrainTransitions = terrain.transitionCount;
+      _blueprintStatus =
+          'Session analyzed → ${'$_terrainScreens'} screens, '
+          '$_terrainTransitions transitions discovered';
+    });
+  }
+
+  void _generateStratagems() {
+    if (!Colossus.isActive) return;
+
+    final terrain = Colossus.instance.terrain;
+    final stratagems = <Stratagem>[];
+    for (final outpost in terrain.outposts.values) {
+      stratagems.addAll(Gauntlet.generateFor(outpost));
+    }
+
+    setState(() {
+      _stratagemCount = stratagems.length;
+      _blueprintStatus =
+          'Generated $_stratagemCount edge-case Stratagems '
+          'for $_terrainScreens screens';
+    });
+  }
+
+  Future<void> _exportBlueprint() async {
+    if (!Colossus.isActive) return;
+
+    try {
+      final export = BlueprintExport.fromScout(scout: Scout.instance);
+      final result = await BlueprintExportIO.saveAll(
+        export,
+        directory: _getOutputDir(),
+      );
+
+      if (mounted) {
+        setState(() {
+          _blueprintStatus =
+              'Blueprint exported!\n'
+              '  JSON: ${result.json}\n'
+              '  Prompt: ${result.prompt}\n'
+              '  Size: ${(export.toJsonString().length / 1024).toStringAsFixed(1)} KB';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Blueprint saved to ${result.json}',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _blueprintStatus = 'Export failed: $e');
+      }
+    }
+  }
+
+  Future<void> _exportBlueprintCompact() async {
+    if (!Colossus.isActive) return;
+
+    try {
+      final export = BlueprintExport.fromScout(scout: Scout.instance);
+      final path = await BlueprintExportIO.save(
+        export,
+        directory: _getOutputDir(),
+        compact: true,
+      );
+      final compactSize = export.toCompactJsonString().length;
+      final prettySize = export.toJsonString().length;
+
+      if (mounted) {
+        setState(() {
+          _blueprintStatus =
+              'Compact export saved!\n'
+              '  Path: $path\n'
+              '  Compact: ${(compactSize / 1024).toStringAsFixed(1)} KB\n'
+              '  Pretty:  ${(prettySize / 1024).toStringAsFixed(1)} KB\n'
+              '  Savings: ${((1 - compactSize / prettySize) * 100).toStringAsFixed(0)}%';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _blueprintStatus = 'Export failed: $e');
+      }
+    }
+  }
+
+  void _copyAiPrompt() {
+    if (!Colossus.isActive) return;
+
+    final export = BlueprintExport.fromScout(scout: Scout.instance);
+    final prompt = export.toAiPrompt();
+    Clipboard.setData(ClipboardData(text: prompt));
+
+    if (mounted) {
+      setState(() {
+        _blueprintStatus =
+            'AI prompt copied to clipboard '
+            '(${prompt.length} chars, '
+            '${prompt.split('\n').length} lines)';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('AI prompt copied to clipboard'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _showTerrainMap(BuildContext context) {
+    if (!Colossus.isActive) return;
+
+    final terrain = Colossus.instance.terrain;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Terrain Map'),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            terrain.toAiMap(),
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: terrain.toAiMap()));
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Terrain map copied'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: const Text('Copy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getOutputDir() {
+    try {
+      return '${Directory.systemTemp.path}/questboard_blueprint';
+    } catch (_) {
+      return '';
     }
   }
 

@@ -89,10 +89,12 @@ void main() {
       steps: steps,
       summary: VerdictSummary(
         totalSteps: steps.length,
-        passedSteps:
-            steps.where((s) => s.status == VerdictStepStatus.passed).length,
-        failedSteps:
-            steps.where((s) => s.status == VerdictStepStatus.failed).length,
+        passedSteps: steps
+            .where((s) => s.status == VerdictStepStatus.passed)
+            .length,
+        failedSteps: steps
+            .where((s) => s.status == VerdictStepStatus.failed)
+            .length,
         skippedSteps: 0,
         successRate: passed ? 1.0 : 0.0,
         duration: const Duration(seconds: 1),
@@ -198,8 +200,10 @@ void main() {
       final terrain = buildSampleTerrain();
       final outpost = terrain.outposts['/home'];
       if (outpost != null) {
-        final quick =
-            Gauntlet.generateFor(outpost, intensity: GauntletIntensity.quick);
+        final quick = Gauntlet.generateFor(
+          outpost,
+          intensity: GauntletIntensity.quick,
+        );
         final thorough = Gauntlet.generateFor(
           outpost,
           intensity: GauntletIntensity.thorough,
@@ -284,18 +288,22 @@ void main() {
 
       final debrief = Debrief(
         verdicts: [
-          makeVerdict('test', passed: false, steps: [
-            VerdictStep(
-              stepId: 1,
-              description: 'find button',
-              status: VerdictStepStatus.failed,
-              duration: const Duration(milliseconds: 500),
-              failure: const VerdictFailure(
-                type: VerdictFailureType.targetNotFound,
-                message: 'Login button not found',
+          makeVerdict(
+            'test',
+            passed: false,
+            steps: [
+              VerdictStep(
+                stepId: 1,
+                description: 'find button',
+                status: VerdictStepStatus.failed,
+                duration: const Duration(milliseconds: 500),
+                failure: const VerdictFailure(
+                  type: VerdictFailureType.targetNotFound,
+                  message: 'Login button not found',
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ],
         terrain: terrain,
         scout: scout,
@@ -396,14 +404,8 @@ void main() {
         terrain.publicScreens.map((o) => o.routePattern).toList(),
         isEmpty,
       );
-      expect(
-        terrain.deadEnds.map((o) => o.routePattern).toList(),
-        isEmpty,
-      );
-      expect(
-        terrain.unreliableMarches.toList(),
-        isEmpty,
-      );
+      expect(terrain.deadEnds.map((o) => o.routePattern).toList(), isEmpty);
+      expect(terrain.unreliableMarches.toList(), isEmpty);
     });
   });
 
@@ -471,18 +473,22 @@ void main() {
     test('debrief with failures produces insights', () {
       Colossus.init(enableLensTab: false);
       final report = Colossus.instance.debrief([
-        makeVerdict('test', passed: false, steps: [
-          VerdictStep(
-            stepId: 1,
-            description: 'find button',
-            status: VerdictStepStatus.failed,
-            duration: const Duration(milliseconds: 500),
-            failure: const VerdictFailure(
-              type: VerdictFailureType.targetNotFound,
-              message: 'Not found',
+        makeVerdict(
+          'test',
+          passed: false,
+          steps: [
+            VerdictStep(
+              stepId: 1,
+              description: 'find button',
+              status: VerdictStepStatus.failed,
+              duration: const Duration(milliseconds: 500),
+              failure: const VerdictFailure(
+                type: VerdictFailureType.targetNotFound,
+                message: 'Not found',
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ]);
 
       expect(report.failedVerdicts, 1);

@@ -60,7 +60,8 @@ void main() {
   }
 
   /// Build a linear graph: a → b → c → ...
-  Terrain buildLinearGraph(List<String> routes, {
+  Terrain buildLinearGraph(
+    List<String> routes, {
     List<MarchTrigger>? triggers,
     List<bool>? authFlags,
     List<List<String>>? tagSets,
@@ -75,8 +76,9 @@ void main() {
             ? authFlags[i]
             : false,
         tags: tagSets != null && i < tagSets.length ? tagSets[i] : null,
-        interactive:
-            elements != null && i < elements.length ? elements[i] : null,
+        interactive: elements != null && i < elements.length
+            ? elements[i]
+            : null,
       );
     }
 
@@ -125,11 +127,7 @@ void main() {
     test('defaults for optional fields', () {
       final prereq = StratagemPrerequisite(
         description: 'Navigate',
-        stratagem: const Stratagem(
-          name: 'nav',
-          startRoute: '/',
-          steps: [],
-        ),
+        stratagem: const Stratagem(name: 'nav', startRoute: '/', steps: []),
       );
 
       expect(prereq.isAuthGate, false);
@@ -208,10 +206,7 @@ void main() {
     group('resolve', () {
       test('empty lineage for entry-point target', () {
         final terrain = buildLinearGraph(['/home', '/settings']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
 
         expect(lineage.targetRoute, '/home');
         expect(lineage.prerequisites, isEmpty);
@@ -224,10 +219,7 @@ void main() {
 
       test('empty lineage for unreachable route', () {
         final terrain = buildLinearGraph(['/a', '/b']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/unknown',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/unknown');
 
         expect(lineage.prerequisites, isEmpty);
         expect(lineage.path, isEmpty);
@@ -235,10 +227,7 @@ void main() {
 
       test('single-hop prerequisite', () {
         final terrain = buildLinearGraph(['/login', '/home']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
 
         expect(lineage.prerequisites, hasLength(1));
         expect(lineage.path, hasLength(1));
@@ -248,13 +237,13 @@ void main() {
       });
 
       test('multi-hop prerequisite chain', () {
-        final terrain = buildLinearGraph(
-          ['/login', '/', '/quest/list', '/quest/42'],
-        );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/quest/42',
-        );
+        final terrain = buildLinearGraph([
+          '/login',
+          '/',
+          '/quest/list',
+          '/quest/42',
+        ]);
+        final lineage = Lineage.resolve(terrain, targetRoute: '/quest/42');
 
         expect(lineage.prerequisites, hasLength(3));
         expect(lineage.path, hasLength(3));
@@ -271,12 +260,11 @@ void main() {
         final terrain = buildLinearGraph(
           ['/login', '/home'],
           triggers: [MarchTrigger.formSubmit],
-          tagSets: [['auth']],
+          tagSets: [
+            ['auth'],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
 
         expect(lineage.requiresAuth, true);
         expect(lineage.prerequisites.first.isAuthGate, true);
@@ -287,10 +275,7 @@ void main() {
           ['/home', '/login'],
           triggers: [MarchTrigger.redirect],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/login',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/login');
 
         expect(lineage.prerequisites.first.isAuthGate, true);
       });
@@ -314,10 +299,7 @@ void main() {
             ],
           ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
 
         expect(lineage.requiresAuth, true);
         expect(lineage.prerequisites.first.isAuthGate, true);
@@ -327,12 +309,11 @@ void main() {
         final terrain = buildLinearGraph(
           ['/register', '/welcome'],
           triggers: [MarchTrigger.formSubmit],
-          tagSets: [['form']],
+          tagSets: [
+            ['form'],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/welcome',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/welcome');
 
         expect(lineage.prerequisites.first.isFormGate, true);
       });
@@ -341,12 +322,11 @@ void main() {
         final terrain = buildLinearGraph(
           ['/profile', '/saved'],
           triggers: [MarchTrigger.tap],
-          tagSets: [['form']],
+          tagSets: [
+            ['form'],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/saved',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/saved');
 
         expect(lineage.prerequisites.first.isFormGate, true);
       });
@@ -375,23 +355,15 @@ void main() {
         outposts['/target']!.entrances.addAll([aToDirect, cToTarget]);
 
         final terrain = createTerrain(outposts);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/target',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/target');
 
         expect(lineage.path, hasLength(1));
         expect(lineage.prerequisites, hasLength(1));
       });
 
       test('handles single-node terrain (target is the only node)', () {
-        final terrain = createTerrain({
-          '/only': createOutpost(route: '/only'),
-        });
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/only',
-        );
+        final terrain = createTerrain({'/only': createOutpost(route: '/only')});
+        final lineage = Lineage.resolve(terrain, targetRoute: '/only');
 
         expect(lineage.prerequisites, isEmpty);
         expect(lineage.path, isEmpty);
@@ -399,20 +371,14 @@ void main() {
 
       test('handles route not in terrain at all', () {
         final terrain = buildLinearGraph(['/a', '/b']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/z',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/z');
 
         expect(lineage.isEmpty, true);
       });
 
       test('target same as entry point returns empty', () {
         final terrain = buildLinearGraph(['/root']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/root',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/root');
 
         expect(lineage.isEmpty, true);
       });
@@ -425,10 +391,7 @@ void main() {
     group('properties', () {
       test('requiresAuth false when no auth gates', () {
         final terrain = buildLinearGraph(['/a', '/b', '/c']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/c',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/c');
 
         expect(lineage.requiresAuth, false);
       });
@@ -437,12 +400,12 @@ void main() {
         final terrain = buildLinearGraph(
           ['/login', '/home', '/settings'],
           triggers: [MarchTrigger.formSubmit, MarchTrigger.tap],
-          tagSets: [['auth'], []],
+          tagSets: [
+            ['auth'],
+            [],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/settings',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/settings');
 
         expect(lineage.requiresAuth, true);
       });
@@ -455,25 +418,21 @@ void main() {
             MarchTrigger.tap,
             MarchTrigger.tap,
           ],
-          tagSets: [['form'], [], []],
+          tagSets: [
+            ['form'],
+            [],
+            [],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/d',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/d');
 
         expect(lineage.prerequisites, hasLength(3));
         expect(lineage.estimatedSetupTime.inMilliseconds, greaterThan(0));
       });
 
       test('hopCount matches path length', () {
-        final terrain = buildLinearGraph(
-          ['/a', '/b', '/c', '/d', '/e'],
-        );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/e',
-        );
+        final terrain = buildLinearGraph(['/a', '/b', '/c', '/d', '/e']);
+        final lineage = Lineage.resolve(terrain, targetRoute: '/e');
 
         expect(lineage.hopCount, 4);
         expect(lineage.path.length, lineage.hopCount);
@@ -487,10 +446,7 @@ void main() {
     group('toSetupStratagem', () {
       test('generates empty Stratagem for empty lineage', () {
         final terrain = buildLinearGraph(['/home']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
         final setup = lineage.toSetupStratagem();
 
         expect(setup.steps, isEmpty);
@@ -500,13 +456,8 @@ void main() {
       });
 
       test('chains all prerequisite steps', () {
-        final terrain = buildLinearGraph(
-          ['/a', '/b', '/c'],
-        );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/c',
-        );
+        final terrain = buildLinearGraph(['/a', '/b', '/c']);
+        final lineage = Lineage.resolve(terrain, targetRoute: '/c');
         final setup = lineage.toSetupStratagem();
 
         expect(setup.steps.length, greaterThanOrEqualTo(2));
@@ -519,10 +470,7 @@ void main() {
 
       test('prefixes step descriptions with [Setup]', () {
         final terrain = buildLinearGraph(['/a', '/b']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final setup = lineage.toSetupStratagem();
 
         for (final step in setup.steps) {
@@ -532,10 +480,7 @@ void main() {
 
       test('forwards testData', () {
         final terrain = buildLinearGraph(['/a', '/b']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final testData = {'heroName': 'Thorin'};
         final setup = lineage.toSetupStratagem(testData: testData);
 
@@ -544,10 +489,7 @@ void main() {
 
       test('uses abortOnFirst failure policy', () {
         final terrain = buildLinearGraph(['/a', '/b']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final setup = lineage.toSetupStratagem();
 
         expect(setup.failurePolicy, StratagemFailurePolicy.abortOnFirst);
@@ -557,7 +499,9 @@ void main() {
         final terrain = buildLinearGraph(
           ['/login', '/home'],
           triggers: [MarchTrigger.formSubmit],
-          tagSets: [['auth', 'form']],
+          tagSets: [
+            ['auth', 'form'],
+          ],
           elements: [
             [
               OutpostElement(
@@ -573,10 +517,7 @@ void main() {
             ],
           ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
         final setup = lineage.toSetupStratagem();
 
         // Should have enterText + tap steps
@@ -593,10 +534,7 @@ void main() {
           ['/detail', '/list'],
           triggers: [MarchTrigger.back],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/list',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/list');
         final setup = lineage.toSetupStratagem();
 
         final backStep = setup.steps.firstWhere(
@@ -610,10 +548,7 @@ void main() {
           ['/a', '/b'],
           triggers: [MarchTrigger.programmatic],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final setup = lineage.toSetupStratagem();
 
         final navStep = setup.steps.firstWhere(
@@ -627,10 +562,7 @@ void main() {
           ['/page1', '/page2'],
           triggers: [MarchTrigger.swipe],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/page2',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/page2');
         final setup = lineage.toSetupStratagem();
 
         final swipeStep = setup.steps.firstWhere(
@@ -647,10 +579,7 @@ void main() {
     group('toAiSummary', () {
       test('includes target route', () {
         final terrain = buildLinearGraph(['/a', '/b']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
 
         expect(lineage.toAiSummary(), contains('/b'));
       });
@@ -659,12 +588,11 @@ void main() {
         final terrain = buildLinearGraph(
           ['/login', '/home'],
           triggers: [MarchTrigger.formSubmit],
-          tagSets: [['auth']],
+          tagSets: [
+            ['auth'],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
         final summary = lineage.toAiSummary();
 
         expect(summary, contains('AUTH REQUIRED: true'));
@@ -672,10 +600,7 @@ void main() {
 
       test('lists prerequisites', () {
         final terrain = buildLinearGraph(['/a', '/b', '/c']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/c',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/c');
         final summary = lineage.toAiSummary();
 
         expect(summary, contains('PREREQUISITES (2)'));
@@ -683,10 +608,7 @@ void main() {
 
       test('includes path description', () {
         final terrain = buildLinearGraph(['/a', '/b', '/c']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/c',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/c');
         final summary = lineage.toAiSummary();
 
         expect(summary, contains('/a'));
@@ -696,10 +618,7 @@ void main() {
 
       test('empty path not printed', () {
         final terrain = buildLinearGraph(['/home']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
         final summary = lineage.toAiSummary();
 
         expect(summary, isNot(contains('PATH:')));
@@ -713,10 +632,7 @@ void main() {
     group('serialization', () {
       test('toJson includes schema', () {
         final terrain = buildLinearGraph(['/a', '/b']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final json = lineage.toJson();
 
         expect(json[r'$schema'], 'titan://lineage/v1');
@@ -726,12 +642,12 @@ void main() {
         final terrain = buildLinearGraph(
           ['/login', '/home', '/settings'],
           triggers: [MarchTrigger.formSubmit, MarchTrigger.tap],
-          tagSets: [['auth'], []],
+          tagSets: [
+            ['auth'],
+            [],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/settings',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/settings');
 
         final json = lineage.toJson();
         final restored = Lineage.fromJson(json);
@@ -739,18 +655,12 @@ void main() {
         expect(restored.targetRoute, lineage.targetRoute);
         expect(restored.requiresAuth, lineage.requiresAuth);
         expect(restored.path.length, lineage.path.length);
-        expect(
-          restored.prerequisites.length,
-          lineage.prerequisites.length,
-        );
+        expect(restored.prerequisites.length, lineage.prerequisites.length);
       });
 
       test('toJson includes all path entries', () {
         final terrain = buildLinearGraph(['/a', '/b', '/c']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/c',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/c');
         final json = lineage.toJson();
 
         final pathEntries = json['path'] as List;
@@ -763,10 +673,7 @@ void main() {
 
       test('toJson includes hop count', () {
         final terrain = buildLinearGraph(['/a', '/b', '/c']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/c',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/c');
 
         expect(lineage.toJson()['hopCount'], 2);
       });
@@ -817,10 +724,7 @@ void main() {
         outposts['/b']!.entrances.addAll([aToB, selfLoop]);
 
         final terrain = createTerrain(outposts);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
 
         expect(lineage.path, hasLength(1));
       });
@@ -848,10 +752,7 @@ void main() {
         outposts['/end']!.entrances.addAll([lToE, rToE]);
 
         final terrain = createTerrain(outposts);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/end',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/end');
 
         // Either path is length 2
         expect(lineage.path, hasLength(2));
@@ -878,10 +779,7 @@ void main() {
         outposts['/target']!.entrances.addAll([aToT, cToT]);
 
         final terrain = createTerrain(outposts);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/target',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/target');
 
         expect(lineage.path, hasLength(1));
         expect(lineage.path.first.fromRoute, '/a');
@@ -890,10 +788,7 @@ void main() {
       test('deep chain produces correct order', () {
         final routes = ['/1', '/2', '/3', '/4', '/5', '/6'];
         final terrain = buildLinearGraph(routes);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/6',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/6');
 
         expect(lineage.prerequisites, hasLength(5));
         expect(lineage.path, hasLength(5));
@@ -909,12 +804,11 @@ void main() {
         final terrain = buildLinearGraph(
           ['/login', '/home'],
           triggers: [MarchTrigger.formSubmit],
-          tagSets: [['auth', 'form']],
+          tagSets: [
+            ['auth', 'form'],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
 
         expect(lineage.prerequisites.first.isAuthGate, true);
         expect(lineage.prerequisites.first.isFormGate, true);
@@ -924,12 +818,12 @@ void main() {
         final terrain = buildLinearGraph(
           ['/login', '/', '/register'],
           triggers: [MarchTrigger.formSubmit, MarchTrigger.tap],
-          tagSets: [['auth'], []],
+          tagSets: [
+            ['auth'],
+            [],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/register',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/register');
 
         expect(lineage.prerequisites[0].isAuthGate, true);
         expect(lineage.prerequisites[1].isAuthGate, false);
@@ -951,10 +845,7 @@ void main() {
         outposts['/b']!.entrances.add(march);
 
         final terrain = createTerrain(outposts);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final setup = lineage.toSetupStratagem();
 
         final tapStep = setup.steps.firstWhere(
@@ -969,10 +860,7 @@ void main() {
           ['/splash', '/deep'],
           triggers: [MarchTrigger.deepLink],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/deep',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/deep');
         final setup = lineage.toSetupStratagem();
 
         expect(
@@ -986,10 +874,7 @@ void main() {
           ['/a', '/b'],
           triggers: [MarchTrigger.unknown],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final setup = lineage.toSetupStratagem();
 
         expect(
@@ -1006,10 +891,7 @@ void main() {
     group('toString', () {
       test('includes target route and counts', () {
         final terrain = buildLinearGraph(['/a', '/b', '/c']);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/c',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/c');
 
         final str = lineage.toString();
         expect(str, contains('/c'));
@@ -1027,7 +909,9 @@ void main() {
         final terrain = buildLinearGraph(
           ['/form', '/done'],
           triggers: [MarchTrigger.formSubmit],
-          tagSets: [['form']],
+          tagSets: [
+            ['form'],
+          ],
           elements: [
             [
               OutpostElement(
@@ -1043,10 +927,7 @@ void main() {
             ],
           ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/done',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/done');
         final setup = lineage.toSetupStratagem();
 
         final textSteps = setup.steps
@@ -1058,13 +939,8 @@ void main() {
       });
 
       test('each step in setup has unique sequential ID', () {
-        final terrain = buildLinearGraph(
-          ['/a', '/b', '/c', '/d'],
-        );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/d',
-        );
+        final terrain = buildLinearGraph(['/a', '/b', '/c', '/d']);
+        final lineage = Lineage.resolve(terrain, targetRoute: '/d');
         final setup = lineage.toSetupStratagem();
 
         final ids = setup.steps.map((s) => s.id).toList();
@@ -1088,16 +964,13 @@ void main() {
         outposts['/b']!.entrances.add(march);
 
         final terrain = createTerrain(outposts);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final setup = lineage.toSetupStratagem();
 
         expect(
-          setup.steps.any((s) =>
-              s.action == StratagemAction.tap &&
-              s.target?.label == 'Next'),
+          setup.steps.any(
+            (s) => s.action == StratagemAction.tap && s.target?.label == 'Next',
+          ),
           true,
         );
       });
@@ -1107,10 +980,7 @@ void main() {
           ['/a', '/b'],
           triggers: [MarchTrigger.tap],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final setup = lineage.toSetupStratagem();
 
         final tapStep = setup.steps.firstWhere(
@@ -1124,10 +994,7 @@ void main() {
           ['/a', '/b'],
           triggers: [MarchTrigger.programmatic],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
         final setup = lineage.toSetupStratagem();
 
         final navStep = setup.steps.firstWhere(
@@ -1142,19 +1009,12 @@ void main() {
           '/a': createOutpost(route: '/a'),
           '/b': createOutpost(route: '/b'),
         };
-        final march = createMarch(
-          from: '/a',
-          to: '/b',
-          durationMs: 5000,
-        );
+        final march = createMarch(from: '/a', to: '/b', durationMs: 5000);
         outposts['/a']!.exits.add(march);
         outposts['/b']!.entrances.add(march);
 
         final terrain = createTerrain(outposts);
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/b',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/b');
 
         expect(
           lineage.prerequisites.first.estimatedDuration.inMilliseconds,
@@ -1166,12 +1026,11 @@ void main() {
         final terrain = buildLinearGraph(
           ['/form', '/done'],
           triggers: [MarchTrigger.formSubmit],
-          tagSets: [['form']],
+          tagSets: [
+            ['form'],
+          ],
         );
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/done',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/done');
 
         expect(
           lineage.prerequisites.first.estimatedDuration.inMilliseconds,
@@ -1193,7 +1052,11 @@ void main() {
             MarchTrigger.tap,
             MarchTrigger.tap,
           ],
-          tagSets: [['auth', 'form'], [], []],
+          tagSets: [
+            ['auth', 'form'],
+            [],
+            [],
+          ],
           elements: [
             [
               OutpostElement(
@@ -1215,10 +1078,7 @@ void main() {
           ],
         );
 
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/report',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/report');
 
         expect(lineage.requiresAuth, true);
         expect(lineage.prerequisites, hasLength(3));
@@ -1235,10 +1095,7 @@ void main() {
           setup.steps.where((s) => s.action == StratagemAction.enterText),
           hasLength(2),
         );
-        expect(
-          setup.steps.any((s) => s.action == StratagemAction.tap),
-          true,
-        );
+        expect(setup.steps.any((s) => s.action == StratagemAction.tap), true);
       });
 
       test('public route has no auth prerequisites', () {
@@ -1247,23 +1104,19 @@ void main() {
           triggers: [MarchTrigger.tap],
         );
 
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/features',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/features');
 
         expect(lineage.requiresAuth, false);
-        expect(
-          lineage.prerequisites.every((p) => !p.isAuthGate),
-          true,
-        );
+        expect(lineage.prerequisites.every((p) => !p.isAuthGate), true);
       });
 
       test('toSetupStratagem round-trip through JSON', () {
         final terrain = buildLinearGraph(
           ['/login', '/home'],
           triggers: [MarchTrigger.formSubmit],
-          tagSets: [['auth', 'form']],
+          tagSets: [
+            ['auth', 'form'],
+          ],
           elements: [
             [
               OutpostElement(
@@ -1275,10 +1128,7 @@ void main() {
           ],
         );
 
-        final lineage = Lineage.resolve(
-          terrain,
-          targetRoute: '/home',
-        );
+        final lineage = Lineage.resolve(terrain, targetRoute: '/home');
 
         final setup = lineage.toSetupStratagem();
         final json = setup.toJson();

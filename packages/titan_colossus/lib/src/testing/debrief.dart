@@ -80,12 +80,12 @@ class DebriefInsight {
 
   /// Serialize to JSON.
   Map<String, dynamic> toJson() => {
-        'type': type.name,
-        'message': message,
-        'suggestion': suggestion,
-        'actionable': actionable,
-        if (fixSuggestion != null) 'fixSuggestion': fixSuggestion,
-      };
+    'type': type.name,
+    'message': message,
+    'suggestion': suggestion,
+    'actionable': actionable,
+    if (fixSuggestion != null) 'fixSuggestion': fixSuggestion,
+  };
 
   /// Deserialize from JSON.
   factory DebriefInsight.fromJson(Map<String, dynamic> json) {
@@ -194,14 +194,14 @@ class DebriefReport {
 
   /// Serialize to JSON.
   Map<String, dynamic> toJson() => {
-        'totalVerdicts': totalVerdicts,
-        'passedVerdicts': passedVerdicts,
-        'failedVerdicts': failedVerdicts,
-        'passRate': passRate,
-        'insights': insights.map((i) => i.toJson()).toList(),
-        'terrainUpdates': terrainUpdates,
-        'suggestedNextActions': suggestedNextActions,
-      };
+    'totalVerdicts': totalVerdicts,
+    'passedVerdicts': passedVerdicts,
+    'failedVerdicts': failedVerdicts,
+    'passRate': passRate,
+    'insights': insights.map((i) => i.toJson()).toList(),
+    'terrainUpdates': terrainUpdates,
+    'suggestedNextActions': suggestedNextActions,
+  };
 
   /// Deserialize from JSON.
   factory DebriefReport.fromJson(
@@ -214,7 +214,8 @@ class DebriefReport {
           .map((e) => DebriefInsight.fromJson(e as Map<String, dynamic>))
           .toList(),
       terrainUpdates: json['terrainUpdates'] as String? ?? '',
-      suggestedNextActions: (json['suggestedNextActions'] as List<dynamic>?)
+      suggestedNextActions:
+          (json['suggestedNextActions'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
@@ -222,7 +223,8 @@ class DebriefReport {
   }
 
   @override
-  String toString() => 'DebriefReport('
+  String toString() =>
+      'DebriefReport('
       '$totalVerdicts verdicts, '
       '${insights.length} insights, '
       'pass rate: ${(passRate * 100).toStringAsFixed(1)}%)';
@@ -260,11 +262,8 @@ class Debrief {
   /// Creates a [Debrief].
   ///
   /// Provide a [scout] for testing; otherwise uses [Scout.instance].
-  Debrief({
-    required this.verdicts,
-    required this.terrain,
-    Scout? scout,
-  }) : _scout = scout;
+  Debrief({required this.verdicts, required this.terrain, Scout? scout})
+    : _scout = scout;
 
   /// Perform the full debrief analysis.
   ///
@@ -328,9 +327,7 @@ class Debrief {
         if (step.tableau != null) {
           for (final glyph in step.tableau!.glyphs) {
             if (glyph.isInteractive) {
-              visibleElements.add(
-                glyph.label ?? glyph.widgetType,
-              );
+              visibleElements.add(glyph.label ?? glyph.widgetType);
             }
           }
         }
@@ -361,7 +358,8 @@ class Debrief {
       case VerdictFailureType.timeout:
         return DebriefInsight(
           type: InsightType.performanceIssue,
-          message: 'Step ${step.stepId} timed out '
+          message:
+              'Step ${step.stepId} timed out '
               '(${step.duration.inMilliseconds}ms)',
           suggestion: 'Increase timeout or add explicit wait step',
           actionable: true,
@@ -372,8 +370,7 @@ class Debrief {
       case VerdictFailureType.wrongState:
         return DebriefInsight(
           type: InsightType.stateCorruption,
-          message:
-              'Step ${step.stepId}: element in unexpected state',
+          message: 'Step ${step.stepId}: element in unexpected state',
           suggestion: failure.message,
           actionable: false,
         );
@@ -400,8 +397,9 @@ class Debrief {
   /// Detect cross-step patterns that indicate systemic issues.
   List<DebriefInsight> _detectPatterns(Verdict verdict) {
     final insights = <DebriefInsight>[];
-    final failedSteps =
-        verdict.steps.where((s) => s.status == VerdictStepStatus.failed);
+    final failedSteps = verdict.steps.where(
+      (s) => s.status == VerdictStepStatus.failed,
+    );
 
     if (failedSteps.isEmpty) return insights;
 
@@ -409,17 +407,18 @@ class Debrief {
     // First failed step has wrongRoute → likely auth/navigation issue
     final firstFailed = failedSteps.first;
     if (firstFailed.failure?.type == VerdictFailureType.wrongRoute) {
-      insights.add(DebriefInsight(
-        type: InsightType.missingPrerequisite,
-        message:
-            'First failure is a route mismatch in "${verdict.stratagemName}" '
-            '— subsequent failures may be cascading',
-        suggestion:
-            'Add prerequisite setup before this Stratagem',
-        actionable: true,
-        fixSuggestion:
-            'Use Lineage.resolve() to inject navigation prerequisites',
-      ));
+      insights.add(
+        DebriefInsight(
+          type: InsightType.missingPrerequisite,
+          message:
+              'First failure is a route mismatch in "${verdict.stratagemName}" '
+              '— subsequent failures may be cascading',
+          suggestion: 'Add prerequisite setup before this Stratagem',
+          actionable: true,
+          fixSuggestion:
+              'Use Lineage.resolve() to inject navigation prerequisites',
+        ),
+      );
     }
 
     // Pattern 2: Wrong screen
@@ -428,16 +427,17 @@ class Debrief {
         .where((s) => s.failure?.type == VerdictFailureType.targetNotFound)
         .length;
     if (notFoundCount >= 3) {
-      insights.add(DebriefInsight(
-        type: InsightType.wrongScreen,
-        message:
-            '$notFoundCount elements not found in "${verdict.stratagemName}" '
-            '— possibly on the wrong screen',
-        suggestion: 'Verify startRoute matches the expected screen',
-        actionable: true,
-        fixSuggestion:
-            'Check Scout.terrain for the correct route pattern',
-      ));
+      insights.add(
+        DebriefInsight(
+          type: InsightType.wrongScreen,
+          message:
+              '$notFoundCount elements not found in "${verdict.stratagemName}" '
+              '— possibly on the wrong screen',
+          suggestion: 'Verify startRoute matches the expected screen',
+          actionable: true,
+          fixSuggestion: 'Check Scout.terrain for the correct route pattern',
+        ),
+      );
     }
 
     return insights;
@@ -448,10 +448,7 @@ class Debrief {
   // -----------------------------------------------------------------------
 
   /// Summarize what changed in the Terrain.
-  String _summarizeTerrainUpdates(
-    int screensBefore,
-    int marchesBefore,
-  ) {
+  String _summarizeTerrainUpdates(int screensBefore, int marchesBefore) {
     final screensAfter = terrain.outposts.length;
     final marchesAfter = terrain.marches.length;
     final newScreens = screensAfter - screensBefore;
@@ -478,25 +475,19 @@ class Debrief {
   /// Generate suggested next actions from insights.
   List<String> _suggestNextActions(List<DebriefInsight> insights) {
     if (insights.isEmpty) {
-      return [
-        'EXPAND: All tests passed — consider adding Gauntlet edge cases',
-      ];
+      return ['EXPAND: All tests passed — consider adding Gauntlet edge cases'];
     }
 
     final actions = <String>[];
     final types = insights.map((i) => i.type).toSet();
 
     if (types.contains(InsightType.missingPrerequisite)) {
-      actions.add(
-        'RESOLVE: Add missing prerequisites (likely authentication)',
-      );
+      actions.add('RESOLVE: Add missing prerequisites (likely authentication)');
     }
 
     if (types.contains(InsightType.elementNotFound) ||
         types.contains(InsightType.wrongScreen)) {
-      actions.add(
-        'UPDATE: Refresh element targets using getAiContext()',
-      );
+      actions.add('UPDATE: Refresh element targets using getAiContext()');
     }
 
     if (types.contains(InsightType.performanceIssue)) {
@@ -512,9 +503,7 @@ class Debrief {
     }
 
     if (types.contains(InsightType.general)) {
-      actions.add(
-        'REVIEW: General failures require manual investigation',
-      );
+      actions.add('REVIEW: General failures require manual investigation');
     }
 
     return actions;

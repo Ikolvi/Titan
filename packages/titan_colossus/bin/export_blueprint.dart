@@ -75,10 +75,7 @@ Future<void> main(List<String> args) async {
     sessions: sessions,
     routePatterns: patterns,
     intensity: intensity,
-    metadata: {
-      'tool': 'export_blueprint',
-      'sessionsDir': sessionsDir,
-    },
+    metadata: {'tool': 'export_blueprint', 'sessionsDir': sessionsDir},
   );
   stdout.writeln('done');
 
@@ -132,9 +129,7 @@ void _printUsage() {
   );
   stdout.writeln();
   stdout.writeln('Usage:');
-  stdout.writeln(
-    '  dart run titan_colossus:export_blueprint [options]',
-  );
+  stdout.writeln('  dart run titan_colossus:export_blueprint [options]');
   stdout.writeln();
   stdout.writeln('Options:');
   stdout.writeln(

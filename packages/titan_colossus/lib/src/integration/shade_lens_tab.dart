@@ -432,9 +432,7 @@ class _ShadeLensPillar extends Pillar {
 
   /// Copy Stratagem template to clipboard.
   Future<void> copyStratagemTemplate() async {
-    final text = const JsonEncoder.withIndent('  ').convert(
-      Stratagem.template,
-    );
+    final text = const JsonEncoder.withIndent('  ').convert(Stratagem.template);
     await Clipboard.setData(ClipboardData(text: text));
     status.value = 'Stratagem template copied';
   }
@@ -523,6 +521,8 @@ class _ShadeTabContent extends StatelessWidget {
       pillars: [() => _ShadeLensPillar(colossus)],
       child: Vestige<_ShadeLensPillar>(
         builder: (context, p) => ListView(
+          key: const PageStorageKey('shade_lens_list'),
+          physics: const ClampingScrollPhysics(),
           padding: const EdgeInsets.all(8),
           children: [
             _buildRecordingSection(p),
@@ -1524,25 +1524,20 @@ Widget _buildStratagemSection(_ShadeLensPillar p) {
     decoration: BoxDecoration(
       color: Colors.deepPurple.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(8),
-      border: Border.all(
-        color: Colors.deepPurple.withValues(alpha: 0.3),
-      ),
+      border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.3)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Header
         InkWell(
-          onTap: () =>
-              p.showStratagem.value = !p.showStratagem.value,
+          onTap: () => p.showStratagem.value = !p.showStratagem.value,
           child: Padding(
             padding: const EdgeInsets.all(8),
             child: Row(
               children: [
                 Icon(
-                  p.showStratagem.value
-                      ? Icons.expand_less
-                      : Icons.expand_more,
+                  p.showStratagem.value ? Icons.expand_less : Icons.expand_more,
                   size: 14,
                   color: Colors.deepPurple.shade200,
                 ),
@@ -1644,6 +1639,7 @@ Widget _buildStratagemSection(_ShadeLensPillar p) {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: TextField(
               maxLines: 5,
+              scrollPhysics: const NeverScrollableScrollPhysics(),
               style: const TextStyle(
                 fontSize: 9,
                 color: Colors.white70,

@@ -72,9 +72,7 @@ class Scout {
   /// Route parameterizer for detecting patterns like `/quest/:id`.
   final RouteParameterizer parameterizer;
 
-  Scout._()
-      : terrain = Terrain(),
-        parameterizer = RouteParameterizer();
+  Scout._() : terrain = Terrain(), parameterizer = RouteParameterizer();
 
   /// Create a Scout with an existing Terrain (for testing/restoration).
   Scout.withTerrain(this.terrain) : parameterizer = RouteParameterizer();
@@ -114,11 +112,7 @@ class Scout {
         final currRoute = tableau.route;
 
         if (prevRoute != null && currRoute != null && prevRoute != currRoute) {
-          final trigger = _inferTrigger(
-            session.imprints,
-            prev,
-            tableau,
-          );
+          final trigger = _inferTrigger(session.imprints, prev, tableau);
           final triggerGlyph = _findTriggerGlyph(
             session.imprints,
             prev,
@@ -168,9 +162,7 @@ class Scout {
         final prevRoute = prevStep.tableau?.route;
         final currRoute = step.tableau?.route;
 
-        if (prevRoute != null &&
-            currRoute != null &&
-            prevRoute != currRoute) {
+        if (prevRoute != null && currRoute != null && prevRoute != currRoute) {
           // Infer trigger from the original Stratagem action if available
           final trigger = stratagem != null && i < stratagem.steps.length
               ? _inferTriggerFromAction(stratagem.steps[i - 1].action)
@@ -228,29 +220,34 @@ class Scout {
     var stepId = 1;
 
     for (final elem in unexplored) {
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.tap,
-        description: 'Explore: tap ${elem.label ?? elem.widgetType}',
-        target: StratagemTarget(
-          label: elem.label,
-          type: elem.widgetType,
-          key: elem.key,
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.tap,
+          description: 'Explore: tap ${elem.label ?? elem.widgetType}',
+          target: StratagemTarget(
+            label: elem.label,
+            type: elem.widgetType,
+            key: elem.key,
+          ),
+          waitAfter: const Duration(seconds: 1),
         ),
-        waitAfter: const Duration(seconds: 1),
-      ));
+      );
       // Navigate back after each exploration tap
-      steps.add(StratagemStep(
-        id: stepId++,
-        action: StratagemAction.back,
-        description: 'Return to explore next element',
-        waitAfter: const Duration(milliseconds: 500),
-      ));
+      steps.add(
+        StratagemStep(
+          id: stepId++,
+          action: StratagemAction.back,
+          description: 'Return to explore next element',
+          waitAfter: const Duration(milliseconds: 500),
+        ),
+      );
     }
 
     return Stratagem(
       name: 'sortie${routePattern.replaceAll("/", "_").replaceAll(":", "")}',
-      description: 'Active discovery of $routePattern '
+      description:
+          'Active discovery of $routePattern '
           '(${unexplored.length} unexplored elements)',
       tags: const ['discovery', 'sortie'],
       startRoute: routePattern,
@@ -311,7 +308,9 @@ class Scout {
           for (final screen in postLoginScreens) {
             // Check if this screen is reachable without login
             final isPublic = terrain.entryPoints.any((entry) {
-              if (loginScreens.any((l) => l.routePattern == entry.routePattern)) {
+              if (loginScreens.any(
+                (l) => l.routePattern == entry.routePattern,
+              )) {
                 return false;
               }
               final path = terrain.shortestPath(
@@ -320,8 +319,9 @@ class Scout {
               );
               if (path == null) return false;
               // Check if any March in the path passes through login
-              return !path.any((m) =>
-                  loginScreens.any((l) => l.routePattern == m.fromRoute));
+              return !path.any(
+                (m) => loginScreens.any((l) => l.routePattern == m.fromRoute),
+              );
             });
 
             if (!isPublic) {
@@ -405,9 +405,9 @@ class Scout {
     March resolvedMarch = march;
     if (source != null) {
       final existing = source.exits.cast<March?>().firstWhere(
-            (m) => m!.matches(march),
-            orElse: () => null,
-          );
+        (m) => m!.matches(march),
+        orElse: () => null,
+      );
       if (existing != null) {
         existing.mergeObservation(march, durationMs: durationMs);
         resolvedMarch = existing;
@@ -422,9 +422,9 @@ class Scout {
     final dest = terrain.outposts[toRoute];
     if (dest != null) {
       final alreadyTracked = dest.entrances.cast<March?>().firstWhere(
-            (m) => m!.matches(march),
-            orElse: () => null,
-          );
+        (m) => m!.matches(march),
+        orElse: () => null,
+      );
       if (alreadyTracked == null) {
         dest.entrances.add(resolvedMarch);
       }
@@ -446,17 +446,19 @@ class Scout {
     if (betweenImprints.isEmpty) return MarchTrigger.redirect;
 
     // Check for text input followed by a tap (form submit)
-    final hasTextInput =
-        betweenImprints.any((i) => i.type == ImprintType.textInput);
-    final hasTap = betweenImprints
-        .any((i) => i.type == ImprintType.pointerUp);
+    final hasTextInput = betweenImprints.any(
+      (i) => i.type == ImprintType.textInput,
+    );
+    final hasTap = betweenImprints.any((i) => i.type == ImprintType.pointerUp);
     if (hasTextInput && hasTap) return MarchTrigger.formSubmit;
 
     // Check for swipe
-    final hasPointerDown =
-        betweenImprints.any((i) => i.type == ImprintType.pointerDown);
-    final hasPointerMove =
-        betweenImprints.where((i) => i.type == ImprintType.pointerMove);
+    final hasPointerDown = betweenImprints.any(
+      (i) => i.type == ImprintType.pointerDown,
+    );
+    final hasPointerMove = betweenImprints.where(
+      (i) => i.type == ImprintType.pointerMove,
+    );
     if (hasPointerDown && hasPointerMove.length > 5) {
       return MarchTrigger.swipe;
     }
@@ -492,8 +494,7 @@ class Scout {
     return switch (action) {
       StratagemAction.tap ||
       StratagemAction.doubleTap ||
-      StratagemAction.longPress =>
-        MarchTrigger.tap,
+      StratagemAction.longPress => MarchTrigger.tap,
       StratagemAction.submitField => MarchTrigger.formSubmit,
       StratagemAction.navigate => MarchTrigger.programmatic,
       StratagemAction.back => MarchTrigger.back,

@@ -1,8 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
 
 import 'fresco.dart';
 import 'glyph.dart';
@@ -46,7 +44,12 @@ class TableauCapture {
   TableauCapture._();
 
   /// Maximum tree depth to walk (prevents infinite recursion).
-  static int maxDepth = 50;
+  ///
+  /// Flutter widget trees are typically 150–250 levels deep due to
+  /// framework overhead (Theme, MediaQuery, Navigator, Overlay,
+  /// Focus, Semantics, Scaffold, etc.). The default of 300 provides
+  /// headroom for deeply nested custom widgets.
+  static int maxDepth = 300;
 
   /// Maximum number of Glyphs per Tableau (prevents huge snapshots).
   static int maxGlyphs = 200;
@@ -145,10 +148,7 @@ class TableauCapture {
     }
 
     // Build ancestor list for children (max 5)
-    final childAncestors = [
-      widgetType,
-      ...ancestors.take(4),
-    ];
+    final childAncestors = [widgetType, ...ancestors.take(4)];
 
     // Recurse into children
     element.visitChildren((child) {
@@ -236,7 +236,7 @@ class TableauCapture {
   /// Classify a widget: interactive, content, or skip.
   static _WidgetClassification _classify(Widget widget) {
     // Interactive widgets
-    if (widget is ButtonStyleButton ||       // ElevatedButton, TextButton, etc.
+    if (widget is ButtonStyleButton || // ElevatedButton, TextButton, etc.
         widget is IconButton ||
         widget is FloatingActionButton ||
         widget is InkWell ||
@@ -326,8 +326,7 @@ class TableauCapture {
 
     // TextField — hint or label
     if (widget is TextField) {
-      return widget.decoration?.labelText ??
-          widget.decoration?.hintText;
+      return widget.decoration?.labelText ?? widget.decoration?.hintText;
     }
     if (widget is TextFormField) {
       // TextFormField wraps TextField — get its decoration
@@ -377,25 +376,39 @@ class TableauCapture {
     return _getSemanticLabel(element);
   }
 
-  /// Walk children to find the first [Text] label.
+  /// Walk children to find the first human-readable [Text] label.
+  ///
+  /// Skips icon codepoints (Unicode Private Use Area characters)
+  /// to prefer real text labels over icon glyphs. For example,
+  /// `FilledButton.icon(label: Text('Submit'), icon: Icon(...))` will
+  /// return `'Submit'` rather than the icon's codepoint.
   static String? _findChildLabel(Element element) {
     String? label;
+    String? iconFallback; // Keep icon text as fallback
     element.visitChildren((child) {
       if (label != null) return;
       final widget = child.widget;
       if (widget is Text && widget.data != null && widget.data!.isNotEmpty) {
         final data = widget.data!;
-        label = data.length > Glyph.maxLabelLength
-            ? data.substring(0, Glyph.maxLabelLength)
-            : data;
+        if (_isIconText(data)) {
+          iconFallback ??= data;
+        } else {
+          label = data.length > Glyph.maxLabelLength
+              ? data.substring(0, Glyph.maxLabelLength)
+              : data;
+        }
         return;
       }
       if (widget is RichText) {
         final plain = widget.text.toPlainText();
         if (plain.isNotEmpty) {
-          label = plain.length > Glyph.maxLabelLength
-              ? plain.substring(0, Glyph.maxLabelLength)
-              : plain;
+          if (_isIconText(plain)) {
+            iconFallback ??= plain;
+          } else {
+            label = plain.length > Glyph.maxLabelLength
+                ? plain.substring(0, Glyph.maxLabelLength)
+                : plain;
+          }
           return;
         }
       }
@@ -405,9 +418,37 @@ class TableauCapture {
         return;
       }
       // Recurse deeper (but only a few levels)
-      label = _findChildLabel(child);
+      final childLabel = _findChildLabel(child);
+      if (childLabel != null) {
+        if (_isIconText(childLabel)) {
+          iconFallback ??= childLabel;
+        } else {
+          label = childLabel;
+        }
+      }
     });
-    return label;
+    return label ?? iconFallback;
+  }
+
+  /// Whether [text] consists solely of icon codepoints (Unicode PUA).
+  ///
+  /// Icon fonts (MaterialIcons, CupertinoIcons) render glyphs as
+  /// characters in the Private Use Area (U+E000–U+F8FF) or
+  /// Supplementary PUA (U+F0000–U+10FFFF). Such strings are not
+  /// meaningful labels for targeting purposes.
+  static bool _isIconText(String text) {
+    if (text.isEmpty) return false;
+    for (final rune in text.runes) {
+      // BMP Private Use Area: U+E000 – U+F8FF
+      if (rune >= 0xE000 && rune <= 0xF8FF) continue;
+      // Supplementary PUA-A: U+F0000 – U+FFFFD
+      if (rune >= 0xF0000 && rune <= 0xFFFFD) continue;
+      // Supplementary PUA-B: U+100000 – U+10FFFD
+      if (rune >= 0x100000 && rune <= 0x10FFFD) continue;
+      // Non-icon character found
+      return false;
+    }
+    return true;
   }
 
   // -----------------------------------------------------------------------
@@ -511,7 +552,10 @@ class TableauCapture {
     if (widget is IconButton) return widget.onPressed != null;
     if (widget is TextField) return widget.enabled ?? true;
     if (widget is Checkbox) return widget.onChanged != null;
-    if (widget is Radio) return widget.onChanged != null;
+    if (widget is Radio) {
+      // ignore: deprecated_member_use
+      return widget.onChanged != null;
+    }
     if (widget is Switch) return widget.onChanged != null;
     if (widget is Slider) return widget.onChanged != null;
     if (widget is ListTile) return widget.enabled;
@@ -523,7 +567,10 @@ class TableauCapture {
     if (widget is Checkbox) return widget.value?.toString();
     if (widget is Switch) return widget.value ? 'on' : 'off';
     if (widget is Slider) return widget.value.toStringAsFixed(2);
-    if (widget is Radio) return widget.groupValue?.toString();
+    if (widget is Radio) {
+      // ignore: deprecated_member_use
+      return widget.groupValue?.toString();
+    }
     return null;
   }
 }

@@ -39,10 +39,7 @@ void main() {
     });
 
     test('skipped factory creates correct step', () {
-      final step = VerdictStep.skipped(
-        stepId: 3,
-        description: 'Submit form',
-      );
+      final step = VerdictStep.skipped(stepId: 3, description: 'Submit form');
       expect(step.status, VerdictStepStatus.skipped);
       expect(step.duration, Duration.zero);
     });
@@ -166,10 +163,7 @@ void main() {
 
     test('all failure types serialize correctly', () {
       for (final type in VerdictFailureType.values) {
-        final failure = VerdictFailure(
-          type: type,
-          message: 'test $type',
-        );
+        final failure = VerdictFailure(type: type, message: 'test $type');
         final json = failure.toJson();
         final restored = VerdictFailure.fromJson(json);
         expect(restored.type, type);
@@ -200,10 +194,7 @@ void main() {
           type: VerdictFailureType.timeout,
         );
         expect(suggestions, isNotEmpty);
-        expect(
-          suggestions.join('\n').toLowerCase(),
-          contains('timeout'),
-        );
+        expect(suggestions.join('\n').toLowerCase(), contains('timeout'));
       });
 
       test('generates for elementMissing with tableau context', () {
@@ -268,10 +259,7 @@ void main() {
             actual: '/login',
           ),
         ),
-        VerdictStep.skipped(
-          stepId: 4,
-          description: 'Step 4',
-        ),
+        VerdictStep.skipped(stepId: 4, description: 'Step 4'),
       ];
 
       final summary = VerdictSummary.fromSteps(
@@ -453,10 +441,7 @@ void main() {
       expect(restored.skippedSteps, 1);
       expect(restored.failedRoutes, ['/settings']);
       // Duration restored
-      expect(
-        restored.duration.inMilliseconds,
-        summary.duration.inMilliseconds,
-      );
+      expect(restored.duration.inMilliseconds, summary.duration.inMilliseconds);
     });
   });
 
@@ -471,7 +456,10 @@ void main() {
         jankFrames: 3,
         startMemoryBytes: 50000000,
         endMemoryBytes: 55000000,
-        settleTimes: const {1: Duration(milliseconds: 200), 3: Duration(milliseconds: 500)},
+        settleTimes: const {
+          1: Duration(milliseconds: 200),
+          3: Duration(milliseconds: 500),
+        },
         slowSteps: const [3, 5],
       );
       final json = perf.toJson();
@@ -556,10 +544,7 @@ void main() {
             expected: 'Email',
           ),
         ),
-        VerdictStep.skipped(
-          stepId: 3,
-          description: 'Tap login',
-        ),
+        VerdictStep.skipped(stepId: 3, description: 'Tap login'),
       ];
 
       failingVerdict = Verdict.fromSteps(

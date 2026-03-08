@@ -110,33 +110,18 @@ void main() {
       });
 
       test('containsPoint returns true for point inside bounds', () {
-        final glyph = createGlyph(
-          left: 10,
-          top: 20,
-          width: 100,
-          height: 48,
-        );
+        final glyph = createGlyph(left: 10, top: 20, width: 100, height: 48);
         expect(glyph.containsPoint(50, 40), true);
       });
 
       test('containsPoint returns true for point on edge', () {
-        final glyph = createGlyph(
-          left: 10,
-          top: 20,
-          width: 100,
-          height: 48,
-        );
+        final glyph = createGlyph(left: 10, top: 20, width: 100, height: 48);
         expect(glyph.containsPoint(10, 20), true);
         expect(glyph.containsPoint(110, 68), true);
       });
 
       test('containsPoint returns false for point outside bounds', () {
-        final glyph = createGlyph(
-          left: 10,
-          top: 20,
-          width: 100,
-          height: 48,
-        );
+        final glyph = createGlyph(left: 10, top: 20, width: 100, height: 48);
         expect(glyph.containsPoint(5, 40), false);
         expect(glyph.containsPoint(111, 40), false);
         expect(glyph.containsPoint(50, 19), false);
@@ -168,7 +153,10 @@ void main() {
         expect(map['fid'], 'email');
         expect(map['k'], 'email_key');
         expect(map['sr'], 'button');
-        expect(map.containsKey('en'), false); // omitted because isEnabled=true (default)
+        expect(
+          map.containsKey('en'),
+          false,
+        ); // omitted because isEnabled=true (default)
         expect(map['cv'], 'a@b.com');
         expect(map['anc'], ['Scaffold', 'Column']);
         expect(map['d'], 5);
@@ -191,8 +179,14 @@ void main() {
         expect(map.containsKey('k'), false);
         expect(map.containsKey('sr'), false);
         expect(map.containsKey('cv'), false);
-        expect(map.containsKey('ia'), false); // omitted because isInteractive=false (default)
-        expect(map.containsKey('en'), false); // omitted because isEnabled=true (default)
+        expect(
+          map.containsKey('ia'),
+          false,
+        ); // omitted because isInteractive=false (default)
+        expect(
+          map.containsKey('en'),
+          false,
+        ); // omitted because isEnabled=true (default)
       });
 
       test('fromMap round-trips all fields', () {
@@ -239,14 +233,7 @@ void main() {
       });
 
       test('fromMap handles integer coordinates', () {
-        final map = {
-          'wt': 'Text',
-          'x': 10,
-          'y': 20,
-          'w': 50,
-          'h': 16,
-          'd': 3,
-        };
+        final map = {'wt': 'Text', 'x': 10, 'y': 20, 'w': 50, 'h': 16, 'd': 3};
         final glyph = Glyph.fromMap(map);
         expect(glyph.left, 10.0);
         expect(glyph.top, 20.0);
@@ -262,10 +249,7 @@ void main() {
     group('copyWith', () {
       test('copies with changed fields', () {
         final original = createGlyph();
-        final copy = original.copyWith(
-          label: 'Cancel',
-          isEnabled: false,
-        );
+        final copy = original.copyWith(label: 'Cancel', isEnabled: false);
 
         expect(copy.label, 'Cancel');
         expect(copy.isEnabled, false);

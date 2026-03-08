@@ -341,6 +341,47 @@ void main() {
       expect(resetCenter, equals(defaultCenter));
     });
 
+    testWidgets('selected tab survives MediaQuery change (keyboard)', (
+      tester,
+    ) async {
+      // Use a wrapper that can change MediaQuery to simulate keyboard.
+      final bottomInset = ValueNotifier<double>(0);
+
+      await tester.pumpWidget(
+        ValueListenableBuilder<double>(
+          valueListenable: bottomInset,
+          builder: (context, inset, _) {
+            return MediaQuery(
+              data: MediaQueryData(
+                size: const Size(400, 800),
+                viewInsets: EdgeInsets.only(bottom: inset),
+              ),
+              child: const MaterialApp(home: Lens(child: Text('app'))),
+            );
+          },
+        ),
+      );
+
+      // Open the Lens panel
+      await tester.tap(find.byIcon(Icons.bug_report));
+      await tester.pump();
+
+      // Verify we see Pillars tab initially (built-in tabs)
+      expect(find.text('Pillars'), findsOneWidget);
+
+      // Switch to Herald tab
+      await tester.tap(find.text('Herald'));
+      await tester.pump();
+      expect(find.text('No Herald events'), findsOneWidget);
+
+      // Simulate keyboard appearing (bottom inset changes)
+      bottomInset.value = 300;
+      await tester.pump();
+
+      // Herald tab content should still be visible — not reset to Pillars
+      expect(find.text('No Herald events'), findsOneWidget);
+    });
+
     testWidgets('resetFabPosition() resets static position', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(home: Lens(child: Text('app'))),

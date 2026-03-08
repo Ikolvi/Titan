@@ -433,7 +433,8 @@ class ShadeSession {
       imprints: (map['imprints'] as List)
           .map((e) => Imprint.fromMap(e as Map<String, dynamic>))
           .toList(),
-      tableaux: (map['tableaux'] as List?)
+      tableaux:
+          (map['tableaux'] as List?)
               ?.map((e) => Tableau.fromMap(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -493,12 +494,15 @@ class ShadeSession {
       if (!_isSignificantForFlow(imprint)) continue;
 
       stepNumber++;
-      final seconds =
-          (imprint.timestamp.inMilliseconds / 1000).toStringAsFixed(1);
+      final seconds = (imprint.timestamp.inMilliseconds / 1000).toStringAsFixed(
+        1,
+      );
 
       // Describe the action
       final actionDescription = _describeAction(imprint, i);
-      buffer.writeln('═══ Step $stepNumber [${seconds}s]: $actionDescription ═══');
+      buffer.writeln(
+        '═══ Step $stepNumber [${seconds}s]: $actionDescription ═══',
+      );
 
       // Resolve what was tapped
       if (imprint.tableauIndex != null &&
@@ -527,8 +531,9 @@ class ShadeSession {
         final nextTableauIndex = imprint.tableauIndex! + 1;
         if (nextTableauIndex < tableaux.length &&
             !describedTableaux.contains(nextTableauIndex)) {
-          final prevTableau =
-              lastTableauIndex >= 0 ? tableaux[lastTableauIndex] : null;
+          final prevTableau = lastTableauIndex >= 0
+              ? tableaux[lastTableauIndex]
+              : null;
           _describeTableau(
             buffer,
             tableaux[nextTableauIndex],
@@ -544,14 +549,10 @@ class ShadeSession {
     // Describe final Tableau if not yet described
     if (tableaux.length > 1 &&
         !describedTableaux.contains(tableaux.length - 1)) {
-      final prevTableau =
-          lastTableauIndex >= 0 ? tableaux[lastTableauIndex] : null;
-      _describeTableau(
-        buffer,
-        tableaux.last,
-        prevTableau,
-        'Final Screen',
-      );
+      final prevTableau = lastTableauIndex >= 0
+          ? tableaux[lastTableauIndex]
+          : null;
+      _describeTableau(buffer, tableaux.last, prevTableau, 'Final Screen');
     }
 
     return buffer.toString().trimRight();
@@ -635,8 +636,7 @@ class ShadeSession {
             'summary': tableaux[i].summary,
             'interactiveElements': tableaux[i].interactiveGlyphs.length,
             'totalElements': tableaux[i].glyphs.length,
-            if (i > 0)
-              'diff': tableaux[i - 1].diff(tableaux[i]).toString(),
+            if (i > 0) 'diff': tableaux[i - 1].diff(tableaux[i]).toString(),
           },
       ],
       'steps': steps,

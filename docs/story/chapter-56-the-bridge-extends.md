@@ -305,7 +305,7 @@ The Colossus had learned to speak beyond its walls. And the machines outside wer
 
 ---
 
-*Next: [Chapter LVII — ???](chapter-57-todo.md)*
+*Next: [Chapter LVII — The Relay Speaks](chapter-57-the-relay-speaks.md)*
 
 ---
 

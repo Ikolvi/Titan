@@ -53,7 +53,8 @@ void main() {
       route: route,
       screenWidth: 375,
       screenHeight: 812,
-      glyphs: glyphs ??
+      glyphs:
+          glyphs ??
           [
             createGlyph(
               label: 'Login',
@@ -177,9 +178,7 @@ void main() {
 
   group('ShadeSession.generateFlowDescription', () {
     test('includes session metadata', () {
-      final session = createSession(
-        tableaux: [createTableau()],
-      );
+      final session = createSession(tableaux: [createTableau()]);
 
       final desc = session.generateFlowDescription();
 
@@ -189,9 +188,7 @@ void main() {
     });
 
     test('describes initial Tableau', () {
-      final session = createSession(
-        tableaux: [createTableau()],
-      );
+      final session = createSession(tableaux: [createTableau()]);
 
       final desc = session.generateFlowDescription();
 
@@ -266,12 +263,16 @@ void main() {
     });
 
     test('shows diff between tableaux', () {
-      final before = createTableau(index: 0, glyphs: [
-        createGlyph(label: 'Login', key: 'login_btn'),
-      ]);
-      final after = createTableau(index: 1, glyphs: [
-        createGlyph(label: 'Login', key: 'login_btn', isEnabled: false),
-      ]);
+      final before = createTableau(
+        index: 0,
+        glyphs: [createGlyph(label: 'Login', key: 'login_btn')],
+      );
+      final after = createTableau(
+        index: 1,
+        glyphs: [
+          createGlyph(label: 'Login', key: 'login_btn', isEnabled: false),
+        ],
+      );
 
       final session = createSession(
         imprints: [
@@ -307,9 +308,7 @@ void main() {
     });
 
     test('includes tableaux summaries', () {
-      final session = createSession(
-        tableaux: [createTableau()],
-      );
+      final session = createSession(tableaux: [createTableau()]);
       final spec = session.toAiTestSpec();
 
       expect(spec['tableaux'], isA<List>());
@@ -396,13 +395,17 @@ void main() {
     });
 
     test('includes tableau diffs for subsequent tableaux', () {
-      final t0 = createTableau(index: 0, glyphs: [
-        createGlyph(label: 'A', key: 'a'),
-      ]);
-      final t1 = createTableau(index: 1, glyphs: [
-        createGlyph(label: 'A', key: 'a'),
-        createGlyph(label: 'B', key: 'b'),
-      ]);
+      final t0 = createTableau(
+        index: 0,
+        glyphs: [createGlyph(label: 'A', key: 'a')],
+      );
+      final t1 = createTableau(
+        index: 1,
+        glyphs: [
+          createGlyph(label: 'A', key: 'a'),
+          createGlyph(label: 'B', key: 'b'),
+        ],
+      );
 
       final session = createSession(tableaux: [t0, t1]);
       final spec = session.toAiTestSpec();

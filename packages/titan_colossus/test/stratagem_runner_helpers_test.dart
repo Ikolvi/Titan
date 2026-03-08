@@ -220,11 +220,9 @@ void main() {
 
     test('label + type + key', () {
       expect(
-        runner.targetDescription(const StratagemTarget(
-          label: 'OK',
-          type: 'Button',
-          key: 'k1',
-        )),
+        runner.targetDescription(
+          const StratagemTarget(label: 'OK', type: 'Button', key: 'k1'),
+        ),
         '"OK" (Button) [key: k1]',
       );
     });
@@ -254,11 +252,7 @@ void main() {
   // validateExpectations — edge cases
   // -------------------------------------------------------------------------
   group('StratagemRunner.validateExpectations', () {
-    final stratagem = const Stratagem(
-      name: 'test',
-      startRoute: '/',
-      steps: [],
-    );
+    final stratagem = const Stratagem(name: 'test', startRoute: '/', steps: []);
 
     test('null expectations returns null', () {
       final result = runner.validateExpectations(
@@ -447,9 +441,7 @@ void main() {
       );
       final result = runner.validateExpectations(
         const StratagemExpectations(
-          elementStates: [
-            StratagemElementState(label: 'Slider', value: '50'),
-          ],
+          elementStates: [StratagemElementState(label: 'Slider', value: '50')],
         ),
         tableau,
         stratagem,
@@ -480,11 +472,7 @@ void main() {
       final result = runner.validateExpectations(
         const StratagemExpectations(
           elementStates: [
-            StratagemElementState(
-              label: 'Toggle',
-              enabled: true,
-              value: 'on',
-            ),
+            StratagemElementState(label: 'Toggle', enabled: true, value: 'on'),
           ],
         ),
         tableau,

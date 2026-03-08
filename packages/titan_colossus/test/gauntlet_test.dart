@@ -99,32 +99,37 @@ void main() {
     });
 
     test('interaction stress has 5 patterns', () {
-      final patterns =
-          Gauntlet.patternsForCategory(GauntletCategory.interactionStress);
+      final patterns = Gauntlet.patternsForCategory(
+        GauntletCategory.interactionStress,
+      );
       expect(patterns, hasLength(5));
     });
 
     test('input boundaries has 7 patterns', () {
-      final patterns =
-          Gauntlet.patternsForCategory(GauntletCategory.inputBoundaries);
+      final patterns = Gauntlet.patternsForCategory(
+        GauntletCategory.inputBoundaries,
+      );
       expect(patterns, hasLength(7));
     });
 
     test('navigation stress has 4 patterns', () {
-      final patterns =
-          Gauntlet.patternsForCategory(GauntletCategory.navigationStress);
+      final patterns = Gauntlet.patternsForCategory(
+        GauntletCategory.navigationStress,
+      );
       expect(patterns, hasLength(4));
     });
 
     test('state integrity has 5 patterns', () {
-      final patterns =
-          Gauntlet.patternsForCategory(GauntletCategory.stateIntegrity);
+      final patterns = Gauntlet.patternsForCategory(
+        GauntletCategory.stateIntegrity,
+      );
       expect(patterns, hasLength(5));
     });
 
     test('timing async has 3 patterns', () {
-      final patterns =
-          Gauntlet.patternsForCategory(GauntletCategory.timingAsync);
+      final patterns = Gauntlet.patternsForCategory(
+        GauntletCategory.timingAsync,
+      );
       expect(patterns, hasLength(3));
     });
 
@@ -154,29 +159,55 @@ void main() {
 
     test('all patterns have non-empty descriptions', () {
       for (final p in Gauntlet.catalog) {
-        expect(p.description, isNotEmpty, reason: '${p.id} missing description');
+        expect(
+          p.description,
+          isNotEmpty,
+          reason: '${p.id} missing description',
+        );
       }
     });
 
     test('all patterns have applicable interaction types', () {
       for (final p in Gauntlet.catalog) {
-        expect(p.applicableInteractionTypes, isNotEmpty,
-            reason: '${p.id} missing interaction types');
+        expect(
+          p.applicableInteractionTypes,
+          isNotEmpty,
+          reason: '${p.id} missing interaction types',
+        );
       }
     });
 
     test('specific pattern IDs match spec', () {
       final ids = Gauntlet.catalog.map((p) => p.id).toSet();
-      expect(ids, containsAll([
-        'rapid_fire', 'double_submit', 'tab_storm',
-        'mid_flight_tap', 'retreat_under_fire',
-        'hollow_strike', 'overflow_scroll', 'rune_injection',
-        'glyph_storm', 'phantom_text', 'titan_count', 'edge_of_range',
-        'full_retreat', 'ambush_arrival', 'eternal_march', 'bedrock_back',
-        'switch_frenzy', 'slider_tempest', 'choice_reversal',
-        'half_inscription', 'forgotten_outpost',
-        'patient_siege', 'avalanche_scroll', 'impatient_general',
-      ]));
+      expect(
+        ids,
+        containsAll([
+          'rapid_fire',
+          'double_submit',
+          'tab_storm',
+          'mid_flight_tap',
+          'retreat_under_fire',
+          'hollow_strike',
+          'overflow_scroll',
+          'rune_injection',
+          'glyph_storm',
+          'phantom_text',
+          'titan_count',
+          'edge_of_range',
+          'full_retreat',
+          'ambush_arrival',
+          'eternal_march',
+          'bedrock_back',
+          'switch_frenzy',
+          'slider_tempest',
+          'choice_reversal',
+          'half_inscription',
+          'forgotten_outpost',
+          'patient_siege',
+          'avalanche_scroll',
+          'impatient_general',
+        ]),
+      );
     });
   });
 
@@ -197,15 +228,14 @@ void main() {
         intensity: GauntletIntensity.quick,
       );
 
-      final rapidFires =
-          results.where((s) => s.name.startsWith('gauntlet_rapid_fire'));
+      final rapidFires = results.where(
+        (s) => s.name.startsWith('gauntlet_rapid_fire'),
+      );
       expect(rapidFires, hasLength(2));
     });
 
     test('rapid_fire has 5 tap steps with 50ms wait', () {
-      final outpost = createOutpost(
-        interactive: [button(label: 'Go')],
-      );
+      final outpost = createOutpost(interactive: [button(label: 'Go')]);
       final results = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.quick,
@@ -222,9 +252,7 @@ void main() {
     });
 
     test('rapid_fire uses continueAll policy', () {
-      final outpost = createOutpost(
-        interactive: [button(label: 'X')],
-      );
+      final outpost = createOutpost(interactive: [button(label: 'X')]);
       final results = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.quick,
@@ -254,9 +282,7 @@ void main() {
     });
 
     test('no double_submit without text fields', () {
-      final outpost = createOutpost(
-        interactive: [button(label: 'Submit')],
-      );
+      final outpost = createOutpost(interactive: [button(label: 'Submit')]);
       final results = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.quick,
@@ -299,25 +325,19 @@ void main() {
         intensity: GauntletIntensity.quick,
       );
 
-      final ts = results.where(
-        (s) => s.name.startsWith('gauntlet_tab_storm'),
-      );
+      final ts = results.where((s) => s.name.startsWith('gauntlet_tab_storm'));
       expect(ts, hasLength(1));
       expect(ts.first.steps, hasLength(2));
     });
 
     test('no tab_storm with single text field', () {
-      final outpost = createOutpost(
-        interactive: [textField(label: 'Solo')],
-      );
+      final outpost = createOutpost(interactive: [textField(label: 'Solo')]);
       final results = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.quick,
       );
 
-      final ts = results.where(
-        (s) => s.name.startsWith('gauntlet_tab_storm'),
-      );
+      final ts = results.where((s) => s.name.startsWith('gauntlet_tab_storm'));
       expect(ts, isEmpty);
     });
   });
@@ -406,9 +426,7 @@ void main() {
     });
 
     test('edge_of_range for sliders', () {
-      final outpost = createOutpost(
-        interactive: [slider(label: 'Volume')],
-      );
+      final outpost = createOutpost(interactive: [slider(label: 'Volume')]);
       final results = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.quick,
@@ -422,17 +440,13 @@ void main() {
     });
 
     test('no input boundary patterns without text/slider', () {
-      final outpost = createOutpost(
-        interactive: [button(label: 'OK')],
-      );
+      final outpost = createOutpost(interactive: [button(label: 'OK')]);
       final results = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.quick,
       );
 
-      final inputPatterns = results.where(
-        (s) => s.tags.contains('input'),
-      );
+      final inputPatterns = results.where((s) => s.tags.contains('input'));
       expect(inputPatterns, isEmpty);
     });
   });
@@ -444,10 +458,7 @@ void main() {
   group('Gauntlet navigation stress', () {
     test('full_retreat for screens with entrances', () {
       final march = createMarch(from: '/a', to: '/test');
-      final outpost = createOutpost(
-        route: '/test',
-        entrances: [march],
-      );
+      final outpost = createOutpost(route: '/test', entrances: [march]);
       final results = Gauntlet.generateFor(outpost);
 
       final fr = results.where(
@@ -492,9 +503,7 @@ void main() {
         intensity: GauntletIntensity.quick,
       );
 
-      final navPatterns = results.where(
-        (s) => s.tags.contains('navigation'),
-      );
+      final navPatterns = results.where((s) => s.tags.contains('navigation'));
       expect(navPatterns, isEmpty);
     });
   });
@@ -505,9 +514,7 @@ void main() {
 
   group('Gauntlet state integrity', () {
     test('switch_frenzy for toggles', () {
-      final outpost = createOutpost(
-        interactive: [toggle(label: 'Dark Mode')],
-      );
+      final outpost = createOutpost(interactive: [toggle(label: 'Dark Mode')]);
       final results = Gauntlet.generateFor(outpost);
 
       final sf = results.where(
@@ -518,9 +525,7 @@ void main() {
     });
 
     test('slider_tempest for sliders', () {
-      final outpost = createOutpost(
-        interactive: [slider(label: 'Volume')],
-      );
+      final outpost = createOutpost(interactive: [slider(label: 'Volume')]);
       final results = Gauntlet.generateFor(outpost);
 
       final st = results.where(
@@ -532,9 +537,7 @@ void main() {
     });
 
     test('choice_reversal for dropdowns', () {
-      final outpost = createOutpost(
-        interactive: [dropdown(label: 'Category')],
-      );
+      final outpost = createOutpost(interactive: [dropdown(label: 'Category')]);
       final results = Gauntlet.generateFor(outpost);
 
       final cr = results.where(
@@ -584,9 +587,7 @@ void main() {
         intensity: GauntletIntensity.quick,
       );
 
-      final statePatterns = results.where(
-        (s) => s.tags.contains('state'),
-      );
+      final statePatterns = results.where((s) => s.tags.contains('state'));
       expect(statePatterns, isEmpty);
     });
   });
@@ -597,9 +598,7 @@ void main() {
 
   group('Gauntlet timing & async', () {
     test('patient_siege at thorough intensity', () {
-      final outpost = createOutpost(
-        interactive: [button(label: 'Action')],
-      );
+      final outpost = createOutpost(interactive: [button(label: 'Action')]);
       final results = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.thorough,
@@ -645,9 +644,7 @@ void main() {
     });
 
     test('no avalanche_scroll without scrollable tag', () {
-      final outpost = createOutpost(
-        interactive: [button(label: 'X')],
-      );
+      final outpost = createOutpost(interactive: [button(label: 'X')]);
       final results = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.thorough,
@@ -713,10 +710,7 @@ void main() {
 
     test('standard adds navigation and state', () {
       final exit = createMarch(from: '/test', to: '/b');
-      final outpost = createOutpost(
-        interactive: [toggle()],
-        exits: [exit],
-      );
+      final outpost = createOutpost(interactive: [toggle()], exits: [exit]);
       final standard = Gauntlet.generateFor(
         outpost,
         intensity: GauntletIntensity.standard,
@@ -746,13 +740,13 @@ void main() {
 
   group('Gauntlet lineage integration', () {
     test('attaches preconditions from lineage', () {
-      final outpost = createOutpost(
-        interactive: [button(label: 'Go')],
+      final outpost = createOutpost(interactive: [button(label: 'Go')]);
+      final terrain = Terrain(
+        outposts: {
+          '/login': createOutpost(route: '/login'),
+          '/test': outpost,
+        },
       );
-      final terrain = Terrain(outposts: {
-        '/login': createOutpost(route: '/login'),
-        '/test': outpost,
-      });
       terrain.outposts['/login']!.exits.add(
         createMarch(from: '/login', to: '/test'),
       );
@@ -768,19 +762,12 @@ void main() {
       );
 
       expect(results, isNotEmpty);
-      expect(
-        results.first.preconditions?['setupStratagem'],
-        isNotNull,
-      );
+      expect(results.first.preconditions?['setupStratagem'], isNotNull);
     });
 
     test('no preconditions when lineage is empty', () {
-      final outpost = createOutpost(
-        interactive: [button(label: 'Go')],
-      );
-      final terrain = Terrain(outposts: {
-        '/home': outpost,
-      });
+      final outpost = createOutpost(interactive: [button(label: 'Go')]);
+      final terrain = Terrain(outposts: {'/home': outpost});
       final lineage = Lineage.resolve(terrain, targetRoute: '/home');
       final results = Gauntlet.generateFor(
         outpost,
@@ -851,7 +838,9 @@ void main() {
     test('all generated Stratagems have gauntlet tag', () {
       final outpost = createOutpost(
         interactive: [
-          textField(), button(label: 'Submit'), toggle(),
+          textField(),
+          button(label: 'Submit'),
+          toggle(),
         ],
         exits: [createMarch(from: '/test', to: '/b')],
       );
@@ -861,14 +850,20 @@ void main() {
       );
 
       for (final s in results) {
-        expect(s.tags, contains('gauntlet'),
-            reason: '${s.name} missing gauntlet tag');
+        expect(
+          s.tags,
+          contains('gauntlet'),
+          reason: '${s.name} missing gauntlet tag',
+        );
       }
     });
 
     test('all generated Stratagems use continueAll', () {
       final outpost = createOutpost(
-        interactive: [textField(), button(label: 'Login')],
+        interactive: [
+          textField(),
+          button(label: 'Login'),
+        ],
       );
       final results = Gauntlet.generateFor(
         outpost,
@@ -876,8 +871,11 @@ void main() {
       );
 
       for (final s in results) {
-        expect(s.failurePolicy, StratagemFailurePolicy.continueAll,
-            reason: '${s.name} should use continueAll');
+        expect(
+          s.failurePolicy,
+          StratagemFailurePolicy.continueAll,
+          reason: '${s.name} should use continueAll',
+        );
       }
     });
 
@@ -892,8 +890,11 @@ void main() {
       );
 
       for (final s in results) {
-        expect(s.startRoute, '/login',
-            reason: '${s.name} has wrong startRoute');
+        expect(
+          s.startRoute,
+          '/login',
+          reason: '${s.name} has wrong startRoute',
+        );
       }
     });
 
@@ -912,8 +913,11 @@ void main() {
 
       for (final s in results) {
         for (var i = 0; i < s.steps.length; i++) {
-          expect(s.steps[i].id, i + 1,
-              reason: '${s.name} step ${i + 1} has wrong ID');
+          expect(
+            s.steps[i].id,
+            i + 1,
+            reason: '${s.name} step ${i + 1} has wrong ID',
+          );
         }
       }
     });
@@ -944,10 +948,7 @@ void main() {
 
       // No interactive elements → no interaction/input/state patterns
       // Bedrock back only (root screen)
-      expect(
-        results.where((s) => !s.name.contains('bedrock_back')),
-        isEmpty,
-      );
+      expect(results.where((s) => !s.name.contains('bedrock_back')), isEmpty);
     });
 
     test('login screen generates many patterns', () {
@@ -974,8 +975,16 @@ void main() {
     });
 
     test('submit-label detection works for various labels', () {
-      for (final label in ['Submit', 'Login', 'Save', 'Register', 'Sign In',
-          'Create Account', 'Send Message', 'Enter the Realm']) {
+      for (final label in [
+        'Submit',
+        'Login',
+        'Save',
+        'Register',
+        'Sign In',
+        'Create Account',
+        'Send Message',
+        'Enter the Realm',
+      ]) {
         final outpost = createOutpost(
           interactive: [
             textField(label: 'Data'),
@@ -990,8 +999,7 @@ void main() {
         final ds = results.where(
           (s) => s.name.startsWith('gauntlet_double_submit'),
         );
-        expect(ds, hasLength(1),
-            reason: '"$label" not detected as submit');
+        expect(ds, hasLength(1), reason: '"$label" not detected as submit');
       }
     });
 

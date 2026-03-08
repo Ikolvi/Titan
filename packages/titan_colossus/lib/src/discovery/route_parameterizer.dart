@@ -123,8 +123,9 @@ class RouteParameterizer {
     // Require at least one non-empty constant segment to anchor the pattern.
     // Without an anchor, routes like /login and /home would be merged even
     // though they're distinct constant routes.
-    final hasConstantAnchor =
-        pattern.any((p) => p.isNotEmpty && !p.startsWith(':'));
+    final hasConstantAnchor = pattern.any(
+      (p) => p.isNotEmpty && !p.startsWith(':'),
+    );
     if (!hasConstantAnchor) {
       _routeToPattern[route] = route;
       return route;

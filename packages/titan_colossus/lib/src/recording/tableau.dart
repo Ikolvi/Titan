@@ -158,7 +158,9 @@ class Tableau {
     final labeled = glyphs.where((g) => g.label != null).take(5);
     if (labeled.isNotEmpty) {
       buffer.write(' | ');
-      buffer.write(labeled.map((g) => '${g.widgetType}: "${g.label}"').join(', '));
+      buffer.write(
+        labeled.map((g) => '${g.widgetType}: "${g.label}"').join(', '),
+      );
       if (glyphs.where((g) => g.label != null).length > 5) {
         buffer.write(', ...');
       }
@@ -312,7 +314,10 @@ class TableauDiff {
 
   /// Whether anything changed between the two Tableaux.
   bool get isEmpty =>
-      routeChange == null && added.isEmpty && removed.isEmpty && changed.isEmpty;
+      routeChange == null &&
+      added.isEmpty &&
+      removed.isEmpty &&
+      changed.isEmpty;
 
   /// Whether something changed.
   bool get isNotEmpty => !isEmpty;
@@ -331,7 +336,8 @@ class TableauDiff {
     required Tableau previous,
     required Tableau current,
   }) {
-    final routeChange = (previous.route != current.route &&
+    final routeChange =
+        (previous.route != current.route &&
             previous.route != null &&
             current.route != null)
         ? (from: previous.route!, to: current.route!)
@@ -386,9 +392,7 @@ class TableauDiff {
 
     final buffer = StringBuffer();
     if (routeChange != null) {
-      buffer.writeln(
-        'Route: ${routeChange!.from} → ${routeChange!.to}',
-      );
+      buffer.writeln('Route: ${routeChange!.from} → ${routeChange!.to}');
     }
     for (final glyph in added) {
       buffer.writeln('ADDED: ${glyph.widgetType} "${glyph.label ?? "?"}"');
@@ -454,7 +458,9 @@ class GlyphChange {
       );
     }
     if (valueChanged) {
-      parts.add('value: "${previous.currentValue}" → "${current.currentValue}"');
+      parts.add(
+        'value: "${previous.currentValue}" → "${current.currentValue}"',
+      );
     }
     if (positionChanged) {
       parts.add(
@@ -463,9 +469,7 @@ class GlyphChange {
       );
     }
 
-    return parts.isEmpty
-        ? '$name (minor change)'
-        : '$name ${parts.join(", ")}';
+    return parts.isEmpty ? '$name (minor change)' : '$name ${parts.join(", ")}';
   }
 
   @override

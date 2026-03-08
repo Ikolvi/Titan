@@ -60,27 +60,29 @@ void main() {
       route: route,
       screenWidth: screenWidth,
       screenHeight: screenHeight,
-      glyphs: glyphs ?? [
-        createGlyph(label: 'Submit', left: 10, top: 20),
-        createGlyph(
-          widgetType: 'TextField',
-          label: 'Email',
-          left: 10,
-          top: 80,
-          interactionType: 'textInput',
-          fieldId: 'email',
-          semanticRole: 'textField',
-        ),
-        createGlyph(
-          widgetType: 'Text',
-          label: 'Welcome',
-          left: 10,
-          top: 5,
-          isInteractive: false,
-          interactionType: null,
-          semanticRole: null,
-        ),
-      ],
+      glyphs:
+          glyphs ??
+          [
+            createGlyph(label: 'Submit', left: 10, top: 20),
+            createGlyph(
+              widgetType: 'TextField',
+              label: 'Email',
+              left: 10,
+              top: 80,
+              interactionType: 'textInput',
+              fieldId: 'email',
+              semanticRole: 'textField',
+            ),
+            createGlyph(
+              widgetType: 'Text',
+              label: 'Welcome',
+              left: 10,
+              top: 5,
+              isInteractive: false,
+              interactionType: null,
+              semanticRole: null,
+            ),
+          ],
       triggerImprintIndex: triggerImprintIndex,
       fresco: fresco,
     );
@@ -114,10 +116,7 @@ void main() {
         final interactive = tableau.interactiveGlyphs;
 
         expect(interactive, hasLength(2));
-        expect(
-          interactive.every((g) => g.isInteractive),
-          true,
-        );
+        expect(interactive.every((g) => g.isInteractive), true);
       });
     });
 
@@ -209,9 +208,7 @@ void main() {
     group('findByKey', () {
       test('finds Glyph by key', () {
         final tableau = createTableau(
-          glyphs: [
-            createGlyph(key: 'submit_btn', label: 'Submit'),
-          ],
+          glyphs: [createGlyph(key: 'submit_btn', label: 'Submit')],
         );
         final result = tableau.findByKey('submit_btn');
 
@@ -397,13 +394,15 @@ void main() {
 
   group('TableauDiff', () {
     test('detects added Glyphs', () {
-      final before = createTableau(glyphs: [
-        createGlyph(label: 'A', widgetType: 'Text', depth: 3),
-      ]);
-      final after = createTableau(glyphs: [
-        createGlyph(label: 'A', widgetType: 'Text', depth: 3),
-        createGlyph(label: 'B', widgetType: 'Text', depth: 4),
-      ]);
+      final before = createTableau(
+        glyphs: [createGlyph(label: 'A', widgetType: 'Text', depth: 3)],
+      );
+      final after = createTableau(
+        glyphs: [
+          createGlyph(label: 'A', widgetType: 'Text', depth: 3),
+          createGlyph(label: 'B', widgetType: 'Text', depth: 4),
+        ],
+      );
 
       final diff = before.diff(after);
 
@@ -413,13 +412,15 @@ void main() {
     });
 
     test('detects removed Glyphs', () {
-      final before = createTableau(glyphs: [
-        createGlyph(label: 'A', widgetType: 'Text', depth: 3),
-        createGlyph(label: 'B', widgetType: 'Text', depth: 4),
-      ]);
-      final after = createTableau(glyphs: [
-        createGlyph(label: 'A', widgetType: 'Text', depth: 3),
-      ]);
+      final before = createTableau(
+        glyphs: [
+          createGlyph(label: 'A', widgetType: 'Text', depth: 3),
+          createGlyph(label: 'B', widgetType: 'Text', depth: 4),
+        ],
+      );
+      final after = createTableau(
+        glyphs: [createGlyph(label: 'A', widgetType: 'Text', depth: 3)],
+      );
 
       final diff = before.diff(after);
 
@@ -429,22 +430,26 @@ void main() {
     });
 
     test('detects changed Glyphs', () {
-      final before = createTableau(glyphs: [
-        createGlyph(
-          label: 'Submit',
-          widgetType: 'ElevatedButton',
-          key: 'submit',
-          isEnabled: true,
-        ),
-      ]);
-      final after = createTableau(glyphs: [
-        createGlyph(
-          label: 'Submit',
-          widgetType: 'ElevatedButton',
-          key: 'submit',
-          isEnabled: false,
-        ),
-      ]);
+      final before = createTableau(
+        glyphs: [
+          createGlyph(
+            label: 'Submit',
+            widgetType: 'ElevatedButton',
+            key: 'submit',
+            isEnabled: true,
+          ),
+        ],
+      );
+      final after = createTableau(
+        glyphs: [
+          createGlyph(
+            label: 'Submit',
+            widgetType: 'ElevatedButton',
+            key: 'submit',
+            isEnabled: false,
+          ),
+        ],
+      );
 
       final diff = before.diff(after);
 
@@ -476,9 +481,7 @@ void main() {
 
     test('toString produces readable output', () {
       final before = createTableau(glyphs: []);
-      final after = createTableau(glyphs: [
-        createGlyph(label: 'New Button'),
-      ]);
+      final after = createTableau(glyphs: [createGlyph(label: 'New Button')]);
 
       final diff = before.diff(after);
       final str = diff.toString();
@@ -600,9 +603,7 @@ void main() {
   // ---------------------------------------------------------
 
   group('ShadeSession tableaux', () {
-    ShadeSession createSession({
-      List<Tableau>? tableaux,
-    }) {
+    ShadeSession createSession({List<Tableau>? tableaux}) {
       return ShadeSession(
         id: 'test-session',
         name: 'Test Session',
@@ -640,9 +641,7 @@ void main() {
     });
 
     test('serializes tableaux when non-empty', () {
-      final session = createSession(
-        tableaux: [createTableau()],
-      );
+      final session = createSession(tableaux: [createTableau()]);
       final map = session.toMap();
 
       expect(map.containsKey('tableaux'), true);

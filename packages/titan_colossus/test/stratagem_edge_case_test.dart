@@ -15,10 +15,7 @@ void main() {
         testData: {},
         steps: [],
       );
-      expect(
-        s.interpolate(r'${testData.email}'),
-        r'${testData.email}',
-      );
+      expect(s.interpolate(r'${testData.email}'), r'${testData.email}');
     });
 
     test('mixed known + unknown variables resolve correctly', () {
@@ -41,10 +38,7 @@ void main() {
         testData: {'user_name_2': 'Bob'},
         steps: [],
       );
-      expect(
-        s.interpolate(r'${testData.user_name_2}'),
-        'Bob',
-      );
+      expect(s.interpolate(r'${testData.user_name_2}'), 'Bob');
     });
 
     test('no interpolation markers returns string unchanged', () {
@@ -58,15 +52,8 @@ void main() {
     });
 
     test('null testData returns original string', () {
-      const s = Stratagem(
-        name: 'test',
-        startRoute: '/',
-        steps: [],
-      );
-      expect(
-        s.interpolate(r'${testData.any}'),
-        r'${testData.any}',
-      );
+      const s = Stratagem(name: 'test', startRoute: '/', steps: []);
+      expect(s.interpolate(r'${testData.any}'), r'${testData.any}');
     });
   });
 
@@ -86,12 +73,7 @@ void main() {
     });
 
     test('empty tags list is omitted from JSON', () {
-      const s = Stratagem(
-        name: 'test',
-        startRoute: '/',
-        tags: [],
-        steps: [],
-      );
+      const s = Stratagem(name: 'test', startRoute: '/', tags: [], steps: []);
       final json = s.toJson();
       expect(json.containsKey('tags'), isFalse);
     });
@@ -192,11 +174,7 @@ void main() {
   // -------------------------------------------------------------------------
   group('StratagemStep — _actionFromName', () {
     test('invalid action string throws FormatException', () {
-      final json = {
-        'id': 1,
-        'action': 'fly',
-        'description': '',
-      };
+      final json = {'id': 1, 'action': 'fly', 'description': ''};
       expect(
         () => StratagemStep.fromJson(json),
         throwsA(isA<FormatException>()),
@@ -204,11 +182,7 @@ void main() {
     });
 
     test('FormatException message lists valid actions', () {
-      final json = {
-        'id': 1,
-        'action': 'teleport',
-        'description': '',
-      };
+      final json = {'id': 1, 'action': 'teleport', 'description': ''};
       try {
         StratagemStep.fromJson(json);
         fail('Should have thrown');
@@ -259,10 +233,7 @@ void main() {
     });
 
     test('ancestor mismatch returns null', () {
-      const target = StratagemTarget(
-        label: 'OK',
-        ancestor: 'Dialog',
-      );
+      const target = StratagemTarget(label: 'OK', ancestor: 'Dialog');
       final tableau = makeTableau([
         Glyph(
           label: 'OK',
@@ -280,10 +251,7 @@ void main() {
     });
 
     test('ancestor match returns glyph', () {
-      const target = StratagemTarget(
-        label: 'OK',
-        ancestor: 'Column',
-      );
+      const target = StratagemTarget(label: 'OK', ancestor: 'Column');
       final tableau = makeTableau([
         Glyph(
           label: 'OK',
@@ -487,20 +455,14 @@ void main() {
   // -------------------------------------------------------------------------
   group('StratagemElementState — toString', () {
     test('with value shows value in output', () {
-      const state = StratagemElementState(
-        label: 'Slider',
-        value: '50',
-      );
+      const state = StratagemElementState(label: 'Slider', value: '50');
       final s = state.toString();
       expect(s, contains('Slider'));
       expect(s, contains('50'));
     });
 
     test('with type shows type in output', () {
-      const state = StratagemElementState(
-        label: 'OK',
-        type: 'Button',
-      );
+      const state = StratagemElementState(label: 'OK', type: 'Button');
       final s = state.toString();
       expect(s, contains('OK'));
       expect(s, contains('Button'));

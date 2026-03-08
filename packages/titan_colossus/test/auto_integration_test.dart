@@ -199,16 +199,18 @@ void main() {
       });
 
       for (var i = 0; i < 3; i++) {
-        colossus.learnFromSession(ShadeSession(
-          id: 'multi_$i',
-          name: 'multi_$i',
-          recordedAt: DateTime(2025, 1, 1),
-          duration: Duration.zero,
-          screenWidth: 375,
-          screenHeight: 812,
-          devicePixelRatio: 2.0,
-          imprints: [],
-        ));
+        colossus.learnFromSession(
+          ShadeSession(
+            id: 'multi_$i',
+            name: 'multi_$i',
+            recordedAt: DateTime(2025, 1, 1),
+            duration: Duration.zero,
+            screenWidth: 375,
+            screenHeight: 812,
+            devicePixelRatio: 2.0,
+            imprints: [],
+          ),
+        );
       }
 
       expect(count, 3);
@@ -221,10 +223,7 @@ void main() {
       Colossus.shutdown();
 
       // After dispose, adding a listener should throw
-      expect(
-        () => notifier.addListener(() {}),
-        throwsA(isA<FlutterError>()),
-      );
+      expect(() => notifier.addListener(() {}), throwsA(isA<FlutterError>()));
     });
 
     test('auto-learn pipeline end-to-end: stop → learn → notify', () {
@@ -354,16 +353,14 @@ void main() {
       Chronicle.reset();
     });
 
-    testWidgets('onAttach creates Colossus with autoLearnSessions',
-        (tester) async {
+    testWidgets('onAttach creates Colossus with autoLearnSessions', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         Beacon(
           pillars: const [],
           plugins: const [
-            ColossusPlugin(
-              enableLens: false,
-              autoLearnSessions: true,
-            ),
+            ColossusPlugin(enableLens: false, autoLearnSessions: true),
           ],
           child: const SizedBox(),
         ),
@@ -373,16 +370,14 @@ void main() {
       expect(Colossus.instance.shade.onRecordingStopped, isNotNull);
     });
 
-    testWidgets('onAttach with autoLearnSessions: false leaves callback null',
-        (tester) async {
+    testWidgets('onAttach with autoLearnSessions: false leaves callback null', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         Beacon(
           pillars: const [],
           plugins: const [
-            ColossusPlugin(
-              enableLens: false,
-              autoLearnSessions: false,
-            ),
+            ColossusPlugin(enableLens: false, autoLearnSessions: false),
           ],
           child: const SizedBox(),
         ),
@@ -392,16 +387,14 @@ void main() {
       expect(Colossus.instance.shade.onRecordingStopped, isNull);
     });
 
-    testWidgets('onAttach passes enableTableauCapture to Colossus.init',
-        (tester) async {
+    testWidgets('onAttach passes enableTableauCapture to Colossus.init', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         Beacon(
           pillars: const [],
           plugins: const [
-            ColossusPlugin(
-              enableLens: false,
-              enableTableauCapture: true,
-            ),
+            ColossusPlugin(enableLens: false, enableTableauCapture: true),
           ],
           child: const SizedBox(),
         ),
@@ -412,15 +405,11 @@ void main() {
       // (We verify by checking that init succeeded — the param was accepted)
     });
 
-    testWidgets(
-        'onDetach shuts down Colossus cleanly',
-        (tester) async {
+    testWidgets('onDetach shuts down Colossus cleanly', (tester) async {
       await tester.pumpWidget(
         Beacon(
           pillars: const [],
-          plugins: const [
-            ColossusPlugin(enableLens: false),
-          ],
+          plugins: const [ColossusPlugin(enableLens: false)],
           child: const SizedBox(),
         ),
       );
@@ -454,16 +443,14 @@ void main() {
       Chronicle.reset();
     });
 
-    testWidgets('Plugin → auto-learn → terrain notifier pipeline',
-        (tester) async {
+    testWidgets('Plugin → auto-learn → terrain notifier pipeline', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         Beacon(
           pillars: const [],
           plugins: const [
-            ColossusPlugin(
-              enableLens: false,
-              autoLearnSessions: true,
-            ),
+            ColossusPlugin(enableLens: false, autoLearnSessions: true),
           ],
           child: const SizedBox(),
         ),
@@ -523,10 +510,7 @@ void main() {
       );
 
       // Should not throw
-      expect(
-        () => colossus.learnFromSession(session),
-        returnsNormally,
-      );
+      expect(() => colossus.learnFromSession(session), returnsNormally);
     });
   });
 }
