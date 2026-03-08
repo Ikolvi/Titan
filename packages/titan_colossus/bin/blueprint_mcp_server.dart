@@ -491,7 +491,11 @@ class _BlueprintMcpServer {
                 'time and observes the result. Supports all Flutter '
                 'interactions: tap, enterText, clearText, scroll, '
                 'back, longPress, swipe, navigate, waitForElement, '
-                'and more. After the action, the new screen state '
+                'submitField, dismissKeyboard, and more. For text '
+                'entry: use enterText with label (the field\'s '
+                'visible label) and value (text to type). The '
+                'keyboard is automatically dismissed after text '
+                'actions. After the action, the new screen state '
                 'is automatically returned (no need to call scry '
                 'separately). IMPORTANT: If an element is marked '
                 'with ⚠️ "requires permission" in the scry output, '
@@ -514,14 +518,16 @@ class _BlueprintMcpServer {
                   'description':
                       'Target element by its visible label text. '
                       'Used for tap, longPress, doubleTap, swipe, '
-                      'waitForElement, waitForElementGone.',
+                      'enterText, clearText, waitForElement, '
+                      'waitForElementGone. For text fields, use the '
+                      'field label shown in the scry output.',
                 },
                 'fieldId': {
                   'type': 'string',
                   'description':
-                      'Target text field by its field ID. Used for '
-                      'enterText, clearText. Get field IDs from the '
-                      'scry output.',
+                      'Target text field by its field ID (auto-'
+                      'resolved to label). Only needed when a field '
+                      'has no visible label. Prefer using label.',
                 },
                 'value': {
                   'type': 'string',
@@ -2156,14 +2162,19 @@ class _BlueprintMcpServer {
           'Missing required parameter: `action`. '
           'Specify one of: tap, enterText, clearText, scroll, back, '
           'longPress, doubleTap, swipe, navigate, waitForElement, '
-          'waitForElementGone, pressKey, submitField.';
+          'waitForElementGone, pressKey, submitField, dismissKeyboard.';
     }
 
-    final label = args['label'] as String?;
+    var label = args['label'] as String?;
     final fieldId = args['fieldId'] as String?;
     final value = args['value'] as String?;
 
-    if (label == null && fieldId == null && action != 'back') {
+    if (label == null &&
+        fieldId == null &&
+        action != 'back' &&
+        action != 'navigate' &&
+        action != 'dismissKeyboard' &&
+        action != 'scroll') {
       return '# Scry Act Failed\n\n'
           'Missing target: provide `label` or `fieldId` to identify '
           'the element to interact with. Use `scry` first to see '
@@ -2171,18 +2182,37 @@ class _BlueprintMcpServer {
     }
 
     try {
-      // Build and execute a 1-step campaign
+      // Resolve fieldId → label when only fieldId is provided.
+      // StratagemTarget matches by label, not fieldId, so we need
+      // to look up the field's display label from the current glyphs.
+      if (label == null && fieldId != null) {
+        final blueprint = await _fetchBlueprintData();
+        final tableau =
+            blueprint?['currentTableau'] as Map<String, dynamic>? ??
+            const {};
+        final glyphs = tableau['glyphs'] as List<dynamic>? ?? [];
+        label = _scryEngine.resolveFieldLabel(glyphs, fieldId);
+        if (label == null) {
+          return '# Scry Act Failed\n\n'
+              'Could not find a text field with fieldId "$fieldId" on the '
+              'current screen. Use `scry` to see available fields and '
+              'their labels.';
+        }
+      }
+
+      // Build and execute the campaign
       final campaign = _scryEngine.buildActionCampaign(
         action: action,
         label: label,
-        fieldId: fieldId,
         value: value,
       );
 
       final result = await _executeRawCampaign(campaign);
 
-      // Brief settle delay for screen to update
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      // Settle delay for screen to update after navigation transitions.
+      // Actions like sign-out trigger reactive redirects (CoreRefresh)
+      // that need several frames to complete the full navigation chain.
+      await Future<void>.delayed(const Duration(milliseconds: 1000));
 
       // Observe the new screen state
       final blueprint = await _fetchBlueprintData();

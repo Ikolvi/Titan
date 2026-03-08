@@ -289,6 +289,11 @@ class Scry {
     final navigationLabels = <String>{};
     final structuralLabels = <String>{};
     final fieldIds = <String, String>{};
+    final textInputLabels = <String>{};
+    final preferredWidgetType = <String, String>{};
+    final preferredInteractionType = <String, String>{};
+    final preferredSemanticRole = <String, String>{};
+    final preferredCurrentValue = <String, String>{};
 
     // --- Pass 1: Classify labels ---
     for (final g in glyphs) {
@@ -315,6 +320,27 @@ class Scry {
         fieldIds[label] = fieldId;
       }
 
+      // Track text input widgets — these take classification priority
+      if (_isTextInputWidget(wt)) {
+        textInputLabels.add(label);
+        preferredWidgetType[label] = wt;
+        final it = glyph['it'] as String?;
+        if (it != null) preferredInteractionType[label] = it;
+        final sr = glyph['sr'] as String?;
+        if (sr != null) preferredSemanticRole[label] = sr;
+        final cv = glyph['cv'] as String?;
+        if (cv != null) preferredCurrentValue[label] = cv;
+      }
+
+      // Track interactive widgets as preferred (if no text input yet)
+      if (isInteractive && !preferredWidgetType.containsKey(label)) {
+        preferredWidgetType[label] = wt;
+        final it = glyph['it'] as String?;
+        if (it != null) preferredInteractionType[label] = it;
+        final sr = glyph['sr'] as String?;
+        if (sr != null) preferredSemanticRole[label] = sr;
+      }
+
       // Detect navigation elements
       if (_isNavigationWidget(wtLower, ancestors)) {
         navigationLabels.add(label);
@@ -337,12 +363,20 @@ class Scry {
       // Skip if already processed (dedup by label)
       if (seen.containsKey(label)) continue;
 
-      final wt = glyph['wt'] as String? ?? '';
-      final sr = glyph['sr'] as String?;
-      final it = glyph['it'] as String?;
-      final cv = glyph['cv'] as String?;
+      // Use the preferred (most representative) widget type from Pass 1.
+      // For example, if "Hero Name" appears as RichText, Text, and
+      // TextField, we want "TextField" — the interactive text input.
+      final wt = preferredWidgetType[label] ??
+          (glyph['wt'] as String? ?? '');
+      final sr = preferredSemanticRole[label] ??
+          (glyph['sr'] as String?);
+      final it = preferredInteractionType[label] ??
+          (glyph['it'] as String?);
+      final cv = preferredCurrentValue[label] ??
+          (glyph['cv'] as String?);
       final isEnabled = glyph['en'] as bool? ?? true;
       final fieldId = fieldIds[label];
+      final isTextField = textInputLabels.contains(label);
 
       // Determine element kind
       final kind = _classifyElement(
@@ -353,6 +387,7 @@ class Scry {
         isInteractive: interactiveLabels.contains(label),
         isNavigation: navigationLabels.contains(label),
         isStructural: structuralLabels.contains(label),
+        isTextField: isTextField,
       );
 
       // Check if this action is gated (destructive)
@@ -429,6 +464,9 @@ class Scry {
     if (gaze.fields.isNotEmpty) {
       buf.writeln('## 📝 Text Fields (${gaze.fields.length})');
       buf.writeln();
+      buf.writeln('Use `scry_act(action: "enterText", label: "<label>", '
+          'value: "<text>")` to type into a field.');
+      buf.writeln();
       for (final f in gaze.fields) {
         final parts = <String>[f.widgetType];
         if (f.fieldId != null) parts.add('fieldId: ${f.fieldId}');
@@ -496,16 +534,39 @@ class Scry {
     return buf.toString();
   }
 
-  /// Build a 1-step Campaign JSON from a single action request.
+  /// Resolve a `fieldId` to its display label from live glyphs.
+  ///
+  /// When the AI targets a text field by `fieldId` (e.g.
+  /// `scry_act(fieldId: 'hero_name')`), this method finds the
+  /// matching glyph and returns its label for use in campaign
+  /// targeting (since [StratagemTarget] resolves by label, not fieldId).
+  ///
+  /// Returns `null` if no glyph matches the given [fieldId].
+  String? resolveFieldLabel(List<dynamic> glyphs, String fieldId) {
+    for (final g in glyphs) {
+      final glyph = g as Map<String, dynamic>;
+      if (glyph['fid'] == fieldId) {
+        return glyph['l'] as String?;
+      }
+    }
+    return null;
+  }
+
+  /// Text-entry actions that require keyboard dismissal afterwards.
+  static const _textActions = {'enterText', 'clearText', 'submitField'};
+
+  /// Build a Campaign JSON from a single action request.
   ///
   /// Wraps the action in a minimal Campaign structure that the
-  /// Relay's `POST /campaign` endpoint can execute.
+  /// Relay's `POST /campaign` endpoint can execute. For text-entry
+  /// actions (`enterText`, `clearText`, `submitField`), a
+  /// `dismissKeyboard` step is automatically appended so the
+  /// keyboard doesn't block the follow-up screen observation.
   ///
   /// [action] — one of: tap, enterText, clearText, scroll, back,
   ///   longPress, doubleTap, swipe, waitForElement, waitForElementGone,
-  ///   navigate, pressKey, etc.
-  /// [label] — target element label (for tap, longPress, etc.)
-  /// [fieldId] — target field ID (for enterText, clearText)
+  ///   navigate, pressKey, submitField, dismissKeyboard, etc.
+  /// [label] — target element label (for tap, enterText, clearText, etc.)
   /// [value] — text to enter (for enterText) or navigation route
   ///   (for navigate)
   /// [timeout] — timeout in ms for wait actions (default: 5000)
@@ -513,33 +574,50 @@ class Scry {
   /// ```dart
   /// const scry = Scry();
   /// final campaign = scry.buildActionCampaign(
-  ///   action: 'tap',
-  ///   label: 'Sign Out',
+  ///   action: 'enterText',
+  ///   label: 'Hero Name',
+  ///   value: 'Kael',
   /// );
-  /// // Produces a Campaign JSON with a single tap step
+  /// // Produces a Campaign with enterText + dismissKeyboard steps
   /// ```
   Map<String, dynamic> buildActionCampaign({
     required String action,
     String? label,
-    String? fieldId,
     String? value,
     int timeout = 5000,
   }) {
     final target = <String, dynamic>{};
     if (label != null) target['label'] = label;
-    if (fieldId != null) target['fieldId'] = fieldId;
 
     // If no explicit target, use a dummy for navigation actions
     if (target.isEmpty && action != 'back' && action != 'navigate') {
       target['label'] = label ?? '';
     }
 
+    var stepId = 1;
+
+    final steps = <Map<String, dynamic>>[];
+
+    // For text-entry actions, add a waitForElement step first to ensure
+    // the target field is present and the screen has settled. This
+    // prevents silent failures when the screen is mid-transition
+    // (e.g. IgnorePointer blocking events during route animation).
+    if (_textActions.contains(action) && target.isNotEmpty) {
+      steps.add({
+        'id': stepId++,
+        'action': 'waitForElement',
+        'target': Map<String, dynamic>.from(target),
+        'timeout': timeout,
+      });
+    }
+
     final step = <String, dynamic>{
-      'id': 1,
+      'id': stepId++,
       'action': action,
       if (target.isNotEmpty) 'target': target,
       // ignore: use_null_aware_elements
       if (value != null) 'value': value,
+      if (action == 'enterText') 'clearFirst': true,
       if (action == 'waitForElement' || action == 'waitForElementGone')
         'timeout': timeout,
     };
@@ -549,14 +627,21 @@ class Scry {
       step['target'] = {'route': value};
     }
 
+    steps.add(step);
+
+    // Auto-dismiss keyboard after text actions so observation isn't blocked
+    if (_textActions.contains(action)) {
+      steps.add({'id': stepId, 'action': 'dismissKeyboard'});
+    }
+
     return {
       'name': '_scry_action',
       'entries': [
         {
           'stratagem': {
             'name': '_scry_step',
-            'startRoute': '/',
-            'steps': [step],
+            'startRoute': '',
+            'steps': steps,
           },
         },
       ],
@@ -642,9 +727,13 @@ class Scry {
     required bool isInteractive,
     required bool isNavigation,
     required bool isStructural,
+    bool isTextField = false,
   }) {
-    // Fields first (text inputs)
-    if (semanticRole == 'textField' ||
+    // Fields first (text inputs) — includes labels that have a
+    // text input widget anywhere in their glyph set, even if the
+    // first glyph seen was a non-input (e.g. RichText label).
+    if (isTextField ||
+        semanticRole == 'textField' ||
         fieldId != null ||
         _isTextInputWidget(widgetType)) {
       return ScryElementKind.field;

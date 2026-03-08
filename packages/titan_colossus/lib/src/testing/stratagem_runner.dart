@@ -384,14 +384,22 @@ class StratagemRunner {
       case StratagemAction.enterText:
         // Tap to focus, then inject text
         await _dispatchTap(target!.centerX, target.centerY);
-        await Future<void>.delayed(const Duration(milliseconds: 100));
         final text = stratagem.interpolate(step.value ?? '');
-        await _injectText(text, clearFirst: step.clearFirst ?? true);
+        await _injectText(
+          text,
+          clearFirst: step.clearFirst ?? true,
+          targetX: target.centerX,
+          targetY: target.centerY,
+        );
 
       case StratagemAction.clearText:
         await _dispatchTap(target!.centerX, target.centerY);
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        await _injectText('', clearFirst: true);
+        await _injectText(
+          '',
+          clearFirst: true,
+          targetX: target.centerX,
+          targetY: target.centerY,
+        );
 
       case StratagemAction.submitField:
         // Trigger text input action (done/next/go)
@@ -755,17 +763,112 @@ class StratagemRunner {
   // Text injection
   // -----------------------------------------------------------------------
 
-  /// Inject text into the currently focused text field.
-  Future<void> _injectText(String text, {bool clearFirst = true}) async {
+  /// Inject text into the focused (or position-matched) text field.
+  ///
+  /// Uses a three-strategy approach:
+  /// 1. **FocusManager** — wait for focus to establish after the tap,
+  ///    then traverse ancestors to find the [EditableText] controller.
+  /// 2. **Position-based lookup** — walk the element tree to find an
+  ///    [EditableText] whose render box contains ([targetX], [targetY]).
+  ///    This works even when the tap doesn't establish focus (e.g. on
+  ///    macOS desktop where touch events may not trigger text field focus).
+  /// 3. **ShadeTextController registry** — single-controller shortcut
+  ///    when exactly one controller is registered.
+  ///
+  /// Throws [StateError] if no controller is found.
+  Future<void> _injectText(
+    String text, {
+    bool clearFirst = true,
+    double? targetX,
+    double? targetY,
+  }) async {
     final value = TextEditingValue(
       text: text,
       selection: TextSelection.collapsed(offset: text.length),
     );
 
-    // Try ShadeTextController registry
-    final controllers = shade.textControllers.values;
-    if (controllers.length == 1) {
-      final controller = controllers.first;
+    // Strategy 1: Poll for focus to be established after the tap.
+    TextEditingController? controller;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      final focus = FocusManager.instance.primaryFocus;
+      if (focus?.context != null) {
+        focus!.context!.visitAncestorElements((element) {
+          if (element.widget is EditableText) {
+            controller = (element.widget as EditableText).controller;
+            return false;
+          }
+          return true;
+        });
+        if (controller != null) break;
+      }
+    }
+
+    // Strategy 2: Position-based lookup — find EditableText at tap position
+    if (controller == null && targetX != null && targetY != null) {
+      controller = _findControllerAtPosition(targetX, targetY);
+    }
+
+    // Strategy 3: ShadeTextController registry (single-controller shortcut)
+    if (controller == null) {
+      final controllers = shade.textControllers.values;
+      if (controllers.length == 1) {
+        controller = controllers.first;
+      }
+    }
+
+    if (controller == null) {
+      throw StateError(
+        'Text injection failed: could not find a TextEditingController. '
+        'primaryFocus: ${FocusManager.instance.primaryFocus}, '
+        'shadeControllers: ${shade.textControllers.length}',
+      );
+    }
+
+    _applyTextValue(controller!, value, clearFirst: clearFirst);
+  }
+
+  /// Find a [TextEditingController] from an [EditableText] widget whose
+  /// render box contains the given screen coordinates.
+  ///
+  /// Walks the entire element tree looking for [EditableText] widgets,
+  /// then checks if their rendered position contains the point. This is
+  /// the most reliable approach as it doesn't depend on focus state or
+  /// the ShadeTextController registry.
+  TextEditingController? _findControllerAtPosition(double x, double y) {
+    final point = Offset(x, y);
+    TextEditingController? result;
+
+    void visit(Element element) {
+      if (result != null) return;
+      if (element.widget is EditableText) {
+        final renderObject = element.renderObject;
+        if (renderObject is RenderBox && renderObject.hasSize) {
+          final position = renderObject.localToGlobal(Offset.zero);
+          final bounds = position & renderObject.size;
+          if (bounds.contains(point)) {
+            result = (element.widget as EditableText).controller;
+            return;
+          }
+        }
+      }
+      element.visitChildren(visit);
+    }
+
+    final root = WidgetsBinding.instance.rootElement;
+    root?.visitChildren(visit);
+    return result;
+  }
+
+  /// Apply a [TextEditingValue] to a controller, using
+  /// [ShadeTextController.setValueSilently] when available to avoid
+  /// recording the injected text as a user interaction.
+  void _applyTextValue(
+    TextEditingController controller,
+    TextEditingValue value, {
+    bool clearFirst = true,
+  }) {
+    if (controller is ShadeTextController) {
       if (clearFirst) {
         controller.setValueSilently(
           const TextEditingValue(
@@ -775,43 +878,14 @@ class StratagemRunner {
         );
       }
       controller.setValueSilently(value);
-      return;
-    }
-
-    // Fallback: find the focused EditableText
-    final focus = FocusManager.instance.primaryFocus;
-    if (focus?.context == null) return;
-
-    TextEditingController? target;
-    focus!.context!.visitAncestorElements((element) {
-      if (element.widget is EditableText) {
-        target = (element.widget as EditableText).controller;
-        return false;
+    } else {
+      if (clearFirst) {
+        controller.value = const TextEditingValue(
+          text: '',
+          selection: TextSelection.collapsed(offset: 0),
+        );
       }
-      return true;
-    });
-
-    if (target != null) {
-      final resolved = target!;
-      if (resolved is ShadeTextController) {
-        if (clearFirst) {
-          resolved.setValueSilently(
-            const TextEditingValue(
-              text: '',
-              selection: TextSelection.collapsed(offset: 0),
-            ),
-          );
-        }
-        resolved.setValueSilently(value);
-      } else {
-        if (clearFirst) {
-          resolved.value = const TextEditingValue(
-            text: '',
-            selection: TextSelection.collapsed(offset: 0),
-          );
-        }
-        resolved.value = value;
-      }
+      controller.value = value;
     }
   }
 

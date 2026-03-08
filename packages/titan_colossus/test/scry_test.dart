@@ -645,6 +645,32 @@ void main() {
       expect(gaze.content.map((e) => e.label),
           contains('Sign in to continue to /'));
     });
+
+    test('TextField classified correctly even when RichText appears first', () {
+      // In real apps, the RichText label inside a TextField's decoration
+      // appears EARLIER in the glyph list than the TextField itself.
+      // Scry must still classify "Hero Name" as a field, not a button.
+      final glyphs = [
+        // RichText label (appears first at higher depth)
+        glyph(label: 'Hero Name', widgetType: 'RichText'),
+        // Text label (also in decoration)
+        glyph(label: 'Hero Name', widgetType: 'Text'),
+        // The actual TextField (lower depth, interactive)
+        glyph(
+          label: 'Hero Name',
+          widgetType: 'TextField',
+          interactive: true,
+          interactionType: 'textInput',
+        ),
+      ];
+
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.fields, hasLength(1));
+      expect(gaze.fields.first.label, 'Hero Name');
+      expect(gaze.fields.first.widgetType, 'TextField');
+      expect(gaze.buttons, isEmpty);
+    });
   });
 
   // ===================================================================
@@ -706,7 +732,7 @@ void main() {
       expect(md, contains('Delete All'));
     });
 
-    test('lists text fields with fieldId', () {
+    test('lists text fields with fieldId and usage hint', () {
       const gaze = ScryGaze(
         elements: [
           ScryElement(
@@ -725,6 +751,8 @@ void main() {
       expect(md, contains('Hero Name'));
       expect(md, contains('fieldId: heroName'));
       expect(md, contains('value: "Kael"'));
+      expect(md, contains('enterText'));
+      expect(md, contains('label'));
     });
 
     test('lists buttons', () {
@@ -832,10 +860,10 @@ void main() {
       expect((step['target'] as Map)['label'], 'Sign Out');
     });
 
-    test('builds enterText campaign with value', () {
+    test('builds enterText campaign with wait + dismiss', () {
       final campaign = scry.buildActionCampaign(
         action: 'enterText',
-        fieldId: 'heroName',
+        label: 'Hero Name',
         value: 'Titan',
       );
 
@@ -843,11 +871,23 @@ void main() {
       final stratagem =
           (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
       final steps = stratagem['steps'] as List;
-      final step = steps[0] as Map<String, dynamic>;
 
+      // Step 1: waitForElement (auto-added for text actions)
+      expect(steps, hasLength(3));
+      final wait = steps[0] as Map<String, dynamic>;
+      expect(wait['action'], 'waitForElement');
+      expect((wait['target'] as Map)['label'], 'Hero Name');
+
+      // Step 2: enterText
+      final step = steps[1] as Map<String, dynamic>;
       expect(step['action'], 'enterText');
-      expect((step['target'] as Map)['fieldId'], 'heroName');
+      expect((step['target'] as Map)['label'], 'Hero Name');
       expect(step['value'], 'Titan');
+      expect(step['clearFirst'], isTrue);
+
+      // Step 3: auto dismissKeyboard
+      final dismiss = steps[2] as Map<String, dynamic>;
+      expect(dismiss['action'], 'dismissKeyboard');
     });
 
     test('builds back campaign without target', () {
@@ -913,6 +953,84 @@ void main() {
       expect(stratagem, contains('name'));
       expect(stratagem, contains('startRoute'));
       expect(stratagem, contains('steps'));
+    });
+
+    test('clearText has wait + dismiss steps', () {
+      final campaign = scry.buildActionCampaign(
+        action: 'clearText',
+        label: 'Hero Name',
+      );
+
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+
+      expect(steps, hasLength(3));
+      expect((steps[0] as Map)['action'], 'waitForElement');
+      expect((steps[1] as Map)['action'], 'clearText');
+      expect((steps[2] as Map)['action'], 'dismissKeyboard');
+    });
+
+    test('submitField has wait + dismiss steps', () {
+      final campaign = scry.buildActionCampaign(
+        action: 'submitField',
+        label: 'Hero Name',
+      );
+
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+
+      expect(steps, hasLength(3));
+      expect((steps[0] as Map)['action'], 'waitForElement');
+      expect((steps[1] as Map)['action'], 'submitField');
+      expect((steps[2] as Map)['action'], 'dismissKeyboard');
+    });
+
+    test('tap does NOT auto-dismiss keyboard', () {
+      final campaign = scry.buildActionCampaign(
+        action: 'tap',
+        label: 'Sign Out',
+      );
+
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+
+      expect(steps, hasLength(1));
+      expect((steps[0] as Map)['action'], 'tap');
+    });
+  });
+
+  // ===================================================================
+  // Scry.resolveFieldLabel
+  // ===================================================================
+  group('Scry.resolveFieldLabel', () {
+    test('resolves fieldId to label', () {
+      final glyphs = [
+        {'wt': 'TextField', 'l': 'Hero Name', 'fid': 'heroName',
+         'ia': true, 'x': 0.0, 'y': 0.0, 'w': 200.0, 'h': 40.0},
+        {'wt': 'Text', 'l': 'Welcome', 'x': 0.0, 'y': 50.0,
+         'w': 100.0, 'h': 20.0},
+      ];
+
+      expect(scry.resolveFieldLabel(glyphs, 'heroName'), 'Hero Name');
+    });
+
+    test('returns null for unknown fieldId', () {
+      final glyphs = [
+        {'wt': 'TextField', 'l': 'Hero Name', 'fid': 'heroName',
+         'ia': true, 'x': 0.0, 'y': 0.0, 'w': 200.0, 'h': 40.0},
+      ];
+
+      expect(scry.resolveFieldLabel(glyphs, 'email'), isNull);
+    });
+
+    test('returns null for empty glyphs', () {
+      expect(scry.resolveFieldLabel([], 'heroName'), isNull);
     });
   });
 
