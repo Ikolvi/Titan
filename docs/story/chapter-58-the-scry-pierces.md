@@ -355,7 +355,7 @@ All on its own.
 
 ---
 
-*Next: [Chapter LIX — ???](chapter-59-todo.md)*
+*Next: [Chapter LIX — The Gaze Deepens](chapter-59-the-gaze-deepens.md)*
 
 ---
 

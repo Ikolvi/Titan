@@ -38,6 +38,10 @@ Titan's enterprise performance monitoring package provides frame tracking, page 
 | Blueprint Overlay | **BlueprintLensTab** | `BlueprintLensTab` |
 | HTTP Bridge | **Relay** | `Relay`, `RelayConfig`, `RelayStatus`, `RelayHandler` |
 | AI Agent Interface | **Scry** | `Scry`, `ScryGaze`, `ScryElement`, `ScryElementKind` |
+| Screen Type | **ScryScreenType** | `ScryScreenType` (login, form, list, detail, settings, empty, error, dashboard) |
+| Screen Alert | **ScryAlert** | `ScryAlert`, `ScryAlertSeverity` |
+| Data Pair | **ScryKeyValue** | `ScryKeyValue` |
+| State Diff | **ScryDiff** | `ScryDiff` |
 
 ## Installation
 
@@ -1223,7 +1227,7 @@ Scry gives AI assistants (via MCP) live vision of the running app. Instead of ex
 ### The Agent Loop
 
 ```
-scry (observe) → AI decides → scry_act (act) → new screen state → repeat
+scry (observe) → AI decides → scry_act (act) → scry_diff (compare) → repeat
 ```
 
 ### Observing
@@ -1232,11 +1236,102 @@ scry (observe) → AI decides → scry_act (act) → new screen state → repeat
 const scry = Scry();
 final gaze = scry.observe(glyphs, route: '/login');
 
-gaze.buttons;    // Tappable elements
-gaze.fields;     // Text inputs (with current values)
-gaze.navigation; // Nav items
-gaze.content;    // Display-only text
-gaze.gated;      // ⚠️ Destructive actions
+gaze.buttons;     // Tappable elements
+gaze.fields;      // Text inputs (with current values)
+gaze.navigation;  // Nav items
+gaze.content;     // Display-only text
+gaze.gated;       // ⚠️ Destructive actions
+gaze.screenType;  // ScryScreenType.login, .form, .list, etc.
+gaze.alerts;      // Errors, warnings, loading indicators
+gaze.dataFields;  // Detected key-value data pairs
+gaze.suggestions; // Context-aware action recommendations
+```
+
+### Screen Type Detection
+
+Scry automatically classifies each screen into one of 9 types:
+
+| Type | Detection Logic |
+|------|----------------|
+| `login` | Text fields + login/signin/enter button |
+| `form` | Multiple fields + submit/save button |
+| `list` | Many similar content items, no fields |
+| `detail` | Key-value data pairs, no input fields |
+| `settings` | Toggles, switches, checkboxes, dropdowns |
+| `empty` | Very few elements, no meaningful content |
+| `error` | Error alerts visible (snackbar, error text) |
+| `dashboard` | Mix of navigation, content, and buttons |
+| `unknown` | Cannot be classified |
+
+### Alert Detection
+
+Scry detects error messages, loading states, and notices from the glyph tree:
+
+```dart
+gaze.hasErrors;  // true if error alerts present
+gaze.isLoading;  // true if loading indicators present
+
+for (final alert in gaze.alerts) {
+  switch (alert.severity) {
+    case ScryAlertSeverity.error:   // SnackBar errors, error text
+    case ScryAlertSeverity.warning: // Warning keywords in content
+    case ScryAlertSeverity.info:    // SnackBar/Banner notices
+    case ScryAlertSeverity.loading: // Progress indicators
+  }
+}
+```
+
+**Detected sources:**
+- `CircularProgressIndicator`, `LinearProgressIndicator` → loading
+- `SnackBar`, `MaterialBanner` ancestors → info or error (based on text)
+- Error keywords ("try again", "went wrong", "could not") → warning
+
+### Key-Value Pair Extraction
+
+Scry detects structured data displays using two strategies:
+
+1. **Inline patterns** — `"Class: Scout"` parsed as key=Class, value=Scout
+2. **Spatial proximity** — Two labels on the same Y row, left one short → paired
+
+```dart
+for (final kv in gaze.dataFields) {
+  print('${kv.key}: ${kv.value}');
+  // Class: Scout
+  // Level: Novice
+  // Glory: 0
+}
+```
+
+### Action Suggestions
+
+Based on screen type, Scry generates context-aware recommendations:
+
+```dart
+gaze.suggestions;
+// Login screen → "Enter credentials in 'Hero Name' and tap 'Enter the Questboard'."
+// Form screen → "Fill in 'First Name', 'Last Name', then tap 'Save'."
+// List screen → "Tap an item to see its details."
+// Error screen → "Note the error message and navigate back or retry."
+```
+
+### State Diff (scry_diff)
+
+Compare two observations to see what changed after an action:
+
+```dart
+final before = scry.observe(glyphsBefore, route: '/login');
+// ... perform action ...
+final after = scry.observe(glyphsAfter, route: '/quests');
+final diff = scry.diff(before, after);
+
+diff.routeChanged;      // true — /login → /quests
+diff.screenTypeChanged; // true — login → list
+diff.appeared;          // [New elements visible after action]
+diff.disappeared;       // [Elements no longer visible]
+diff.changedValues;     // {'Score': {'from': '10', 'to': '20'}}
+diff.hasChanges;        // true if anything changed
+
+print(diff.format());   // AI-readable markdown summary
 ```
 
 ### Acting (Single)
@@ -1265,8 +1360,9 @@ Combine multiple actions in one call:
 
 | Tool | Purpose |
 |------|---------|
-| `scry` | Observe the current screen |
-| `scry_act` | Perform action(s) and observe result |
+| `scry` | Observe the current screen (returns formatted Gaze with intelligence) |
+| `scry_act` | Perform action(s) and observe result (single or multi-action) |
+| `scry_diff` | Compare current screen against previous observation |
 
 ### Element Classification
 
@@ -1291,7 +1387,7 @@ When entering text, three strategies are tried in order:
 ## Testing
 
 ```bash
-cd packages/titan_colossus && fvm flutter test  # 1466+ tests
+cd packages/titan_colossus && fvm flutter test  # 1517+ tests
 ```
 
 ---
