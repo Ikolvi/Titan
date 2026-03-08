@@ -1014,10 +1014,14 @@ Map<String, dynamic> _scryGlyph({
     'w': 100.0,
     'h': 48.0,
     'ia': interactive,
+    // ignore: use_null_aware_elements
     if (interactionType != null) 'it': interactionType,
+    // ignore: use_null_aware_elements
     if (fieldId != null) 'fid': fieldId,
+    // ignore: use_null_aware_elements
     if (currentValue != null) 'cv': currentValue,
     'd': depth,
+    // ignore: use_null_aware_elements
     if (ancestors != null) 'anc': ancestors,
     'en': true,
   };

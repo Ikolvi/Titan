@@ -1465,8 +1465,16 @@ class Scry {
     _detectOverlaps(elementList, maxDepth);
 
     // --- Pass 4: Intelligence layer ---
-    final alerts = _detectAlerts(glyphs);
-    final dataFields = _extractKeyValuePairs(glyphs);
+    final alerts = _detectAlerts(
+      glyphs,
+      interactiveLabels: interactiveLabels,
+      navigationLabels: navigationLabels,
+    );
+    final dataFields = _extractKeyValuePairs(
+      glyphs,
+      interactiveLabels: interactiveLabels,
+      navigationLabels: navigationLabels,
+    );
     final screenType = _classifyScreen(elementList, alerts, dataFields);
     final suggestions = _generateSuggestions(elementList, screenType, alerts);
     final formStatus = _analyzeFormStatus(elementList, glyphs);
@@ -2424,7 +2432,11 @@ class Scry {
   // -----------------------------------------------------------------------
 
   /// Detect errors, warnings, loading states, and notices from raw glyphs.
-  List<ScryAlert> _detectAlerts(List<dynamic> glyphs) {
+  List<ScryAlert> _detectAlerts(
+    List<dynamic> glyphs, {
+    required Set<String> interactiveLabels,
+    required Set<String> navigationLabels,
+  }) {
     final alerts = <ScryAlert>[];
     final seenMessages = <String>{};
 
@@ -2453,6 +2465,12 @@ class Scry {
       // Snackbar / MaterialBanner / Toast (by widget type or ancestor)
       if (_noticeWidgetPattern.hasMatch(wt) ||
           _noticeWidgetPattern.hasMatch(ancestorStr)) {
+        // Skip interactive labels (button text inside a banner)
+        if (interactiveLabels.contains(label)) continue;
+        // Skip navigation labels
+        if (navigationLabels.contains(label)) continue;
+        // Skip very short labels (likely icon characters, not messages)
+        if (label.length < 2) continue;
         if (label.isNotEmpty && seenMessages.add(label)) {
           // Classify as error if text contains error keywords
           final severity = _errorTextPattern.hasMatch(label)
@@ -2515,10 +2533,20 @@ class Scry {
   /// Pattern for raw Unicode private-use-area glyphs (single emoji-like chars).
   static final _rawGlyphPattern = RegExp(r'^[\uE000-\uF8FF\uDB80-\uDBFF]');
 
-  List<ScryKeyValue> _extractKeyValuePairs(List<dynamic> glyphs) {
+  List<ScryKeyValue> _extractKeyValuePairs(
+    List<dynamic> glyphs, {
+    required Set<String> interactiveLabels,
+    required Set<String> navigationLabels,
+  }) {
     final pairs = <ScryKeyValue>[];
     final usedLabels = <String>{};
     final seenPairs = <String>{};
+
+    // Pre-populate usedLabels with interactive and navigation labels.
+    // Non-interactive text glyphs sharing the same label as a button or
+    // nav tab should never be paired as key-value data.
+    usedLabels.addAll(interactiveLabels);
+    usedLabels.addAll(navigationLabels);
 
     // --- Strategy 1: Inline "Key: Value" patterns ---
     for (final g in glyphs) {

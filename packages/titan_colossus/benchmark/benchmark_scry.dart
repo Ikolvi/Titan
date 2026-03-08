@@ -63,7 +63,7 @@ String _ms(Stopwatch sw) {
   final ms = sw.elapsedMilliseconds;
   final us = sw.elapsedMicroseconds;
   if (ms > 0) return '${ms}ms'.padLeft(10);
-  return '${us}µs'.padLeft(10);
+  return '$usµs'.padLeft(10);
 }
 
 String _pad(int n) => n.toString().padLeft(7);
@@ -94,12 +94,18 @@ Map<String, dynamic> _glyph({
     'w': w,
     'h': h,
     'ia': interactive,
+    // ignore: use_null_aware_elements
     if (interactionType != null) 'it': interactionType,
+    // ignore: use_null_aware_elements
     if (fieldId != null) 'fid': fieldId,
+    // ignore: use_null_aware_elements
     if (currentValue != null) 'cv': currentValue,
+    // ignore: use_null_aware_elements
     if (semanticRole != null) 'sr': semanticRole,
     'd': depth,
+    // ignore: use_null_aware_elements
     if (key != null) 'k': key,
+    // ignore: use_null_aware_elements
     if (ancestors != null) 'anc': ancestors,
     'en': enabled,
   };

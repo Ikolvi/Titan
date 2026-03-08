@@ -1654,6 +1654,34 @@ void main() {
           .toList();
       expect(noticeAlerts, isEmpty);
     });
+
+    test('excludes interactive labels from SnackBar alert detection', () {
+      // Button labels that appear as text inside a SnackBar should not
+      // be reported as info alerts — the AI already knows about buttons.
+      final glyphs = [
+        glyph(
+          label: 'Dismiss',
+          widgetType: 'TextButton',
+          interactive: true,
+          interactionType: 'tap',
+          ancestors: ['SnackBar'],
+        ),
+        glyph(label: 'Dismiss', widgetType: 'Text', ancestors: ['SnackBar']),
+        glyph(
+          label: 'Action completed',
+          widgetType: 'Text',
+          ancestors: ['SnackBar'],
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final infoAlerts = gaze.alerts
+          .where((a) => a.severity == ScryAlertSeverity.info)
+          .toList();
+      // "Dismiss" should be filtered (interactive label)
+      // "Action completed" should be kept (genuine notice text)
+      expect(infoAlerts, hasLength(1));
+      expect(infoAlerts.first.message, 'Action completed');
+    });
   });
 
   // ===================================================================
@@ -1831,6 +1859,114 @@ void main() {
         },
       ];
       final gaze = scry.observe(glyphs);
+      expect(gaze.dataFields, isEmpty);
+    });
+
+    test('excludes interactive labels from proximity pairing', () {
+      // Button labels that also appear as non-interactive text glyphs
+      // should not be paired as key-value data.
+      final glyphs = <Map<String, dynamic>>[
+        // Interactive button
+        {
+          'wt': 'IconButton',
+          'l': 'Sign Out',
+          'ia': true,
+          'it': 'tap',
+          'x': 20.0,
+          'y': 100.0,
+          'w': 100.0,
+          'h': 48.0,
+        },
+        // Non-interactive text copy of button label (same label)
+        {
+          'wt': 'Text',
+          'l': 'Sign Out',
+          'ia': false,
+          'x': 20.0,
+          'y': 100.0,
+          'w': 80.0,
+          'h': 24.0,
+        },
+        // Another interactive button adjacent to Sign Out
+        {
+          'wt': 'IconButton',
+          'l': 'About',
+          'ia': true,
+          'it': 'tap',
+          'x': 130.0,
+          'y': 100.0,
+          'w': 80.0,
+          'h': 48.0,
+        },
+        // Non-interactive text copy
+        {
+          'wt': 'Text',
+          'l': 'About',
+          'ia': false,
+          'x': 130.0,
+          'y': 100.0,
+          'w': 60.0,
+          'h': 24.0,
+        },
+      ];
+      final gaze = scry.observe(glyphs);
+      // Should NOT pair "Sign Out: About" — both are interactive labels
+      expect(
+        gaze.dataFields,
+        isNot(
+          contains(
+            isA<ScryKeyValue>().having((kv) => kv.key, 'key', 'Sign Out'),
+          ),
+        ),
+      );
+    });
+
+    test('excludes navigation labels from proximity pairing', () {
+      // NavigationDestination labels should not become KV pairs
+      final glyphs = <Map<String, dynamic>>[
+        {
+          'wt': 'NavigationDestination',
+          'l': 'Quests',
+          'ia': true,
+          'it': 'tap',
+          'x': 0.0,
+          'y': 750.0,
+          'w': 80.0,
+          'h': 48.0,
+          'anc': ['NavigationBar'],
+        },
+        {
+          'wt': 'Text',
+          'l': 'Quests',
+          'ia': false,
+          'x': 5.0,
+          'y': 760.0,
+          'w': 60.0,
+          'h': 20.0,
+        },
+        {
+          'wt': 'NavigationDestination',
+          'l': 'Hero',
+          'ia': true,
+          'it': 'tap',
+          'x': 90.0,
+          'y': 750.0,
+          'w': 80.0,
+          'h': 48.0,
+          'anc': ['NavigationBar'],
+        },
+        {
+          'wt': 'Text',
+          'l': 'Hero',
+          'ia': false,
+          'x': 95.0,
+          'y': 760.0,
+          'w': 50.0,
+          'h': 20.0,
+        },
+      ];
+      final gaze = scry.observe(glyphs);
+      // Should NOT pair "Quests: Hero"
       expect(gaze.dataFields, isEmpty);
     });
   });
