@@ -471,7 +471,15 @@ class _BlueprintMcpServer {
                 'Observe the current live app screen in real-time. '
                 'Returns a structured, AI-actionable view of all '
                 'visible elements: buttons, text fields, navigation '
-                'tabs, and content. Use this to understand what is '
+                'tabs, and content — including spatial layout '
+                '(screen regions: topBar/mainContent/bottomNav/'
+                'floating), ancestor context (Dialog, Card, '
+                'BottomSheet), overlap/occlusion detection (elements '
+                'behind dialogs are marked obscured), widget Keys '
+                'for stable targeting, repeated-element multiplicity '
+                '(e.g. 3× "Delete" buttons with indices), and form '
+                'validation status (filled/empty/disabled fields, '
+                'validation errors). Use this to understand what is '
                 'on screen before deciding what action to take with '
                 'scry_act. Together, scry + scry_act form a real-time '
                 'agent loop: observe → decide → act → observe again. '
@@ -484,7 +492,7 @@ class _BlueprintMcpServer {
             'description':
                 'Execute one or more actions on the live app and '
                 'return the resulting screen state. Supports single '
-                'actions (action + label + value) or multiple '
+                'actions (action + label + value + key) or multiple '
                 'actions via the actions array. For multi-step '
                 'flows (e.g., fill a form and tap submit), use the '
                 'actions array to combine them in one call. '
@@ -494,11 +502,15 @@ class _BlueprintMcpServer {
                 'entry: use enterText with label (the field\'s '
                 'visible label) and value (text to type). The '
                 'keyboard is automatically dismissed after text '
-                'actions. After the action(s), the new screen state '
-                'is automatically returned. IMPORTANT: If an '
-                'element is marked with ⚠️ "requires permission" '
-                'in the scry output, ask the user for approval '
-                'before acting on it.',
+                'actions. TARGETING: prefer key over label when '
+                'available — keys survive i18n changes. For '
+                'repeated elements (e.g. 3 "Delete" buttons), '
+                'use key to target a specific one. Avoid acting '
+                'on obscured elements. After the action(s), the '
+                'new screen state is automatically returned. '
+                'IMPORTANT: If an element is marked with ⚠️ '
+                '"requires permission" in the scry output, ask '
+                'the user for approval before acting on it.',
             'inputSchema': {
               'type': 'object',
               'properties': {
@@ -516,7 +528,17 @@ class _BlueprintMcpServer {
                   'type': 'string',
                   'description':
                       'Target element by its visible label text '
-                      '(for single action mode).',
+                      '(for single action mode). If the element '
+                      'has a key, prefer using key instead.',
+                },
+                'key': {
+                  'type': 'string',
+                  'description':
+                      'Target element by its widget Key (e.g. '
+                      'ValueKey(\'submit_btn\')). More stable '
+                      'than label — survives i18n and text '
+                      'changes. Shown in scry output when '
+                      'available. Preferred over label.',
                 },
                 'fieldId': {
                   'type': 'string',
@@ -552,6 +574,12 @@ class _BlueprintMcpServer {
                         'type': 'string',
                         'description': 'Target element by visible label text.',
                       },
+                      'key': {
+                        'type': 'string',
+                        'description':
+                            'Target element by widget Key. '
+                            'Preferred over label for stability.',
+                      },
                       'fieldId': {
                         'type': 'string',
                         'description':
@@ -577,8 +605,10 @@ class _BlueprintMcpServer {
                 'an action to verify it had the expected effect. '
                 'Must call scry at least once beforehand. Returns '
                 'a structured diff showing route changes, screen '
-                'type transitions, new/removed elements, and '
-                'value changes.',
+                'type transitions, new/removed elements, value '
+                'changes, occlusion changes, and form status '
+                'updates. Also includes the full current screen '
+                'observation with spatial layout and form state.',
             'inputSchema': {'type': 'object', 'properties': {}},
           },
         ],
@@ -2225,15 +2255,17 @@ class _BlueprintMcpServer {
     var label = args['label'] as String?;
     final fieldId = args['fieldId'] as String?;
     final value = args['value'] as String?;
+    final key = args['key'] as String?;
 
     if (label == null &&
         fieldId == null &&
+        key == null &&
         action != 'back' &&
         action != 'navigate' &&
         action != 'dismissKeyboard' &&
         action != 'scroll') {
       return '# Scry Act Failed\n\n'
-          'Missing target: provide `label` or `fieldId` to identify '
+          'Missing target: provide `label`, `key`, or `fieldId` to identify '
           'the element to interact with. Use `scry` first to see '
           'available elements.';
     }
@@ -2255,6 +2287,7 @@ class _BlueprintMcpServer {
         action: action,
         label: label,
         value: value,
+        key: key,
       );
 
       final result = await _executeRawCampaign(campaign);
@@ -2298,6 +2331,7 @@ class _BlueprintMcpServer {
         var label = entry['label'] as String?;
         final fieldId = entry['fieldId'] as String?;
         final value = entry['value'] as String?;
+        final key = entry['key'] as String?;
 
         // Resolve fieldId → label
         if (label == null && fieldId != null) {
@@ -2319,19 +2353,22 @@ class _BlueprintMcpServer {
 
         // Validate target for actions that need one
         if (label == null &&
+            key == null &&
             action != 'back' &&
             action != 'navigate' &&
             action != 'dismissKeyboard' &&
             action != 'scroll') {
           return '# Scry Act Failed\n\n'
               'Action ${i + 1} (`$action`): missing target. Provide '
-              '`label` or `fieldId`.';
+              '`label`, `key`, or `fieldId`.';
         }
 
         resolvedActions.add({
           'action': action,
           // ignore: use_null_aware_elements
           if (label != null) 'label': label,
+          // ignore: use_null_aware_elements
+          if (key != null) 'key': key,
           // ignore: use_null_aware_elements
           if (value != null) 'value': value,
         });
