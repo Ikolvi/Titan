@@ -284,6 +284,108 @@ class ScryDiff {
 }
 
 // =========================================================================
+// ScryFormStatus — Form validation awareness
+// =========================================================================
+
+/// Describes the validation state of a form on screen.
+///
+/// Tracks which fields have values, which have validation errors,
+/// and whether the form appears ready for submission.
+///
+/// ```dart
+/// if (gaze.formStatus != null && gaze.formStatus!.isReady) {
+///   // All fields filled, no errors — safe to submit
+/// }
+/// ```
+class ScryFormStatus {
+  /// Creates a [ScryFormStatus].
+  const ScryFormStatus({
+    required this.totalFields,
+    required this.filledFields,
+    required this.emptyFields,
+    required this.validationErrors,
+    required this.disabledFields,
+  });
+
+  /// Total number of text input fields.
+  final int totalFields;
+
+  /// Number of fields with a non-empty value.
+  final int filledFields;
+
+  /// Labels of fields with no value.
+  final List<String> emptyFields;
+
+  /// Detected validation error messages near fields.
+  final List<ScryFieldError> validationErrors;
+
+  /// Labels of disabled fields.
+  final List<String> disabledFields;
+
+  /// Whether all fields have values and no validation errors.
+  bool get isReady =>
+      emptyFields.isEmpty && validationErrors.isEmpty && totalFields > 0;
+
+  /// Serialize to JSON.
+  Map<String, dynamic> toJson() => {
+    'totalFields': totalFields,
+    'filledFields': filledFields,
+    'emptyFields': emptyFields,
+    'validationErrors': validationErrors.map((e) => e.toJson()).toList(),
+    'disabledFields': disabledFields,
+    'isReady': isReady,
+  };
+}
+
+/// A validation error detected near a form field.
+class ScryFieldError {
+  /// Creates a [ScryFieldError].
+  const ScryFieldError({required this.fieldLabel, required this.errorMessage});
+
+  /// The label of the field with the validation error.
+  final String fieldLabel;
+
+  /// The error message text.
+  final String errorMessage;
+
+  /// Serialize to JSON.
+  Map<String, dynamic> toJson() => {
+    'fieldLabel': fieldLabel,
+    'errorMessage': errorMessage,
+  };
+}
+
+// =========================================================================
+// ScryScreenRegion — Inferred spatial region of the screen
+// =========================================================================
+
+/// The inferred spatial region where an element is located.
+///
+/// Helps the AI understand the layout structure without
+/// absolute pixel coordinates.
+///
+/// ```dart
+/// final topElements = gaze.elements
+///     .where((e) => e.region == ScryScreenRegion.topBar);
+/// ```
+enum ScryScreenRegion {
+  /// Top bar area (AppBar, status bar, toolbar).
+  topBar,
+
+  /// Main scrollable content area.
+  mainContent,
+
+  /// Bottom navigation area (tabs, nav bar).
+  bottomNav,
+
+  /// Floating element (FAB, floating action button, overlay).
+  floating,
+
+  /// Cannot determine the region.
+  unknown,
+}
+
+// =========================================================================
 // ScryElementKind — Element classification
 // =========================================================================
 
@@ -349,6 +451,17 @@ class ScryElement {
     this.interactionType,
     this.isEnabled = true,
     this.gated = false,
+    this.x,
+    this.y,
+    this.w,
+    this.h,
+    this.depth,
+    this.key,
+    this.context,
+    this.obscured = false,
+    this.occurrenceIndex,
+    this.totalOccurrences,
+    this.region = ScryScreenRegion.unknown,
   });
 
   /// The categorized kind of this element.
@@ -385,6 +498,54 @@ class ScryElement {
   /// irreversible actions (delete, remove, reset, etc.).
   final bool gated;
 
+  /// The X position (left edge) in logical pixels.
+  final double? x;
+
+  /// The Y position (top edge) in logical pixels.
+  final double? y;
+
+  /// The width in logical pixels.
+  final double? w;
+
+  /// The height in logical pixels.
+  final double? h;
+
+  /// The element's tree depth (higher = deeper/on top).
+  final int? depth;
+
+  /// The developer-assigned widget Key (e.g., `ValueKey('hero_name')`).
+  ///
+  /// More stable than labels for targeting, since keys survive
+  /// i18n changes and text updates.
+  final String? key;
+
+  /// The ancestor context (e.g., `'Dialog'`, `'Card'`, `'BottomSheet'`).
+  ///
+  /// Extracted from the ancestor chain to help the AI understand
+  /// what container this element lives in.
+  final String? context;
+
+  /// Whether this element is visually obscured by a higher-depth overlay.
+  ///
+  /// When `true`, the AI should not try to interact with this element
+  /// because a dialog, modal, or overlay is covering it.
+  final bool obscured;
+
+  /// The 0-based index of this element among identically-labeled siblings.
+  ///
+  /// When multiple elements share the same label (e.g., 7 "Delete"
+  /// buttons in a list), this identifies which occurrence this is.
+  /// `null` when the label is unique.
+  final int? occurrenceIndex;
+
+  /// The total number of elements sharing this label.
+  ///
+  /// `null` when the label is unique.
+  final int? totalOccurrences;
+
+  /// The inferred screen region where this element is located.
+  final ScryScreenRegion region;
+
   /// Serialize to JSON.
   Map<String, dynamic> toJson() => {
     'kind': kind.name,
@@ -397,6 +558,17 @@ class ScryElement {
     if (interactionType != null) 'interactionType': interactionType,
     if (!isEnabled) 'isEnabled': false,
     if (gated) 'gated': true,
+    if (x != null) 'x': x,
+    if (y != null) 'y': y,
+    if (w != null) 'w': w,
+    if (h != null) 'h': h,
+    if (depth != null) 'depth': depth,
+    if (key != null) 'key': key,
+    if (context != null) 'context': context,
+    if (obscured) 'obscured': true,
+    if (occurrenceIndex != null) 'occurrenceIndex': occurrenceIndex,
+    if (totalOccurrences != null) 'totalOccurrences': totalOccurrences,
+    if (region != ScryScreenRegion.unknown) 'region': region.name,
   };
 }
 
@@ -429,6 +601,7 @@ class ScryGaze {
     this.alerts = const [],
     this.dataFields = const [],
     this.suggestions = const [],
+    this.formStatus,
   });
 
   /// All detected elements.
@@ -452,6 +625,9 @@ class ScryGaze {
   /// AI-generated action suggestions for the current screen.
   final List<String> suggestions;
 
+  /// Form status (non-null when text fields are present).
+  final ScryFormStatus? formStatus;
+
   /// Interactive buttons (tappable, non-navigation).
   List<ScryElement> get buttons =>
       elements.where((e) => e.kind == ScryElementKind.button).toList();
@@ -474,6 +650,9 @@ class ScryGaze {
 
   /// Elements that require user permission before interacting.
   List<ScryElement> get gated => elements.where((e) => e.gated).toList();
+
+  /// Elements obscured by an overlay (dialog, modal, etc.).
+  List<ScryElement> get obscured => elements.where((e) => e.obscured).toList();
 
   /// Whether this looks like an authentication/login screen.
   bool get isAuthScreen => screenType == ScryScreenType.login;
@@ -499,10 +678,12 @@ class ScryGaze {
     'fieldCount': fields.length,
     'navigationCount': navigation.length,
     'contentCount': content.length,
+    if (obscured.isNotEmpty) 'obscuredCount': obscured.length,
     if (alerts.isNotEmpty) 'alerts': alerts.map((a) => a.toJson()).toList(),
     if (dataFields.isNotEmpty)
       'dataFields': dataFields.map((d) => d.toJson()).toList(),
     if (suggestions.isNotEmpty) 'suggestions': suggestions,
+    if (formStatus != null) 'formStatus': formStatus!.toJson(),
     'elements': elements.map((e) => e.toJson()).toList(),
   };
 }
@@ -586,7 +767,6 @@ class Scry {
   /// print(gaze.buttons.length); // number of tappable buttons
   /// ```
   ScryGaze observe(List<dynamic> glyphs, {String? route}) {
-    final seen = <String, ScryElement>{};
     final interactiveLabels = <String>{};
     final navigationLabels = <String>{};
     final structuralLabels = <String>{};
@@ -596,6 +776,12 @@ class Scry {
     final preferredInteractionType = <String, String>{};
     final preferredSemanticRole = <String, String>{};
     final preferredCurrentValue = <String, String>{};
+    // Track interactive label counts for multiplicity.
+    // Only interactive elements can be meaningfully repeated
+    // (e.g. 7 "Delete" buttons in a list). Non-interactive duplicates
+    // (like RichText + Tooltip for the same label) are alternate
+    // representations and should be deduplicated.
+    final interactiveLabelCounts = <String, int>{};
 
     // --- Pass 1: Classify labels ---
     for (final g in glyphs) {
@@ -611,6 +797,12 @@ class Scry {
       final wtLower = wt.toLowerCase();
       final fieldId = glyph['fid'] as String?;
       final ancestors = glyph['anc'] as List<dynamic>? ?? [];
+
+      // Count interactive occurrences of each label
+      if (isInteractive) {
+        interactiveLabelCounts[label] =
+            (interactiveLabelCounts[label] ?? 0) + 1;
+      }
 
       // Track interactive labels
       if (isInteractive) {
@@ -654,7 +846,21 @@ class Scry {
       }
     }
 
-    // --- Pass 2: Build unique elements ---
+    // --- Pass 2: Build elements with spatial/key/depth data ---
+    // For labels that appear only once interactively, dedup as before.
+    // For labels with multiple interactive glyphs, create indexed entries.
+    final elementList = <ScryElement>[];
+    final seenUnique = <String>{};
+    final labelOccurrence = <String, int>{};
+
+    // Find max depth across all glyphs for overlay detection
+    var maxDepth = 0;
+    for (final g in glyphs) {
+      final glyph = g as Map<String, dynamic>;
+      final d = glyph['d'] as int? ?? 0;
+      if (d > maxDepth) maxDepth = d;
+    }
+
     for (final g in glyphs) {
       final glyph = g as Map<String, dynamic>;
       final label = (glyph['l'] as String? ?? '').trim();
@@ -662,12 +868,29 @@ class Scry {
       if (label.startsWith('IconData(')) continue;
       if (label.length == 1 && label.codeUnitAt(0) > 0xE000) continue;
 
-      // Skip if already processed (dedup by label)
-      if (seen.containsKey(label)) continue;
+      final isInteractive = glyph['ia'] == true;
+      final totalInteractive = interactiveLabelCounts[label] ?? 0;
+      final isRepeated = totalInteractive > 1;
 
-      // Use the preferred (most representative) widget type from Pass 1.
-      // For example, if "Hero Name" appears as RichText, Text, and
-      // TextField, we want "TextField" — the interactive text input.
+      // Multiplicity: only keep multiple instances for interactive elements
+      // with >1 interactive occurrence. Non-interactive duplicates dedup.
+      if (isRepeated && isInteractive) {
+        // Allow multiple interactive elements with indices
+      } else {
+        // Dedup: first occurrence wins
+        if (seenUnique.contains(label)) continue;
+        seenUnique.add(label);
+      }
+
+      // Track occurrence index for repeated interactive labels
+      final occurrenceIdx = isRepeated && isInteractive
+          ? (labelOccurrence[label] ?? 0)
+          : null;
+      if (isRepeated && isInteractive) {
+        labelOccurrence[label] = (occurrenceIdx ?? 0) + 1;
+      }
+
+      // Use the preferred widget type from Pass 1.
       final wt = preferredWidgetType[label] ?? (glyph['wt'] as String? ?? '');
       final sr = preferredSemanticRole[label] ?? (glyph['sr'] as String?);
       final it = preferredInteractionType[label] ?? (glyph['it'] as String?);
@@ -675,6 +898,18 @@ class Scry {
       final isEnabled = glyph['en'] as bool? ?? true;
       final fieldId = fieldIds[label];
       final isTextField = textInputLabels.contains(label);
+
+      // Spatial data
+      final x = (glyph['x'] as num?)?.toDouble();
+      final y = (glyph['y'] as num?)?.toDouble();
+      final w = (glyph['w'] as num?)?.toDouble();
+      final h = (glyph['h'] as num?)?.toDouble();
+      final depth = glyph['d'] as int?;
+      final key = glyph['k'] as String?;
+      final ancestors = glyph['anc'] as List<dynamic>? ?? [];
+
+      // Extract ancestor context
+      final context = _extractAncestorContext(ancestors);
 
       // Determine element kind
       final kind = _classifyElement(
@@ -691,27 +926,46 @@ class Scry {
       // Check if this action is gated (destructive)
       final gated = interactiveLabels.contains(label) && _isGatedAction(label);
 
-      seen[label] = ScryElement(
-        kind: kind,
-        label: label,
-        widgetType: wt,
-        isInteractive: interactiveLabels.contains(label),
-        fieldId: fieldId,
-        currentValue: cv,
-        semanticRole: sr,
-        interactionType: it,
-        isEnabled: isEnabled,
-        gated: gated,
+      // Infer screen region from Y position
+      final region = _inferRegion(y: y, h: h, ancestors: ancestors);
+
+      elementList.add(
+        ScryElement(
+          kind: kind,
+          label: label,
+          widgetType: wt,
+          isInteractive: interactiveLabels.contains(label),
+          fieldId: fieldId,
+          currentValue: cv,
+          semanticRole: sr,
+          interactionType: it,
+          isEnabled: isEnabled,
+          gated: gated,
+          x: x,
+          y: y,
+          w: w,
+          h: h,
+          depth: depth,
+          key: key,
+          context: context,
+          occurrenceIndex: isRepeated && isInteractive ? occurrenceIdx : null,
+          totalOccurrences: isRepeated && isInteractive
+              ? totalInteractive
+              : null,
+          region: region,
+        ),
       );
     }
 
-    final elementList = seen.values.toList();
+    // --- Pass 3: Overlap/occlusion detection ---
+    _detectOverlaps(elementList, maxDepth);
 
-    // --- Pass 3: Intelligence layer ---
+    // --- Pass 4: Intelligence layer ---
     final alerts = _detectAlerts(glyphs);
     final dataFields = _extractKeyValuePairs(glyphs);
     final screenType = _classifyScreen(elementList, alerts, dataFields);
     final suggestions = _generateSuggestions(elementList, screenType, alerts);
+    final formStatus = _analyzeFormStatus(elementList, glyphs);
 
     return ScryGaze(
       elements: elementList,
@@ -721,6 +975,7 @@ class Scry {
       alerts: alerts,
       dataFields: dataFields,
       suggestions: suggestions,
+      formStatus: formStatus,
     );
   }
 
@@ -808,6 +1063,35 @@ class Scry {
       buf.writeln();
     }
 
+    // --- Form Status ---
+    if (gaze.formStatus != null) {
+      final fs = gaze.formStatus!;
+      buf.writeln('## 📋 Form Status');
+      buf.writeln();
+      buf.writeln('- **Fields**: ${fs.filledFields}/${fs.totalFields} filled');
+      if (fs.emptyFields.isNotEmpty) {
+        buf.writeln(
+          '- **Empty**: ${fs.emptyFields.map((f) => '"$f"').join(', ')}',
+        );
+      }
+      if (fs.disabledFields.isNotEmpty) {
+        buf.writeln(
+          '- **Disabled**: '
+          '${fs.disabledFields.map((f) => '"$f"').join(', ')}',
+        );
+      }
+      if (fs.validationErrors.isNotEmpty) {
+        buf.writeln('- **Validation Errors**:');
+        for (final ve in fs.validationErrors) {
+          buf.writeln('  - "${ve.fieldLabel}": ${ve.errorMessage}');
+        }
+      }
+      if (fs.isReady) {
+        buf.writeln('- ✅ **Form is ready to submit**');
+      }
+      buf.writeln();
+    }
+
     // --- Fields (most important for input) ---
     if (gaze.fields.isNotEmpty) {
       buf.writeln('## 📝 Text Fields (${gaze.fields.length})');
@@ -820,10 +1104,13 @@ class Scry {
       for (final f in gaze.fields) {
         final parts = <String>[f.widgetType];
         if (f.fieldId != null) parts.add('fieldId: ${f.fieldId}');
+        if (f.key != null) parts.add('key: ${f.key}');
         if (f.currentValue != null) {
           parts.add('value: "${f.currentValue}"');
         }
         if (!f.isEnabled) parts.add('disabled');
+        if (f.obscured) parts.add('⛔ obscured');
+        if (f.context != null) parts.add('in ${f.context}');
         buf.writeln('- **${f.label}** (${parts.join(', ')})');
       }
       buf.writeln();
@@ -836,7 +1123,15 @@ class Scry {
       for (final b in gaze.buttons) {
         final suffix = b.gated ? ' ⚠️ requires permission' : '';
         final disabled = !b.isEnabled ? ' [disabled]' : '';
-        buf.writeln('- **${b.label}** (${b.widgetType})$disabled$suffix');
+        final obscured = b.obscured ? ' ⛔ obscured' : '';
+        final multi = b.totalOccurrences != null
+            ? ' (×${b.totalOccurrences}, #${b.occurrenceIndex! + 1})'
+            : '';
+        final ctx = b.context != null ? ' [in ${b.context}]' : '';
+        buf.writeln(
+          '- **${b.label}** (${b.widgetType})'
+          '$multi$ctx$disabled$obscured$suffix',
+        );
       }
       buf.writeln();
     }
@@ -856,8 +1151,20 @@ class Scry {
       buf.writeln('## 📄 Content (${gaze.content.length})');
       buf.writeln();
       for (final c in gaze.content) {
-        buf.writeln('- ${c.label}');
+        final ctx = c.context != null ? ' [in ${c.context}]' : '';
+        buf.writeln('- ${c.label}$ctx');
       }
+      buf.writeln();
+    }
+
+    // --- Obscured Elements ---
+    if (gaze.obscured.isNotEmpty) {
+      buf.writeln('## ⛔ Obscured (${gaze.obscured.length})');
+      buf.writeln();
+      buf.writeln(
+        '_These elements are hidden behind an overlay '
+        '(dialog, modal, bottom sheet). Do not interact with them._',
+      );
       buf.writeln();
     }
 
@@ -921,6 +1228,7 @@ class Scry {
   /// [label] — target element label (for tap, enterText, clearText, etc.)
   /// [value] — text to enter (for enterText) or navigation route
   ///   (for navigate)
+  /// [key] — widget key for stable targeting (preferred over label)
   /// [timeout] — timeout in ms for wait actions (default: 5000)
   ///
   /// ```dart
@@ -936,10 +1244,15 @@ class Scry {
     required String action,
     String? label,
     String? value,
+    String? key,
     int timeout = 5000,
   }) {
     final target = <String, dynamic>{};
-    if (label != null) target['label'] = label;
+    if (key != null) {
+      target['key'] = key;
+    } else if (label != null) {
+      target['label'] = label;
+    }
 
     // If no explicit target, use a dummy for navigation actions
     if (target.isEmpty && action != 'back' && action != 'navigate') {
@@ -1003,6 +1316,7 @@ class Scry {
   /// - `action` (required) — the action type
   /// - `label` (optional) — target element label
   /// - `value` (optional) — text value or route
+  /// - `key` (optional) — widget key for stable targeting
   ///
   /// Text-entry actions automatically get `waitForElement` pre-steps
   /// and `dismissKeyboard` post-steps, just like [buildActionCampaign].
@@ -1025,9 +1339,14 @@ class Scry {
       final action = entry['action'] as String;
       final label = entry['label'] as String?;
       final value = entry['value'] as String?;
+      final key = entry['key'] as String?;
 
       final target = <String, dynamic>{};
-      if (label != null) target['label'] = label;
+      if (key != null) {
+        target['key'] = key;
+      } else if (label != null) {
+        target['label'] = label;
+      }
 
       if (target.isEmpty && action != 'back' && action != 'navigate') {
         target['label'] = label ?? '';
@@ -1793,5 +2112,280 @@ class Scry {
     }
 
     return suggestions;
+  }
+
+  // -----------------------------------------------------------------------
+  // Intelligence: Ancestor context extraction
+  // -----------------------------------------------------------------------
+
+  /// Known container widgets that provide useful context.
+  static const _contextContainers = [
+    'Dialog',
+    'AlertDialog',
+    'SimpleDialog',
+    'BottomSheet',
+    'ModalBottomSheet',
+    'Card',
+    'ExpansionTile',
+    'ListTile',
+    'Drawer',
+    'PopupMenuButton',
+    'DropdownButton',
+    'Tooltip',
+  ];
+
+  /// Extract the nearest meaningful ancestor container context.
+  ///
+  /// Returns a human-readable context string like `'Dialog'`,
+  /// `'Card'`, `'BottomSheet'`, or `null` if no notable ancestor.
+  String? _extractAncestorContext(List<dynamic> ancestors) {
+    if (ancestors.isEmpty) return null;
+
+    final ancestorStr = ancestors.join(' ');
+    for (final container in _contextContainers) {
+      if (ancestorStr.contains(container)) return container;
+    }
+    return null;
+  }
+
+  // -----------------------------------------------------------------------
+  // Intelligence: Screen region inference
+  // -----------------------------------------------------------------------
+
+  /// Standard Material Design breakpoints for region inference.
+  static const _topBarMaxY = 100.0;
+  static const _bottomNavMinY = 700.0;
+
+  /// Infer the screen region from position and ancestor data.
+  ScryScreenRegion _inferRegion({
+    double? y,
+    double? h,
+    required List<dynamic> ancestors,
+  }) {
+    final ancestorStr = ancestors.join(' ').toLowerCase();
+
+    // Ancestor-based (most reliable)
+    if (ancestorStr.contains('appbar') || ancestorStr.contains('toolbar')) {
+      return ScryScreenRegion.topBar;
+    }
+    if (ancestorStr.contains('navigationbar') ||
+        ancestorStr.contains('bottomnavigationbar') ||
+        ancestorStr.contains('navigationrail')) {
+      return ScryScreenRegion.bottomNav;
+    }
+    if (ancestorStr.contains('floatingactionbutton')) {
+      return ScryScreenRegion.floating;
+    }
+
+    // Position-based fallback
+    if (y != null) {
+      if (y < _topBarMaxY) return ScryScreenRegion.topBar;
+      if (y > _bottomNavMinY) return ScryScreenRegion.bottomNav;
+      return ScryScreenRegion.mainContent;
+    }
+
+    return ScryScreenRegion.unknown;
+  }
+
+  // -----------------------------------------------------------------------
+  // Intelligence: Overlap / occlusion detection
+  // -----------------------------------------------------------------------
+
+  /// Detect elements obscured by higher-depth overlays.
+  ///
+  /// A Dialog or modal at depth 50 obscures elements at depth 10
+  /// if their bounding boxes overlap. This mutates element list
+  /// in place by replacing obscured elements with copies.
+  void _detectOverlaps(List<ScryElement> elements, int maxDepth) {
+    // Find the overlay threshold — elements inside Dialog/BottomSheet
+    // are typically much deeper than background content.
+    // We use the context field to identify overlay elements.
+    final overlayElements = elements
+        .where(
+          (e) =>
+              e.context == 'Dialog' ||
+              e.context == 'AlertDialog' ||
+              e.context == 'SimpleDialog' ||
+              e.context == 'BottomSheet' ||
+              e.context == 'ModalBottomSheet',
+        )
+        .toList();
+
+    if (overlayElements.isEmpty) return;
+
+    // Compute the bounding box of the overlay
+    double? overlayMinX, overlayMinY, overlayMaxX, overlayMaxY;
+    var overlayMinDepth = maxDepth;
+
+    for (final o in overlayElements) {
+      if (o.x != null && o.y != null && o.w != null && o.h != null) {
+        final ox = o.x!;
+        final oy = o.y!;
+        final ow = o.w!;
+        final oh = o.h!;
+
+        overlayMinX = overlayMinX == null
+            ? ox
+            : (ox < overlayMinX ? ox : overlayMinX);
+        overlayMinY = overlayMinY == null
+            ? oy
+            : (oy < overlayMinY ? oy : overlayMinY);
+        overlayMaxX = overlayMaxX == null
+            ? ox + ow
+            : (ox + ow > overlayMaxX ? ox + ow : overlayMaxX);
+        overlayMaxY = overlayMaxY == null
+            ? oy + oh
+            : (oy + oh > overlayMaxY ? oy + oh : overlayMaxY);
+      }
+      if (o.depth != null && o.depth! < overlayMinDepth) {
+        overlayMinDepth = o.depth!;
+      }
+    }
+
+    // No spatial data → can't detect overlaps
+    if (overlayMinX == null ||
+        overlayMinY == null ||
+        overlayMaxX == null ||
+        overlayMaxY == null) {
+      return;
+    }
+
+    // Mark non-overlay elements as obscured if they overlap spatially
+    // and have lower depth than the overlay.
+    for (var i = 0; i < elements.length; i++) {
+      final e = elements[i];
+      if (e.context == 'Dialog' ||
+          e.context == 'AlertDialog' ||
+          e.context == 'SimpleDialog' ||
+          e.context == 'BottomSheet' ||
+          e.context == 'ModalBottomSheet') {
+        continue; // Don't mark overlay elements themselves
+      }
+
+      if (e.depth != null &&
+          e.depth! < overlayMinDepth &&
+          e.x != null &&
+          e.y != null) {
+        // Check spatial overlap
+        final ex = e.x!;
+        final ey = e.y!;
+        final ew = e.w ?? 0;
+        final eh = e.h ?? 0;
+
+        final overlaps =
+            ex < overlayMaxX &&
+            ex + ew > overlayMinX &&
+            ey < overlayMaxY &&
+            ey + eh > overlayMinY;
+
+        if (overlaps) {
+          // Replace with an obscured copy
+          elements[i] = ScryElement(
+            kind: e.kind,
+            label: e.label,
+            widgetType: e.widgetType,
+            isInteractive: e.isInteractive,
+            fieldId: e.fieldId,
+            currentValue: e.currentValue,
+            semanticRole: e.semanticRole,
+            interactionType: e.interactionType,
+            isEnabled: e.isEnabled,
+            gated: e.gated,
+            x: e.x,
+            y: e.y,
+            w: e.w,
+            h: e.h,
+            depth: e.depth,
+            key: e.key,
+            context: e.context,
+            obscured: true,
+            occurrenceIndex: e.occurrenceIndex,
+            totalOccurrences: e.totalOccurrences,
+            region: e.region,
+          );
+        }
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Intelligence: Form validation awareness
+  // -----------------------------------------------------------------------
+
+  /// Pattern for validation error text near form fields.
+  static final _validationErrorPattern = RegExp(
+    r'\b(required|must be|cannot be empty|invalid|too short|too long'
+    r'|at least|no more than|does not match|already taken'
+    r'|please enter|please provide|is required)\b',
+    caseSensitive: false,
+  );
+
+  /// Analyze form field status — fill state, validation, readiness.
+  ScryFormStatus? _analyzeFormStatus(
+    List<ScryElement> elements,
+    List<dynamic> glyphs,
+  ) {
+    final fields = elements
+        .where((e) => e.kind == ScryElementKind.field)
+        .toList();
+
+    if (fields.isEmpty) return null;
+
+    final emptyFields = <String>[];
+    final disabledFields = <String>[];
+    var filledCount = 0;
+
+    for (final f in fields) {
+      if (!f.isEnabled) {
+        disabledFields.add(f.label);
+      }
+      if (f.currentValue == null || f.currentValue!.isEmpty) {
+        emptyFields.add(f.label);
+      } else {
+        filledCount++;
+      }
+    }
+
+    // Detect validation errors by finding error-like text near fields
+    final validationErrors = <ScryFieldError>[];
+
+    for (final f in fields) {
+      if (f.y == null) continue;
+
+      // Look for error helper text below each field (within ~50px)
+      for (final g in glyphs) {
+        final glyph = g as Map<String, dynamic>;
+        final label = (glyph['l'] as String? ?? '').trim();
+        if (label.isEmpty) continue;
+        if (glyph['ia'] == true) continue; // Skip interactive elements
+
+        final gy = (glyph['y'] as num?)?.toDouble();
+        if (gy == null) continue;
+
+        // Error text is typically directly below the field
+        final dy = gy - f.y!;
+        if (dy < 5 || dy > 50) continue;
+
+        // Check X proximity too
+        if (f.x != null) {
+          final gx = (glyph['x'] as num?)?.toDouble();
+          if (gx != null && (gx - f.x!).abs() > 20) continue;
+        }
+
+        if (_validationErrorPattern.hasMatch(label)) {
+          validationErrors.add(
+            ScryFieldError(fieldLabel: f.label, errorMessage: label),
+          );
+        }
+      }
+    }
+
+    return ScryFormStatus(
+      totalFields: fields.length,
+      filledFields: filledCount,
+      emptyFields: emptyFields,
+      validationErrors: validationErrors,
+      disabledFields: disabledFields,
+    );
   }
 }

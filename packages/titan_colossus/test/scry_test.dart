@@ -15,6 +15,12 @@ void main() {
     String? currentValue,
     bool enabled = true,
     List<String>? ancestors,
+    double x = 0.0,
+    double y = 0.0,
+    double w = 100.0,
+    double h = 40.0,
+    int? depth,
+    String? key,
   }) => {
     'wt': widgetType,
     'l': label,
@@ -30,10 +36,14 @@ void main() {
     if (!enabled) 'en': false,
     // ignore: use_null_aware_elements
     if (ancestors != null) 'anc': ancestors,
-    'x': 0.0,
-    'y': 0.0,
-    'w': 100.0,
-    'h': 40.0,
+    'x': x,
+    'y': y,
+    'w': w,
+    'h': h,
+    // ignore: use_null_aware_elements
+    if (depth != null) 'd': depth,
+    // ignore: use_null_aware_elements
+    if (key != null) 'k': key,
   };
 
   // ===================================================================
@@ -2097,6 +2107,965 @@ void main() {
       final gaze = scry.observe(glyphs);
       expect(gaze.screenType, ScryScreenType.detail);
       expect(gaze.dataFields, hasLength(3));
+    });
+  });
+
+  // ===================================================================
+  // Spatial layout awareness
+  // ===================================================================
+  group('Spatial layout awareness', () {
+    test('ScryElement stores x/y/w/h from glyphs', () {
+      final glyphs = [
+        glyph(
+          label: 'Hero Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'heroName',
+          x: 16.0,
+          y: 200.0,
+          w: 350.0,
+          h: 56.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final field = gaze.elements.firstWhere((e) => e.label == 'Hero Name');
+      expect(field.x, 16.0);
+      expect(field.y, 200.0);
+      expect(field.w, 350.0);
+      expect(field.h, 56.0);
+    });
+
+    test('ScryElement stores depth from glyphs', () {
+      final glyphs = [glyph(label: 'Title', depth: 12, y: 50.0)];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.elements.first.depth, 12);
+    });
+
+    test('ScryElement toJson includes spatial data when present', () {
+      const element = ScryElement(
+        kind: ScryElementKind.button,
+        label: 'Tap Me',
+        widgetType: 'ElevatedButton',
+        x: 10.0,
+        y: 200.0,
+        w: 120.0,
+        h: 48.0,
+        depth: 5,
+      );
+      final json = element.toJson();
+      expect(json['x'], 10.0);
+      expect(json['y'], 200.0);
+      expect(json['w'], 120.0);
+      expect(json['h'], 48.0);
+      expect(json['depth'], 5);
+    });
+
+    test('ScryElement toJson omits null spatial data', () {
+      const element = ScryElement(
+        kind: ScryElementKind.content,
+        label: 'Hello',
+        widgetType: 'Text',
+      );
+      final json = element.toJson();
+      expect(json.containsKey('x'), isFalse);
+      expect(json.containsKey('depth'), isFalse);
+    });
+  });
+
+  // ===================================================================
+  // Screen region inference
+  // ===================================================================
+  group('Screen region inference', () {
+    test('AppBar ancestor → topBar region', () {
+      final glyphs = [
+        glyph(
+          label: 'My App',
+          ancestors: ['MaterialApp', 'Scaffold', 'AppBar', 'Text'],
+          y: 40.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final el = gaze.elements.firstWhere((e) => e.label == 'My App');
+      expect(el.region, ScryScreenRegion.topBar);
+    });
+
+    test('NavigationBar ancestor → bottomNav region', () {
+      final glyphs = [
+        glyph(
+          label: 'Home',
+          widgetType: 'GestureDetector',
+          interactive: true,
+          ancestors: [
+            'MaterialApp',
+            'Scaffold',
+            'NavigationBar',
+            'GestureDetector',
+          ],
+          y: 750.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final el = gaze.elements.firstWhere((e) => e.label == 'Home');
+      expect(el.region, ScryScreenRegion.bottomNav);
+    });
+
+    test('FAB ancestor → floating region', () {
+      final glyphs = [
+        glyph(
+          label: 'Add',
+          widgetType: 'FloatingActionButton',
+          interactive: true,
+          ancestors: ['MaterialApp', 'Scaffold', 'FloatingActionButton'],
+          y: 600.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final el = gaze.elements.firstWhere((e) => e.label == 'Add');
+      expect(el.region, ScryScreenRegion.floating);
+    });
+
+    test('y < 100 without ancestor → topBar by position', () {
+      final glyphs = [glyph(label: 'Title Text', y: 50.0)];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.elements.first.region, ScryScreenRegion.topBar);
+    });
+
+    test('y > 700 without ancestor → bottomNav by position', () {
+      final glyphs = [
+        glyph(
+          label: 'Tab Label',
+          widgetType: 'GestureDetector',
+          interactive: true,
+          y: 750.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.elements.first.region, ScryScreenRegion.bottomNav);
+    });
+
+    test('y between 100 and 700 → mainContent', () {
+      final glyphs = [glyph(label: 'Content Text', y: 400.0)];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.elements.first.region, ScryScreenRegion.mainContent);
+    });
+
+    test('ScryScreenRegion has all expected values', () {
+      expect(ScryScreenRegion.values, hasLength(5));
+      expect(ScryScreenRegion.values, contains(ScryScreenRegion.topBar));
+      expect(ScryScreenRegion.values, contains(ScryScreenRegion.mainContent));
+      expect(ScryScreenRegion.values, contains(ScryScreenRegion.bottomNav));
+      expect(ScryScreenRegion.values, contains(ScryScreenRegion.floating));
+      expect(ScryScreenRegion.values, contains(ScryScreenRegion.unknown));
+    });
+  });
+
+  // ===================================================================
+  // Key-based stable targeting
+  // ===================================================================
+  group('Key-based stable targeting', () {
+    test('ScryElement stores key from glyph', () {
+      final glyphs = [
+        glyph(
+          label: 'Submit',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          key: "ValueKey('submit_btn')",
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final btn = gaze.elements.firstWhere((e) => e.label == 'Submit');
+      expect(btn.key, "ValueKey('submit_btn')");
+    });
+
+    test('ScryElement toJson includes key when present', () {
+      const element = ScryElement(
+        kind: ScryElementKind.button,
+        label: 'Submit',
+        widgetType: 'ElevatedButton',
+        key: "ValueKey('submit_btn')",
+      );
+      final json = element.toJson();
+      expect(json['key'], "ValueKey('submit_btn')");
+    });
+
+    test('buildActionCampaign prefers key over label', () {
+      final campaign = scry.buildActionCampaign(
+        action: 'tap',
+        label: 'Submit',
+        key: "ValueKey('submit_btn')",
+      );
+      // Campaign has nested structure: entries[0].stratagem.steps
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+      final tapStep = steps.last as Map<String, dynamic>;
+      expect(tapStep['action'], 'tap');
+      final target = tapStep['target'] as Map<String, dynamic>;
+      expect(target['key'], "ValueKey('submit_btn')");
+    });
+
+    test('buildActionCampaign works without key', () {
+      final campaign = scry.buildActionCampaign(action: 'tap', label: 'Submit');
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+      final tapStep = steps.last as Map<String, dynamic>;
+      final target = tapStep['target'] as Map<String, dynamic>;
+      expect(target['label'], 'Submit');
+      expect(target.containsKey('key'), isFalse);
+    });
+
+    test('buildMultiActionCampaign uses key from action map', () {
+      final campaign = scry.buildMultiActionCampaign([
+        {'action': 'tap', 'label': 'Delete', 'key': "ValueKey('del_0')"},
+      ]);
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+      final tapStep = steps.last as Map<String, dynamic>;
+      final target = tapStep['target'] as Map<String, dynamic>;
+      expect(target['key'], "ValueKey('del_0')");
+    });
+  });
+
+  // ===================================================================
+  // Ancestor context annotation
+  // ===================================================================
+  group('Ancestor context annotation', () {
+    test('Dialog ancestor sets context to Dialog', () {
+      final glyphs = [
+        glyph(
+          label: 'Cancel',
+          widgetType: 'TextButton',
+          interactive: true,
+          ancestors: ['MaterialApp', 'Scaffold', 'Dialog', 'TextButton'],
+          depth: 30,
+          y: 400.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final btn = gaze.elements.firstWhere((e) => e.label == 'Cancel');
+      expect(btn.context, 'Dialog');
+    });
+
+    test('BottomSheet ancestor sets context', () {
+      final glyphs = [
+        glyph(
+          label: 'Close',
+          widgetType: 'TextButton',
+          interactive: true,
+          ancestors: ['MaterialApp', 'Scaffold', 'BottomSheet', 'TextButton'],
+          depth: 25,
+          y: 500.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final btn = gaze.elements.firstWhere((e) => e.label == 'Close');
+      expect(btn.context, 'BottomSheet');
+    });
+
+    test('Card ancestor sets context', () {
+      final glyphs = [
+        glyph(
+          label: 'Card Title',
+          ancestors: ['MaterialApp', 'Scaffold', 'Card', 'Text'],
+          y: 200.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final el = gaze.elements.firstWhere((e) => e.label == 'Card Title');
+      expect(el.context, 'Card');
+    });
+
+    test('no recognized ancestor sets context to null', () {
+      final glyphs = [
+        glyph(
+          label: 'Plain Text',
+          ancestors: ['MaterialApp', 'Scaffold', 'Column', 'Text'],
+          y: 300.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final el = gaze.elements.firstWhere((e) => e.label == 'Plain Text');
+      expect(el.context, isNull);
+    });
+
+    test('formatGaze shows context for buttons', () {
+      final glyphs = [
+        glyph(
+          label: 'Confirm',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          ancestors: ['MaterialApp', 'Scaffold', 'Dialog', 'ElevatedButton'],
+          depth: 30,
+          y: 400.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final output = scry.formatGaze(gaze);
+      expect(output, contains('Dialog'));
+    });
+  });
+
+  // ===================================================================
+  // Overlap / occlusion detection
+  // ===================================================================
+  group('Overlap / occlusion detection', () {
+    test('background element behind dialog is marked obscured', () {
+      final glyphs = [
+        // Background button at depth 5
+        glyph(
+          label: 'Background Button',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          depth: 5,
+          x: 50.0,
+          y: 300.0,
+          w: 200.0,
+          h: 48.0,
+        ),
+        // Dialog content at depth 30
+        glyph(
+          label: 'Dialog Title',
+          ancestors: ['MaterialApp', 'Scaffold', 'Dialog', 'Text'],
+          depth: 30,
+          x: 20.0,
+          y: 200.0,
+          w: 350.0,
+          h: 400.0,
+        ),
+        glyph(
+          label: 'OK',
+          widgetType: 'TextButton',
+          interactive: true,
+          ancestors: ['MaterialApp', 'Scaffold', 'Dialog', 'TextButton'],
+          depth: 30,
+          x: 150.0,
+          y: 500.0,
+          w: 60.0,
+          h: 36.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      final bgBtn = gaze.elements.firstWhere(
+        (e) => e.label == 'Background Button',
+      );
+      expect(bgBtn.obscured, isTrue);
+
+      // Dialog elements should NOT be obscured
+      final okBtn = gaze.elements.firstWhere((e) => e.label == 'OK');
+      expect(okBtn.obscured, isFalse);
+    });
+
+    test('non-overlapping background element is not obscured', () {
+      final glyphs = [
+        // Background button far from dialog
+        glyph(
+          label: 'Far Away Button',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          depth: 5,
+          x: 50.0,
+          y: 50.0,
+          w: 100.0,
+          h: 48.0,
+        ),
+        // Dialog in center of screen
+        glyph(
+          label: 'Dialog Content',
+          ancestors: ['MaterialApp', 'Scaffold', 'Dialog', 'Text'],
+          depth: 30,
+          x: 100.0,
+          y: 200.0,
+          w: 200.0,
+          h: 200.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      final btn = gaze.elements.firstWhere((e) => e.label == 'Far Away Button');
+      expect(btn.obscured, isFalse);
+    });
+
+    test('ScryGaze.obscured getter returns only obscured elements', () {
+      final glyphs = [
+        glyph(
+          label: 'Hidden',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          depth: 5,
+          x: 100.0,
+          y: 300.0,
+          w: 200.0,
+          h: 48.0,
+        ),
+        glyph(
+          label: 'Visible',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          depth: 5,
+          x: 50.0,
+          y: 50.0,
+          w: 80.0,
+          h: 48.0,
+        ),
+        glyph(
+          label: 'Dialog Text',
+          ancestors: ['MaterialApp', 'Scaffold', 'Dialog', 'Text'],
+          depth: 30,
+          x: 80.0,
+          y: 250.0,
+          w: 250.0,
+          h: 200.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.obscured, hasLength(1));
+      expect(gaze.obscured.first.label, 'Hidden');
+    });
+
+    test('no overlay means nothing is obscured', () {
+      final glyphs = [
+        glyph(
+          label: 'Button A',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          depth: 5,
+          y: 200.0,
+        ),
+        glyph(
+          label: 'Button B',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          depth: 5,
+          y: 300.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.obscured, isEmpty);
+    });
+
+    test('ScryGaze toJson includes obscured count', () {
+      final glyphs = [
+        glyph(
+          label: 'Blocked',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          depth: 5,
+          x: 100.0,
+          y: 300.0,
+          w: 200.0,
+          h: 48.0,
+        ),
+        glyph(
+          label: 'Modal OK',
+          widgetType: 'TextButton',
+          interactive: true,
+          ancestors: ['Dialog'],
+          depth: 30,
+          x: 80.0,
+          y: 250.0,
+          w: 250.0,
+          h: 200.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final json = gaze.toJson();
+      expect(json['obscuredCount'], 1);
+    });
+
+    test('formatGaze includes obscured warning section', () {
+      final glyphs = [
+        glyph(
+          label: 'Hidden Btn',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          depth: 5,
+          x: 100.0,
+          y: 300.0,
+          w: 200.0,
+          h: 48.0,
+        ),
+        glyph(
+          label: 'Dialog OK',
+          widgetType: 'TextButton',
+          interactive: true,
+          ancestors: ['Dialog'],
+          depth: 30,
+          x: 80.0,
+          y: 250.0,
+          w: 250.0,
+          h: 200.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final output = scry.formatGaze(gaze);
+      expect(output, contains('Obscured'));
+      expect(output, contains('Hidden Btn'));
+    });
+  });
+
+  // ===================================================================
+  // Repeated-element multiplicity
+  // ===================================================================
+  group('Repeated-element multiplicity', () {
+    test('multiple interactive buttons with same label get indices', () {
+      final glyphs = [
+        glyph(
+          label: 'Delete',
+          widgetType: 'IconButton',
+          interactive: true,
+          y: 100.0,
+        ),
+        glyph(
+          label: 'Delete',
+          widgetType: 'IconButton',
+          interactive: true,
+          y: 200.0,
+        ),
+        glyph(
+          label: 'Delete',
+          widgetType: 'IconButton',
+          interactive: true,
+          y: 300.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      final deletes = gaze.elements.where((e) => e.label == 'Delete').toList();
+      expect(deletes, hasLength(3));
+      expect(deletes[0].occurrenceIndex, 0);
+      expect(deletes[0].totalOccurrences, 3);
+      expect(deletes[1].occurrenceIndex, 1);
+      expect(deletes[2].occurrenceIndex, 2);
+    });
+
+    test('unique label has null occurrence fields', () {
+      final glyphs = [
+        glyph(label: 'Submit', widgetType: 'ElevatedButton', interactive: true),
+      ];
+      final gaze = scry.observe(glyphs);
+      final btn = gaze.elements.firstWhere((e) => e.label == 'Submit');
+      expect(btn.occurrenceIndex, isNull);
+      expect(btn.totalOccurrences, isNull);
+    });
+
+    test('non-interactive duplicates are still deduplicated', () {
+      // Same label appearing as both GestureDetector and Tooltip
+      // for the same UI element — should dedup, not multiply
+      final glyphs = [
+        glyph(
+          label: 'Quests',
+          widgetType: 'GestureDetector',
+          interactive: true,
+          ancestors: [
+            'MaterialApp',
+            'Scaffold',
+            'BottomNavigationBar',
+            'GestureDetector',
+          ],
+        ),
+        glyph(
+          label: 'Quests',
+          widgetType: 'Tooltip',
+          interactive: false,
+          ancestors: [
+            'MaterialApp',
+            'Scaffold',
+            'BottomNavigationBar',
+            'Tooltip',
+          ],
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final quests = gaze.elements.where((e) => e.label == 'Quests').toList();
+      // Should dedup to one element since only one is interactive
+      expect(quests, hasLength(1));
+      expect(quests.first.occurrenceIndex, isNull);
+    });
+
+    test('formatGaze shows multiplicity for repeated buttons', () {
+      final glyphs = [
+        glyph(
+          label: 'Remove',
+          widgetType: 'IconButton',
+          interactive: true,
+          y: 100.0,
+        ),
+        glyph(
+          label: 'Remove',
+          widgetType: 'IconButton',
+          interactive: true,
+          y: 200.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final output = scry.formatGaze(gaze);
+      // Should show occurrence count/index
+      expect(output, contains('Remove'));
+      expect(output, contains('×2'));
+    });
+  });
+
+  // ===================================================================
+  // Form validation awareness
+  // ===================================================================
+  group('Form validation awareness', () {
+    test('detects empty and filled fields', () {
+      final glyphs = [
+        glyph(
+          label: 'Username',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'username',
+          currentValue: 'Kael',
+          y: 100.0,
+        ),
+        glyph(
+          label: 'Password',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'password',
+          y: 200.0,
+        ),
+        glyph(
+          label: 'Submit',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          y: 300.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.formStatus, isNotNull);
+      expect(gaze.formStatus!.totalFields, 2);
+      expect(gaze.formStatus!.filledFields, 1);
+      expect(gaze.formStatus!.emptyFields, ['Password']);
+      expect(gaze.formStatus!.isReady, isFalse);
+    });
+
+    test('all fields filled and no errors → isReady', () {
+      final glyphs = [
+        glyph(
+          label: 'Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'name',
+          currentValue: 'Kael',
+          y: 100.0,
+        ),
+        glyph(
+          label: 'Email',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'email',
+          currentValue: 'kael@titan.io',
+          y: 200.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.formStatus, isNotNull);
+      expect(gaze.formStatus!.isReady, isTrue);
+      expect(gaze.formStatus!.emptyFields, isEmpty);
+      expect(gaze.formStatus!.validationErrors, isEmpty);
+    });
+
+    test('detects disabled fields', () {
+      final glyphs = [
+        glyph(
+          label: 'Locked Field',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'locked',
+          enabled: false,
+          y: 100.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.formStatus, isNotNull);
+      expect(gaze.formStatus!.disabledFields, ['Locked Field']);
+    });
+
+    test('detects validation errors near fields', () {
+      final glyphs = [
+        glyph(
+          label: 'Email',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'email',
+          currentValue: 'bad',
+          x: 16.0,
+          y: 100.0,
+          w: 350.0,
+          h: 56.0,
+        ),
+        // Error text directly below the field
+        glyph(
+          label: 'Please enter a valid email',
+          x: 16.0,
+          y: 130.0,
+          w: 200.0,
+          h: 16.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.formStatus, isNotNull);
+      expect(gaze.formStatus!.validationErrors, hasLength(1));
+      expect(gaze.formStatus!.validationErrors.first.fieldLabel, 'Email');
+      expect(
+        gaze.formStatus!.validationErrors.first.errorMessage,
+        'Please enter a valid email',
+      );
+      expect(gaze.formStatus!.isReady, isFalse);
+    });
+
+    test('ignores error text too far from field', () {
+      final glyphs = [
+        glyph(
+          label: 'Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'name',
+          currentValue: 'Kael',
+          x: 16.0,
+          y: 100.0,
+          w: 350.0,
+          h: 56.0,
+        ),
+        // Error text far below — 200px gap
+        glyph(
+          label: 'This field is required',
+          x: 16.0,
+          y: 300.0,
+          w: 200.0,
+          h: 16.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.formStatus, isNotNull);
+      expect(gaze.formStatus!.validationErrors, isEmpty);
+    });
+
+    test('no fields → null formStatus', () {
+      final glyphs = [
+        glyph(label: 'Welcome'),
+        glyph(label: 'Start', widgetType: 'ElevatedButton', interactive: true),
+      ];
+      final gaze = scry.observe(glyphs);
+      expect(gaze.formStatus, isNull);
+    });
+
+    test('ScryFormStatus serializes to JSON', () {
+      const status = ScryFormStatus(
+        totalFields: 3,
+        filledFields: 2,
+        emptyFields: ['Password'],
+        validationErrors: [
+          ScryFieldError(fieldLabel: 'Email', errorMessage: 'Invalid email'),
+        ],
+        disabledFields: [],
+      );
+
+      final json = status.toJson();
+      expect(json['totalFields'], 3);
+      expect(json['filledFields'], 2);
+      expect(json['emptyFields'], ['Password']);
+      expect(json['isReady'], isFalse);
+      expect(json['validationErrors'], hasLength(1));
+    });
+
+    test('ScryFieldError serializes to JSON', () {
+      const error = ScryFieldError(
+        fieldLabel: 'Email',
+        errorMessage: 'Invalid email',
+      );
+      final json = error.toJson();
+      expect(json['fieldLabel'], 'Email');
+      expect(json['errorMessage'], 'Invalid email');
+    });
+
+    test('ScryGaze toJson includes formStatus when present', () {
+      final glyphs = [
+        glyph(
+          label: 'Field',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'f',
+          y: 100.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final json = gaze.toJson();
+      expect(json.containsKey('formStatus'), isTrue);
+    });
+
+    test('formatGaze includes form status section', () {
+      final glyphs = [
+        glyph(
+          label: 'Username',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'username',
+          currentValue: 'Kael',
+          y: 100.0,
+        ),
+        glyph(
+          label: 'Password',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'password',
+          y: 200.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+      final output = scry.formatGaze(gaze);
+      expect(output, contains('Form Status'));
+      expect(output, contains('filled'));
+    });
+  });
+
+  // ===================================================================
+  // Combined capabilities integration
+  // ===================================================================
+  group('Combined capabilities', () {
+    test('observe produces full-featured elements', () {
+      final glyphs = [
+        // AppBar title
+        glyph(
+          label: 'Quest Log',
+          ancestors: ['MaterialApp', 'Scaffold', 'AppBar', 'Text'],
+          y: 40.0,
+          depth: 10,
+        ),
+        // Form field with key
+        glyph(
+          label: 'Quest Name',
+          widgetType: 'TextField',
+          interactive: true,
+          fieldId: 'questName',
+          currentValue: 'Dragon Slayer',
+          key: "ValueKey('quest_name')",
+          y: 200.0,
+          depth: 12,
+        ),
+        // Submit button in Card context
+        glyph(
+          label: 'Create Quest',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          ancestors: ['MaterialApp', 'Scaffold', 'Card', 'ElevatedButton'],
+          y: 400.0,
+          depth: 14,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      // AppBar title → topBar region
+      final title = gaze.elements.firstWhere((e) => e.label == 'Quest Log');
+      expect(title.region, ScryScreenRegion.topBar);
+
+      // Field has key and is in main content
+      final field = gaze.elements.firstWhere((e) => e.label == 'Quest Name');
+      expect(field.key, "ValueKey('quest_name')");
+      expect(field.region, ScryScreenRegion.mainContent);
+
+      // Button has Card context
+      final btn = gaze.elements.firstWhere((e) => e.label == 'Create Quest');
+      expect(btn.context, 'Card');
+
+      // Form status populated
+      expect(gaze.formStatus, isNotNull);
+      expect(gaze.formStatus!.filledFields, 1);
+    });
+
+    test('dialog overlays + multiplicity + key targeting together', () {
+      final glyphs = [
+        // Three "Edit" buttons in a list (background)
+        glyph(
+          label: 'Edit',
+          widgetType: 'IconButton',
+          interactive: true,
+          depth: 5,
+          x: 300.0,
+          y: 100.0,
+          w: 48.0,
+          h: 48.0,
+          key: "ValueKey('edit_0')",
+        ),
+        glyph(
+          label: 'Edit',
+          widgetType: 'IconButton',
+          interactive: true,
+          depth: 5,
+          x: 300.0,
+          y: 200.0,
+          w: 48.0,
+          h: 48.0,
+          key: "ValueKey('edit_1')",
+        ),
+        glyph(
+          label: 'Edit',
+          widgetType: 'IconButton',
+          interactive: true,
+          depth: 5,
+          x: 300.0,
+          y: 300.0,
+          w: 48.0,
+          h: 48.0,
+          key: "ValueKey('edit_2')",
+        ),
+        // Dialog overlay covering the middle area
+        glyph(
+          label: 'Confirm Edit',
+          ancestors: ['MaterialApp', 'Scaffold', 'Dialog', 'Text'],
+          depth: 30,
+          x: 50.0,
+          y: 150.0,
+          w: 300.0,
+          h: 300.0,
+        ),
+        glyph(
+          label: 'Save',
+          widgetType: 'ElevatedButton',
+          interactive: true,
+          ancestors: ['MaterialApp', 'Scaffold', 'Dialog', 'ElevatedButton'],
+          depth: 30,
+          x: 200.0,
+          y: 400.0,
+          w: 100.0,
+          h: 48.0,
+        ),
+      ];
+      final gaze = scry.observe(glyphs);
+
+      // All 3 Edit buttons should have multiplicity
+      final edits = gaze.elements.where((e) => e.label == 'Edit').toList();
+      expect(edits, hasLength(3));
+      expect(edits[0].totalOccurrences, 3);
+
+      // Edit buttons 1 and 2 (y=200, y=300) overlap with dialog
+      // Edit button 0 (y=100) is above the dialog
+      final obscuredEdits = edits.where((e) => e.obscured).toList();
+      expect(obscuredEdits, hasLength(2));
+
+      // Keys are preserved even when obscured
+      for (final e in edits) {
+        expect(e.key, isNotNull);
+      }
+
+      // Dialog elements not obscured
+      final save = gaze.elements.firstWhere((e) => e.label == 'Save');
+      expect(save.obscured, isFalse);
+      expect(save.context, 'Dialog');
     });
   });
 }
