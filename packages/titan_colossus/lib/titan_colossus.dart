@@ -94,7 +94,10 @@ export 'src/relay.dart';
 
 // Integrations
 export 'src/integration/blueprint_lens_tab.dart';
+export 'src/integration/colossus_argus.dart';
 export 'src/integration/colossus_atlas_observer.dart';
+export 'src/integration/colossus_basalt.dart';
+export 'src/integration/colossus_bastion.dart';
 export 'src/integration/colossus_envoy.dart';
 export 'src/integration/colossus_lens_tab.dart';
 export 'src/integration/lens.dart';

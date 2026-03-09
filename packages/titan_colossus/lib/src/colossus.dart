@@ -245,6 +245,53 @@ class Colossus extends Pillar {
     }
   }
 
+  // -----------------------------------------------------------------------
+  // Integration Events (cross-cutting bridge events)
+  // -----------------------------------------------------------------------
+
+  /// Tracked integration events from Colossus bridges (newest last).
+  ///
+  /// Sources: `atlas`, `basalt`, `argus`, `bastion`, or custom bridges.
+  /// Each entry is a JSON-serializable map with at least `source`, `type`,
+  /// and `timestamp` keys.
+  final List<Map<String, dynamic>> _events = [];
+
+  /// Maximum number of integration events to retain.
+  static const int _maxEvents = 1000;
+
+  /// All tracked integration events since initialization (newest last).
+  ///
+  /// ```dart
+  /// final events = Colossus.instance.events;
+  /// final authEvents = events.where((e) => e['source'] == 'argus');
+  /// ```
+  List<Map<String, dynamic>> get events => List.unmodifiable(_events);
+
+  /// Tracks an integration event from a Colossus bridge.
+  ///
+  /// Automatically adds a `timestamp` field if not present. Events are
+  /// stored in-memory and accessible via the Relay HTTP endpoint.
+  ///
+  /// ```dart
+  /// Colossus.instance.trackEvent({
+  ///   'source': 'basalt',
+  ///   'type': 'circuit_trip',
+  ///   'name': 'api-breaker',
+  ///   'tripCount': 3,
+  /// });
+  /// ```
+  void trackEvent(Map<String, dynamic> event) {
+    final stamped = {
+      ...event,
+      if (!event.containsKey('timestamp'))
+        'timestamp': DateTime.now().toIso8601String(),
+    };
+    _events.add(stamped);
+    if (_events.length > _maxEvents) {
+      _events.removeAt(0);
+    }
+  }
+
   /// The original [FlutterError.onError] handler, restored on dispose.
   FlutterExceptionHandler? _previousErrorHandler;
 

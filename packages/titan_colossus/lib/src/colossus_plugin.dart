@@ -5,7 +5,10 @@ import 'package:titan_bastion/titan_bastion.dart';
 
 import 'colossus.dart';
 import 'export/blueprint_export.dart';
+import 'integration/colossus_argus.dart';
 import 'integration/colossus_atlas_observer.dart';
+import 'integration/colossus_basalt.dart';
+import 'integration/colossus_bastion.dart';
 import 'integration/colossus_envoy.dart';
 import 'integration/lens.dart';
 import 'relay/relay.dart';
@@ -244,6 +247,16 @@ class ColossusPlugin extends TitanPlugin {
   /// Gracefully degrades — no error if Envoy is not registered.
   final bool autoEnvoyMetrics;
 
+  /// Whether to automatically connect [ColossusArgus] for auth event
+  /// tracking when [Argus] is registered in Titan DI.
+  ///
+  /// Gracefully degrades — no error if Argus is not registered.
+  final bool autoArgusMetrics;
+
+  /// Whether to automatically connect [ColossusBastion] for Pillar
+  /// lifecycle tracking, state mutation heat maps, and effect errors.
+  final bool autoBastionMetrics;
+
   /// Creates a ColossusPlugin with the given configuration.
   ///
   /// All parameters mirror [Colossus.init] options. The plugin
@@ -269,6 +282,8 @@ class ColossusPlugin extends TitanPlugin {
     this.enableRelay = false,
     this.relayConfig = const RelayConfig(),
     this.autoEnvoyMetrics = true,
+    this.autoArgusMetrics = true,
+    this.autoBastionMetrics = true,
   });
 
   @override
@@ -328,6 +343,18 @@ class ColossusPlugin extends TitanPlugin {
     if (autoEnvoyMetrics) {
       ColossusEnvoy.connect();
     }
+
+    // Auto-connect Argus auth event tracking.
+    // Listens to isLoggedIn state changes and forwards as events.
+    if (autoArgusMetrics) {
+      ColossusArgus.connect();
+    }
+
+    // Auto-connect Bastion reactive engine observer.
+    // Tracks Pillar lifecycle, state mutation frequency, effect errors.
+    if (autoBastionMetrics) {
+      ColossusBastion.connect();
+    }
   }
 
   @override
@@ -358,6 +385,19 @@ class ColossusPlugin extends TitanPlugin {
     if (autoEnvoyMetrics) {
       ColossusEnvoy.disconnect();
     }
+
+    // Disconnect Argus auth tracking.
+    if (autoArgusMetrics) {
+      ColossusArgus.disconnect();
+    }
+
+    // Disconnect Bastion reactive engine observer.
+    if (autoBastionMetrics) {
+      ColossusBastion.disconnect();
+    }
+
+    // Disconnect any Basalt resilience monitors.
+    ColossusBasalt.disconnectAll();
 
     // Remove Atlas observer before shutdown
     if (autoAtlasIntegration) {

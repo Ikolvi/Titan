@@ -24,6 +24,8 @@ dependencies:
   titan: ^1.1.3
   titan_bastion: ^1.1.0
   titan_atlas: ^1.0.3
+  titan_basalt: ^1.0.0
+  titan_argus: ^1.0.0
   titan_envoy: ^1.0.0
 
 dev_dependencies:
