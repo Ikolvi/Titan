@@ -245,7 +245,7 @@ void main() {
         final path = terrain.shortestPath('/a', '/c');
         expect(path, hasLength(2));
         expect(path!.first.fromRoute, '/a');
-        expect(path!.first.toRoute, '/b');
+        expect(path.first.toRoute, '/b');
         expect(path.last.fromRoute, '/b');
         expect(path.last.toRoute, '/c');
       });

@@ -1447,7 +1447,7 @@ void main() {
       Colossus.shutdown();
     });
 
-    Verdict _makeVerdict({
+    Verdict makeVerdict({
       required String name,
       required bool passed,
       Duration duration = const Duration(milliseconds: 100),
@@ -1487,8 +1487,8 @@ void main() {
     }
 
     testWidgets('shows debrief results after running debrief', (tester) async {
-      final passVerdict = _makeVerdict(name: 'test-1', passed: true);
-      final failVerdict = _makeVerdict(name: 'test-2', passed: false);
+      final passVerdict = makeVerdict(name: 'test-1', passed: true);
+      final failVerdict = makeVerdict(name: 'test-2', passed: false);
 
       // Debrief the verdicts via Colossus
       final report = colossus.debrief([passVerdict, failVerdict]);
@@ -1512,9 +1512,9 @@ void main() {
     });
 
     testWidgets('debrief report has valid pass rate', (tester) async {
-      final v1 = _makeVerdict(name: 'a', passed: true);
-      final v2 = _makeVerdict(name: 'b', passed: true);
-      final v3 = _makeVerdict(name: 'c', passed: false);
+      final v1 = makeVerdict(name: 'a', passed: true);
+      final v2 = makeVerdict(name: 'b', passed: true);
+      final v3 = makeVerdict(name: 'c', passed: false);
 
       final report = colossus.debrief([v1, v2, v3]);
 
@@ -1523,8 +1523,8 @@ void main() {
     });
 
     testWidgets('100% pass rate for all-passing verdicts', (tester) async {
-      final v1 = _makeVerdict(name: 'x', passed: true);
-      final v2 = _makeVerdict(name: 'y', passed: true);
+      final v1 = makeVerdict(name: 'x', passed: true);
+      final v2 = makeVerdict(name: 'y', passed: true);
 
       final report = colossus.debrief([v1, v2]);
 
@@ -1535,7 +1535,7 @@ void main() {
     testWidgets('debrief insights are generated for failed verdicts', (
       tester,
     ) async {
-      final failVerdict = _makeVerdict(name: 'fail-test', passed: false);
+      final failVerdict = makeVerdict(name: 'fail-test', passed: false);
       final report = colossus.debrief([failVerdict]);
 
       // Should have at least one insight for the failure
@@ -1543,7 +1543,7 @@ void main() {
     });
 
     testWidgets('suggested next actions are generated', (tester) async {
-      final failVerdict = _makeVerdict(name: 'fail-nav', passed: false);
+      final failVerdict = makeVerdict(name: 'fail-nav', passed: false);
       final report = colossus.debrief([failVerdict]);
 
       // Debrief analysis should produce suggested actions

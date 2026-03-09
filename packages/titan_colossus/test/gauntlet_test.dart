@@ -880,7 +880,6 @@ void main() {
     });
 
     test('all generated Stratagems have startRoute', () {
-      final outpost = createOutpost(route: '/login');
       final results = Gauntlet.generateFor(
         createOutpost(
           route: '/login',

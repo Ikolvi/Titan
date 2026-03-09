@@ -68,12 +68,6 @@ void main() {
 
   Terrain makeTerrain() => Terrain();
 
-  /// Creates an isolated Scout–Terrain pair for test isolation.
-  (Terrain, Scout) makeScoutPair() {
-    final terrain = Terrain();
-    return (terrain, Scout.withTerrain(terrain));
-  }
-
   // =========================================================================
   // InsightType
   // =========================================================================

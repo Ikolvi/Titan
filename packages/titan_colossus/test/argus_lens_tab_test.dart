@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:titan/titan.dart';
 import 'package:titan_argus/titan_argus.dart';
 import 'package:titan_colossus/titan_colossus.dart';
 

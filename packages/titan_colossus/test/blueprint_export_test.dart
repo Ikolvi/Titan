@@ -6,14 +6,11 @@ import 'package:titan_colossus/titan_colossus.dart';
 
 void main() {
   group('BlueprintExport', () {
-    late Terrain terrain;
-
     setUp(() {
-      terrain = Terrain();
       Scout.reset();
     });
 
-    Terrain _buildSampleTerrain() {
+    Terrain buildSampleTerrain() {
       final t = Terrain();
       // Add outposts manually via Scout
       final scout = Scout.withTerrain(t);
@@ -54,7 +51,7 @@ void main() {
     }
 
     test('fromScout creates export with terrain and stratagems', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final export = BlueprintExport.fromScout(scout: scout);
@@ -118,7 +115,7 @@ void main() {
     });
 
     test('toJson produces valid JSON structure', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final export = BlueprintExport.fromScout(scout: scout);
@@ -135,7 +132,7 @@ void main() {
     });
 
     test('toJson includes lineage data', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final export = BlueprintExport.fromScout(scout: scout);
@@ -149,7 +146,7 @@ void main() {
     });
 
     test('toJson includes verdicts when provided', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final verdict = Verdict.fromSteps(
@@ -179,7 +176,7 @@ void main() {
     });
 
     test('toJson omits verdicts key when no verdicts', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final export = BlueprintExport.fromScout(scout: scout);
@@ -189,7 +186,7 @@ void main() {
     });
 
     test('toJsonString produces valid JSON', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final export = BlueprintExport.fromScout(scout: scout);
@@ -202,7 +199,7 @@ void main() {
     });
 
     test('toCompactJsonString produces valid JSON without indentation', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final export = BlueprintExport.fromScout(scout: scout);
@@ -227,7 +224,7 @@ void main() {
     });
 
     test('toAiPrompt generates Markdown content', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final export = BlueprintExport.fromScout(scout: scout);
@@ -303,7 +300,7 @@ void main() {
     });
 
     test('toAiPrompt includes failed verdicts', () {
-      final t = _buildSampleTerrain();
+      final t = buildSampleTerrain();
       final scout = Scout.withTerrain(t);
 
       final verdict = Verdict.fromSteps(
@@ -353,7 +350,7 @@ void main() {
       }
     });
 
-    BlueprintExport _createExport() {
+    BlueprintExport createExport() {
       return BlueprintExport(
         terrain: Terrain(),
         stratagems: const [],
@@ -364,7 +361,7 @@ void main() {
     }
 
     test('save writes JSON file', () async {
-      final export = _createExport();
+      final export = createExport();
 
       final path = await BlueprintExportIO.save(
         export,
@@ -379,7 +376,7 @@ void main() {
     });
 
     test('save uses default filename', () async {
-      final export = _createExport();
+      final export = createExport();
 
       final path = await BlueprintExportIO.save(
         export,
@@ -390,7 +387,7 @@ void main() {
     });
 
     test('save uses custom filename', () async {
-      final export = _createExport();
+      final export = createExport();
 
       final path = await BlueprintExportIO.save(
         export,
@@ -402,7 +399,7 @@ void main() {
     });
 
     test('savePrompt writes Markdown file', () async {
-      final export = _createExport();
+      final export = createExport();
 
       final path = await BlueprintExportIO.savePrompt(
         export,
@@ -416,7 +413,7 @@ void main() {
     });
 
     test('saveAll writes both files', () async {
-      final export = _createExport();
+      final export = createExport();
 
       final result = await BlueprintExportIO.saveAll(
         export,
@@ -429,7 +426,7 @@ void main() {
     });
 
     test('save creates directory if missing', () async {
-      final export = _createExport();
+      final export = createExport();
       final nestedDir = '${tempDir.path}/nested/deep';
 
       final path = await BlueprintExportIO.save(export, directory: nestedDir);
@@ -438,7 +435,7 @@ void main() {
     });
 
     test('loadTerrain loads from saved file', () async {
-      final export = _createExport();
+      final export = createExport();
       final path = await BlueprintExportIO.save(
         export,
         directory: tempDir.path,

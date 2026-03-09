@@ -51,8 +51,13 @@ void main() {
 
     addOutpost('/quest/:id', 'Quest Detail', 12, [
       march('/quest/:id', '/', MarchTrigger.back, 8),
-      march('/quest/:id', '/quest/:id/edit', MarchTrigger.tap, 4,
-          label: 'Edit'),
+      march(
+        '/quest/:id',
+        '/quest/:id/edit',
+        MarchTrigger.tap,
+        4,
+        label: 'Edit',
+      ),
     ]);
 
     addOutpost('/quest/:id/edit', 'Quest Edit', 4, [
@@ -76,8 +81,6 @@ void main() {
 
     terrain.sessionsAnalyzed = 5;
     terrain.invalidateCache();
-
-    final scout = Scout.withTerrain(terrain);
 
     // Generate Stratagems
     final stratagems = <Stratagem>[];
@@ -121,8 +124,10 @@ void main() {
     // ignore: avoid_print
     print('${stratagems.length} Stratagems');
     // ignore: avoid_print
-    print('${terrain.screenCount} screens, '
-        '${terrain.transitionCount} transitions');
+    print(
+      '${terrain.screenCount} screens, '
+      '${terrain.transitionCount} transitions',
+    );
     // ignore: avoid_print
     print('${terrain.deadEnds.length} dead ends');
 

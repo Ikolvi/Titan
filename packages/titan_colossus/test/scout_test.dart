@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:titan_colossus/titan_colossus.dart';
 
@@ -1062,7 +1060,7 @@ void main() {
 
     group('March merging', () {
       test('merges duplicate Marches across sessions', () {
-        final makeSession = () => createSession(
+        ShadeSession makeSession() => createSession(
           tableaux: [
             createTableau(index: 0, route: '/login', timestamp: Duration.zero),
             createTableau(
