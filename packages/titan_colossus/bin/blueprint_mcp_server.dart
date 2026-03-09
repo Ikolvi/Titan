@@ -2468,7 +2468,7 @@ class _BlueprintMcpServer {
     };
 
     if (relayOnlyTools.contains(toolName)) {
-      final result = switch (toolName) {
+      final Object result = switch (toolName) {
         'execute_campaign' => await _executeCampaign(toolArgs),
         'relay_status' => await _relayStatus(),
         'relay_terrain' => await _relayTerrain(),
@@ -2509,13 +2509,21 @@ class _BlueprintMcpServer {
         _ => 'Unknown tool: $toolName',
       };
 
+      // Support mixed content (text + image). Tools returning a
+      // List<Map<String, dynamic>> provide raw MCP content items;
+      // String results are wrapped in a text content item.
+      final List<Map<String, dynamic>> content;
+      if (result is List<Map<String, dynamic>>) {
+        content = result;
+      } else {
+        content = [
+          {'type': 'text', 'text': result},
+        ];
+      }
+
       return {
         'jsonrpc': '2.0',
-        'result': {
-          'content': [
-            {'type': 'text', 'text': result},
-          ],
-        },
+        'result': {'content': content},
         'id': id,
       };
     }
@@ -6048,13 +6056,16 @@ class _BlueprintMcpServer {
   // Enterprise MCP tools (screenshot, accessibility, DI inspection)
   // -----------------------------------------------------------------------
 
-  /// Capture a screenshot via Relay, decode, and save to disk.
+  /// Capture a screenshot via Relay, decode, save to disk, and
+  /// return both the file metadata and the image itself.
   ///
-  /// Saves the PNG to `.titan/screenshots/screenshot-{timestamp}.png`
-  /// and returns the file path. Works identically across native and
-  /// web relays — the MCP server always runs on the host machine
-  /// with filesystem access.
-  Future<String> _captureScreenshot(Map<String, dynamic> args) async {
+  /// Returns a `List<Map<String, dynamic>>` of MCP content items:
+  /// 1. A text item with file path and metadata
+  /// 2. An image item with the base64 PNG for inline viewing
+  ///
+  /// Saves the PNG to `.titan/screenshots/screenshot-{timestamp}.png`.
+  /// Works identically across native HTTP and web WebSocket relays.
+  Future<Object> _captureScreenshot(Map<String, dynamic> args) async {
     final pixelRatio = args['pixelRatio'] as num?;
     final path = pixelRatio != null
         ? '/screenshot?pixelRatio=$pixelRatio'
@@ -6090,19 +6101,22 @@ class _BlueprintMcpServer {
       File(filePath).writeAsBytesSync(bytes);
 
       final sizeKb = (bytes.length / 1024).toStringAsFixed(1);
-      final buf = StringBuffer();
-      buf.writeln('# Screenshot Captured');
-      buf.writeln();
-      buf.writeln('| Property | Value |');
-      buf.writeln('|----------|-------|');
-      buf.writeln('| File | `$filePath` |');
-      buf.writeln('| Size | $sizeKb KB (${bytes.length} bytes) |');
-      buf.writeln(
+      final textContent = StringBuffer();
+      textContent.writeln('# Screenshot Captured');
+      textContent.writeln();
+      textContent.writeln('| Property | Value |');
+      textContent.writeln('|----------|-------|');
+      textContent.writeln('| File | `$filePath` |');
+      textContent.writeln('| Size | $sizeKb KB (${bytes.length} bytes) |');
+      textContent.writeln(
         '| Pixel Ratio | ${data['pixelRatio'] ?? pixelRatio ?? 0.5} |',
       );
-      buf.writeln();
-      buf.writeln('Screenshot saved to disk. Open the file to view.');
-      return buf.toString();
+
+      // Return text metadata + inline image for AI vision.
+      return <Map<String, dynamic>>[
+        {'type': 'text', 'text': textContent.toString()},
+        {'type': 'image', 'data': base64Str, 'mimeType': 'image/png'},
+      ];
     } on SocketException {
       return '# Screenshot Unavailable\n\n'
           'Relay is not running. Start your app with '
