@@ -200,11 +200,12 @@ void main() {
 
   group('MarkCategory', () {
     test('has all expected categories', () {
-      expect(MarkCategory.values, hasLength(5));
+      expect(MarkCategory.values, hasLength(6));
       expect(MarkCategory.values, contains(MarkCategory.frame));
       expect(MarkCategory.values, contains(MarkCategory.pageLoad));
       expect(MarkCategory.values, contains(MarkCategory.memory));
       expect(MarkCategory.values, contains(MarkCategory.rebuild));
+      expect(MarkCategory.values, contains(MarkCategory.api));
       expect(MarkCategory.values, contains(MarkCategory.custom));
     });
   });
