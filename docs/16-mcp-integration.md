@@ -94,28 +94,18 @@ On web, browsers cannot host HTTP servers. The connection direction is **reverse
 
 1. **Dart SDK** ≥ 3.10.3 (or Flutter ≥ 3.10.0)
 2. **titan_colossus** package in your app's dependencies
-3. **FVM** (recommended) — all examples use `fvm dart` / `fvm flutter`
+3. **Dart SDK** and **Flutter** available on your PATH
 4. Your Flutter app configured with `ColossusPlugin(enableRelay: true)` for live mode
 
 ### Verify Dart is available
 
 ```bash
-# With FVM
-fvm dart --version
-
-# Without FVM
 dart --version
 ```
 
 Note the path to your `dart` executable. You'll need it for IDE configuration:
 
 ```bash
-# FVM path (common)
-which fvm    # e.g., /Users/you/.pub-cache/bin/fvm
-# Dart through FVM
-fvm which dart    # e.g., /Users/you/fvm/versions/stable/bin/dart
-
-# Direct system Dart
 which dart    # e.g., /usr/local/bin/dart
 ```
 
@@ -148,7 +138,7 @@ runApp(
 
 ```bash
 cd your_project
-fvm flutter run -d macos    # or any device
+flutter run -d macos    # or any device
 ```
 
 ### 4. Wait for Relay to initialize (~12 seconds after launch)
@@ -192,7 +182,7 @@ Open VS Code Settings (`Cmd+,` / `Ctrl+,`) → search for "mcp" → edit `settin
 {
   "github.copilot.chat.mcpServers": {
     "titan-blueprint": {
-      "command": "/Users/you/fvm/versions/stable/bin/dart",
+      "command": "dart",
       "args": [
         "run",
         "titan_colossus:blueprint_mcp_server"
@@ -203,27 +193,7 @@ Open VS Code Settings (`Cmd+,` / `Ctrl+,`) → search for "mcp" → edit `settin
 }
 ```
 
-#### Option C: With FVM wrapper
-
-If `dart` isn't on your PATH but `fvm` is:
-
-```json
-{
-  "github.copilot.chat.mcpServers": {
-    "titan-blueprint": {
-      "command": "fvm",
-      "args": [
-        "dart",
-        "run",
-        "titan_colossus:blueprint_mcp_server"
-      ],
-      "cwd": "${workspaceFolder}/packages/titan_colossus"
-    }
-  }
-}
-```
-
-#### Option D: With CLI overrides
+#### Option C: With CLI overrides
 
 For custom relay host/port (e.g., physical device on the network):
 
@@ -509,7 +479,7 @@ Create or edit `~/.cursor/mcp.json`:
 {
   "mcpServers": {
     "titan-blueprint": {
-      "command": "/Users/you/fvm/versions/stable/bin/dart",
+      "command": "dart",
       "args": [
         "run",
         "titan_colossus:blueprint_mcp_server"
@@ -540,7 +510,7 @@ JetBrains IDEs 2025.1+ include native MCP support in the AI Assistant.
 2. Click **Add** (+)
 3. Configure:
    - **Name:** `titan-blueprint`
-   - **Command:** `dart` (or full path: `/Users/you/fvm/versions/stable/bin/dart`)
+   - **Command:** `dart`
    - **Arguments:** `run titan_colossus:blueprint_mcp_server`
    - **Working Directory:** `/path/to/project/packages/titan_colossus`
 4. Click **OK** → **Apply**
@@ -970,10 +940,10 @@ Requests without a valid token receive a **401** JSON-RPC error response:
 
 ```bash
 cd packages/titan_colossus
-fvm dart run titan_colossus:blueprint_mcp_server
+dart run titan_colossus:blueprint_mcp_server
 
 # With custom options
-fvm dart run titan_colossus:blueprint_mcp_server \
+dart run titan_colossus:blueprint_mcp_server \
   --relay-host 192.168.1.50 \
   --relay-port 8642 \
   --blueprint-path /path/to/.titan/blueprint.json
@@ -1444,7 +1414,7 @@ The Relay uses `dart:io` HTTP server, which is not available on web platforms. F
 | Symptom | Fix |
 |---------|-----|
 | Server not listed | Restart IDE after adding configuration |
-| "command not found: dart" | Use absolute path to dart: `/Users/you/fvm/versions/stable/bin/dart` |
+| "command not found: dart" | Ensure `dart` is on your PATH or use absolute path (e.g., `which dart`) |
 | Server crashes immediately | Run manually in terminal to see error: `cd packages/titan_colossus && dart run titan_colossus:blueprint_mcp_server` |
 | Wrong cwd | Ensure `cwd` points to `packages/titan_colossus` (where `pubspec.yaml` is) |
 
@@ -1482,7 +1452,7 @@ kill <PID>        # Kill it
 **"dart: command not found" in MCP server:**
 Use the full path to the Dart executable:
 ```json
-"command": "/Users/you/fvm/versions/stable/bin/dart"
+"command": "/path/to/your/dart"
 ```
 
 **Timeout waiting for Relay:**

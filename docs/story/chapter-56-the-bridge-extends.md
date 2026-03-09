@@ -131,7 +131,7 @@ Kael built a command-line caravan:
 
 ```bash
 # Load sessions from disk, feed them through Scout, export the result
-fvm dart run titan_colossus:export_blueprint \
+dart run titan_colossus:export_blueprint \
   --sessions-dir .titan/sessions \
   --output-dir .titan \
   --patterns /quest/:id,/hero/:heroId \
@@ -150,7 +150,7 @@ Rhea added it to the CI configuration that afternoon:
 - name: Generate AI Blueprint
   run: |
     cd packages/titan_colossus
-    fvm dart run titan_colossus:export_blueprint \
+    dart run titan_colossus:export_blueprint \
       --sessions-dir ${{ github.workspace }}/.titan/sessions \
       --output-dir .titan
 ```
@@ -319,5 +319,5 @@ The Colossus had learned to speak beyond its walls. And the machines outside wer
 - `BlueprintExportIO.loadTerrain()` / `loadSessions()` — Read back saved data
 - `BlueprintSaveResult` — Result from `saveAll()` with JSON and prompt file paths
 - `ColossusPlugin(blueprintExportDirectory: '.titan')` — Auto-export on shutdown
-- CLI tool: `fvm dart run titan_colossus:export_blueprint`
-- MCP Server: `fvm dart run titan_colossus:blueprint_mcp_server`
+- CLI tool: `dart run titan_colossus:export_blueprint`
+- MCP Server: `dart run titan_colossus:blueprint_mcp_server`

@@ -884,17 +884,17 @@ Export a Blueprint from previously saved Shade session files — useful for CI/C
 cd packages/titan_colossus
 
 # Basic export (default: .titan/sessions → .titan/)
-fvm dart run titan_colossus:export_blueprint
+dart run titan_colossus:export_blueprint
 
 # Full options
-fvm dart run titan_colossus:export_blueprint \
+dart run titan_colossus:export_blueprint \
   --sessions-dir .titan/sessions \
   --output-dir .titan \
   --patterns /quest/:id,/hero/:heroId \
   --intensity thorough
 
 # AI prompt only (skip JSON)
-fvm dart run titan_colossus:export_blueprint --prompt-only
+dart run titan_colossus:export_blueprint --prompt-only
 ```
 
 The CLI tool:
@@ -1407,7 +1407,7 @@ When entering text, three strategies are tried in order:
 ## Testing
 
 ```bash
-cd packages/titan_colossus && fvm flutter test  # 1517+ tests
+cd packages/titan_colossus && flutter test  # 1517+ tests
 ```
 
 ---

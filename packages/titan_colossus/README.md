@@ -521,17 +521,17 @@ Use the CLI tool to build a Blueprint from previously saved Shade sessions:
 cd packages/titan_colossus
 
 # Basic export
-fvm dart run titan_colossus:export_blueprint
+dart run titan_colossus:export_blueprint
 
 # With options
-fvm dart run titan_colossus:export_blueprint \
+dart run titan_colossus:export_blueprint \
   --sessions-dir .titan/sessions \
   --output-dir .titan \
   --patterns /quest/:id,/hero/:heroId \
   --intensity thorough
 
 # AI prompt only
-fvm dart run titan_colossus:export_blueprint --prompt-only
+dart run titan_colossus:export_blueprint --prompt-only
 ```
 
 #### Blueprint MCP Server
