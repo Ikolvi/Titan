@@ -19,6 +19,9 @@ import 'screens/quest_detail_screen.dart';
 import 'screens/quest_list_screen.dart';
 import 'screens/shade_demo_screen.dart';
 import 'screens/spark_demo_screen.dart';
+import 'screens/tale_detail_screen.dart';
+import 'screens/tavern_screen.dart';
+import 'pillars/tavern_pillar.dart';
 
 // ---------------------------------------------------------------------------
 // Questboard -- The Titan Example App
@@ -54,6 +57,16 @@ import 'screens/spark_demo_screen.dart';
 //   Shade                      -- Gesture recording & macro replay
 //   Phantom                    -- Automated gesture replay engine
 //   CoreRefresh                -- Reactive Sentinel re-evaluation on auth change
+//   EnvoyPillar                -- HTTP client with auto-disposal
+//   Courier pipeline           -- LogCourier, RetryCourier, CacheCourier, etc.
+//   Codex + Envoy              -- Paginated HTTP data fetching
+//   Quarry + Envoy             -- SWR data fetching over HTTP
+//   envoyQuarry                -- One-line SWR extension
+//   MemoryCache                -- In-memory response cache
+//   Recall                     -- Cancel token for search
+//   MetricsCourier             -- Per-request performance metrics
+//   Gate                       -- Concurrency throttle
+//   POST / DELETE              -- Write operations through Envoy
 //
 // ---------------------------------------------------------------------------
 
@@ -108,6 +121,7 @@ void main() {
           ),
           Passage('/spark', (_) => const SparkDemoScreen(), name: 'spark'),
           Passage('/shade', (_) => const ShadeDemoScreen(), name: 'shade'),
+          Passage('/tavern', (_) => const TavernScreen(), name: 'tavern'),
         ],
       ),
 
@@ -117,6 +131,12 @@ void main() {
         (waypoint) => QuestDetailScreen(questId: waypoint.runes['id'] ?? ''),
         shift: Shift.slideUp(),
         name: 'quest-detail',
+      ),
+      Passage(
+        '/tale/:id',
+        (waypoint) => TaleDetailScreen(taleId: waypoint.runes['id'] ?? ''),
+        shift: Shift.slideUp(),
+        name: 'tale-detail',
       ),
       Passage(
         '/register',
@@ -146,6 +166,7 @@ void main() {
         QuestboardPillar.new,
         QuestListPillar.new,
         QuestDetailPillar.new,
+        TavernPillar.new,
       ],
       plugins: [
         ColossusPlugin(
@@ -207,6 +228,8 @@ class _QuestboardShell extends StatelessWidget {
         ? 3
         : path == '/shade'
         ? 4
+        : path == '/tavern'
+        ? 5
         : 0;
 
     return Scaffold(
@@ -245,7 +268,9 @@ class _QuestboardShell extends StatelessWidget {
                 ? '/enterprise'
                 : i == 3
                 ? '/spark'
-                : '/shade',
+                : i == 4
+                ? '/shade'
+                : '/tavern',
           );
         },
         destinations: const [
@@ -273,6 +298,11 @@ class _QuestboardShell extends StatelessWidget {
             icon: Icon(Icons.fiber_smart_record_outlined),
             selectedIcon: Icon(Icons.fiber_smart_record),
             label: 'Shade',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.local_bar_outlined),
+            selectedIcon: Icon(Icons.local_bar),
+            label: 'Tavern',
           ),
         ],
       ),

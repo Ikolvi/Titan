@@ -615,9 +615,7 @@ class _ShadeDemoScreenState extends State<ShadeDemoScreen> {
             Text(
               'The Scout maps the Terrain. The Gauntlet generates '
               'edge-case test plans. Export to feed AI assistants.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colors.outline,
-              ),
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.outline),
             ),
             const SizedBox(height: 12),
 
@@ -783,9 +781,7 @@ class _ShadeDemoScreenState extends State<ShadeDemoScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Blueprint saved to ${result.json}',
-            ),
+            content: Text('Blueprint saved to ${result.json}'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -862,10 +858,7 @@ class _ShadeDemoScreenState extends State<ShadeDemoScreen> {
         content: SingleChildScrollView(
           child: SelectableText(
             terrain.toAiMap(),
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-            ),
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
           ),
         ),
         actions: [

@@ -1813,11 +1813,11 @@ class _ToolkitTab extends StatelessWidget {
                       Text(
                         'Indexed: ${Annals.isIndexed ? "ON" : "OFF"}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Annals.isIndexed
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.outline,
-                            ),
+                          fontWeight: FontWeight.bold,
+                          color: Annals.isIndexed
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.outline,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       // Toggle indexed mode
@@ -1854,8 +1854,9 @@ class _ToolkitTab extends StatelessWidget {
                             label: const Text('Query by Type'),
                             onPressed: () {
                               final sw = Stopwatch()..start();
-                              final results =
-                                  Annals.query(pillarType: 'EnterpriseDemoPillar');
+                              final results = Annals.query(
+                                pillarType: 'EnterpriseDemoPillar',
+                              );
                               sw.stop();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -1895,8 +1896,9 @@ class _ToolkitTab extends StatelessWidget {
                             label: const Text('Export to File'),
                             onPressed: () {
                               try {
-                                final dir = Directory.systemTemp
-                                    .createTempSync('annals_');
+                                final dir = Directory.systemTemp.createTempSync(
+                                  'annals_',
+                                );
                                 final file = File('${dir.path}/annals.json');
                                 final sink = file.openWrite();
                                 Annals.exportToBuffer(sink);
