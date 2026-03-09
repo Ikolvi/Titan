@@ -7,9 +7,11 @@
 /// `export_blueprint` or auto-exported by ColossusPlugin) and exposes
 /// the data as MCP tools that AI assistants can call.
 ///
-/// ## Usage
+/// ## Transports
 ///
-/// Add to your VS Code settings (`.vscode/settings.json`):
+/// ### stdio (default)
+///
+/// Standard MCP transport — JSON-RPC over stdin/stdout.
 ///
 /// ```json
 /// {
@@ -21,6 +23,28 @@
 ///         "titan_colossus:blueprint_mcp_server"
 ///       ],
 ///       "cwd": "${workspaceFolder}/packages/titan_colossus"
+///     }
+///   }
+/// }
+/// ```
+///
+/// ### HTTP+SSE (web-compatible)
+///
+/// For browser-based and remote AI clients. Runs an HTTP server with
+/// `GET /sse` for server→client events and `POST /message` for
+/// client→server JSON-RPC.
+///
+/// ```bash
+/// dart run titan_colossus:blueprint_mcp_server \
+///   --transport sse --sse-port 3000
+/// ```
+///
+/// ```json
+/// {
+///   "github.copilot.chat.mcpServers": {
+///     "titan-blueprint": {
+///       "type": "sse",
+///       "url": "http://localhost:3000/sse"
 ///     }
 ///   }
 /// }
@@ -68,29 +92,52 @@ import 'package:titan_colossus/src/testing/scry.dart';
 
 /// MCP Server for Titan Blueprint data.
 ///
-/// Implements the Model Context Protocol (MCP) over stdio, exposing
-/// Blueprint data as tools that AI assistants can invoke.
+/// Implements the Model Context Protocol (MCP) over stdio or HTTP+SSE,
+/// exposing Blueprint data as tools that AI assistants can invoke.
+///
+/// ## Transports
+///
+/// - **stdio** (default): JSON-RPC over stdin/stdout — standard MCP
+/// - **sse**: HTTP+SSE — `GET /sse` for server→client, `POST /message`
+///   for client→server. Use `--transport sse --sse-port 3000`.
 Future<void> main(List<String> args) async {
   // Ensure stdout handles UTF-8 (em-dash etc. in generated content)
   stdout.encoding = utf8;
 
   final server = _BlueprintMcpServer();
+  var transport = 'stdio';
 
   // Support CLI arguments for configuration
-  for (var i = 0; i < args.length - 1; i++) {
-    switch (args[i]) {
-      case '--blueprint-path':
-        server._blueprintPath = args[i + 1];
-      case '--relay-host':
-        server._relayHost = args[i + 1];
-      case '--relay-port':
-        server._relayPort = int.parse(args[i + 1]);
-      case '--relay-token':
-        server._relayAuthToken = args[i + 1];
+  for (var i = 0; i < args.length; i++) {
+    if (i + 1 < args.length) {
+      switch (args[i]) {
+        case '--blueprint-path':
+          server._blueprintPath = args[i + 1];
+        case '--relay-host':
+          server._relayHost = args[i + 1];
+        case '--relay-port':
+          server._relayPort = int.parse(args[i + 1]);
+        case '--relay-token':
+          server._relayAuthToken = args[i + 1];
+        case '--transport':
+          transport = args[i + 1];
+        case '--sse-port':
+          server._ssePort = int.parse(args[i + 1]);
+        case '--sse-host':
+          server._sseHost = args[i + 1];
+      }
     }
   }
 
-  await server.run();
+  switch (transport) {
+    case 'stdio':
+      await server.run();
+    case 'sse':
+      await server.runSse();
+    default:
+      stderr.writeln('Unknown transport: $transport (use "stdio" or "sse")');
+      exit(1);
+  }
 }
 
 class _BlueprintMcpServer {
@@ -100,12 +147,15 @@ class _BlueprintMcpServer {
   String _relayHost = '127.0.0.1';
   int _relayPort = 8642;
   String? _relayAuthToken;
+  int _ssePort = 3000;
+  String _sseHost = '127.0.0.1';
 
   /// Directory containing the blueprint files, derived from [_blueprintPath].
   String get _blueprintDir => _blueprintPath.contains('/')
       ? _blueprintPath.substring(0, _blueprintPath.lastIndexOf('/'))
       : '.titan';
 
+  /// Runs the MCP server over stdio (default transport).
   Future<void> run() async {
     // Read JSON-RPC messages from stdin, write responses to stdout
     final lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
@@ -130,6 +180,156 @@ class _BlueprintMcpServer {
         };
         stdout.writeln(jsonEncode(errorResponse));
       }
+    }
+  }
+
+  /// Runs the MCP server over HTTP+SSE (web-compatible transport).
+  ///
+  /// - `GET /sse` — Opens an SSE stream for server→client messages.
+  ///   Each JSON-RPC response is sent as an SSE `message` event.
+  /// - `POST /message` — Receives JSON-RPC requests from the client.
+  ///   Responses are pushed via the SSE stream.
+  /// - `GET /health` — Returns 200 OK for liveness checks.
+  ///
+  /// Per the MCP spec (2024-11-05), the SSE transport enables browser-based
+  /// and remote AI clients to connect without stdio.
+  Future<void> runSse() async {
+    final httpServer = await HttpServer.bind(_sseHost, _ssePort);
+    stderr.writeln('MCP SSE server listening on http://$_sseHost:$_ssePort');
+    stderr.writeln('  SSE endpoint:     GET  /sse');
+    stderr.writeln('  Message endpoint: POST /message');
+    stderr.writeln('  Health check:     GET  /health');
+
+    // Track active SSE clients for broadcasting responses.
+    final sseClients = <HttpResponse>[];
+
+    void sendSseEvent(HttpResponse sink, String event, String data) {
+      sink
+        ..write('event: $event\n')
+        ..write('data: $data\n\n');
+    }
+
+    await for (final request in httpServer) {
+      final path = request.uri.path;
+      final method = request.method;
+
+      // CORS headers for browser access
+      request.response.headers
+        ..set('Access-Control-Allow-Origin', '*')
+        ..set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        ..set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        ..set('Access-Control-Max-Age', '86400');
+
+      // Handle CORS preflight
+      if (method == 'OPTIONS') {
+        request.response
+          ..statusCode = 204
+          ..close();
+        continue;
+      }
+
+      // Health check (no auth required)
+      if (method == 'GET' && path == '/health') {
+        request.response
+          ..statusCode = 200
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode({
+              'status': 'ok',
+              'transport': 'sse',
+              'protocol': '2024-11-05',
+            }),
+          )
+          ..close();
+        continue;
+      }
+
+      // SSE endpoint — server→client stream
+      if (method == 'GET' && path == '/sse') {
+        request.response.headers
+          ..set('Content-Type', 'text/event-stream')
+          ..set('Cache-Control', 'no-cache')
+          ..set('Connection', 'keep-alive');
+        request.response.bufferOutput = false;
+
+        sseClients.add(request.response);
+        stderr.writeln('SSE client connected (${sseClients.length} active)');
+
+        // Send initial endpoint info so the client knows where to POST
+        final messageUri = 'http://$_sseHost:$_ssePort/message';
+        sendSseEvent(request.response, 'endpoint', messageUri);
+
+        // Detect disconnect
+        request.response.done.then((_) {
+          sseClients.remove(request.response);
+          stderr.writeln(
+            'SSE client disconnected (${sseClients.length} active)',
+          );
+        }).ignore();
+
+        // Keep connection open — don't close
+        continue;
+      }
+
+      // Message endpoint — client→server JSON-RPC
+      if (method == 'POST' && path == '/message') {
+        try {
+          final body = await utf8.decodeStream(request);
+          final rpcRequest = jsonDecode(body) as Map<String, dynamic>;
+          final response = await _handleRequest(rpcRequest);
+
+          // Send response via SSE to all connected clients
+          if (response != null) {
+            final responseJson = jsonEncode(response);
+            for (final client in List.of(sseClients)) {
+              try {
+                sendSseEvent(client, 'message', responseJson);
+              } catch (_) {
+                sseClients.remove(client);
+              }
+            }
+          }
+
+          // Also return 202 Accepted with the response ID
+          request.response
+            ..statusCode = 202
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode({'accepted': true, 'id': rpcRequest['id']}))
+            ..close();
+        } catch (e) {
+          final errorResponse = {
+            'jsonrpc': '2.0',
+            'error': {'code': -32700, 'message': 'Parse error: $e'},
+            'id': null,
+          };
+          final errorJson = jsonEncode(errorResponse);
+
+          // Push error via SSE
+          for (final client in List.of(sseClients)) {
+            try {
+              sendSseEvent(client, 'message', errorJson);
+            } catch (_) {
+              sseClients.remove(client);
+            }
+          }
+
+          request.response
+            ..statusCode = 400
+            ..headers.contentType = ContentType.json
+            ..write(errorJson)
+            ..close();
+        }
+        continue;
+      }
+
+      // Unknown route
+      request.response
+        ..statusCode = 404
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({'error': 'Not found. Use GET /sse or POST /message.'}),
+        )
+        ..close();
     }
   }
 

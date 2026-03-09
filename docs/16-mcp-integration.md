@@ -221,6 +221,49 @@ For custom relay host/port (e.g., physical device on the network):
 }
 ```
 
+#### Option E: HTTP+SSE transport (web-compatible)
+
+For browser-based AI clients, remote environments, or when stdio isn't available,
+use the SSE transport. This starts an HTTP server with `GET /sse` for
+server→client events and `POST /message` for client→server JSON-RPC:
+
+```bash
+# Start the MCP server with SSE transport
+dart run titan_colossus:blueprint_mcp_server \
+  --transport sse --sse-port 3000
+```
+
+Configure VS Code to connect via SSE:
+
+```json
+{
+  "github.copilot.chat.mcpServers": {
+    "titan-blueprint": {
+      "type": "sse",
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}
+```
+
+Additional CLI options for SSE:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--transport` | `stdio` | Transport type: `stdio` or `sse` |
+| `--sse-port` | `3000` | Port for the SSE HTTP server |
+| `--sse-host` | `127.0.0.1` | Bind address (`0.0.0.0` for remote access) |
+| `--relay-host` | `127.0.0.1` | Relay host (same as stdio mode) |
+| `--relay-port` | `8642` | Relay port (same as stdio mode) |
+
+**Endpoints:**
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/sse` | SSE stream — server→client JSON-RPC responses |
+| `POST` | `/message` | Client→server JSON-RPC requests |
+| `GET` | `/health` | Health check (returns transport info) |
+
 #### Verification
 
 1. Open the Copilot Chat panel
