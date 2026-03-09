@@ -222,6 +222,28 @@ abstract interface class RelayHandler {
   ///
   /// Returns only failed API calls for quick triage.
   Map<String, dynamic> getApiErrors();
+
+  /// Get the currently configured Tremor thresholds.
+  ///
+  /// Returns tremor names, categories, severities, and fired states.
+  Map<String, dynamic> getTremors();
+
+  /// Add a new Tremor at runtime.
+  ///
+  /// [config] must include `type` (factory name) and type-specific
+  /// parameters like `threshold`, `widget`, etc.
+  /// Returns the resulting tremor configuration.
+  Map<String, dynamic> addTremor(Map<String, dynamic> config);
+
+  /// Remove a Tremor by name.
+  ///
+  /// Returns whether a tremor was found and removed.
+  Map<String, dynamic> removeTremor(String name);
+
+  /// Reset all Tremor fired states and optionally clear alert history.
+  ///
+  /// Returns the reset result.
+  Map<String, dynamic> resetTremors({bool clearHistory = false});
 }
 
 // ---------------------------------------------------------------------------

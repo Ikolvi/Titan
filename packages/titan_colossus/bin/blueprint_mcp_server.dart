@@ -825,6 +825,116 @@ class _BlueprintMcpServer {
                 'duration, and error message for each failed request.',
             'inputSchema': {'type': 'object', 'properties': {}},
           },
+          {
+            'name': 'get_tremors',
+            'description':
+                'Get the currently configured Tremor performance alert '
+                'thresholds. Shows each tremor name, category (frame, '
+                'pageLoad, memory, rebuild, api, custom), severity, '
+                'and once-mode setting. Also reports the alert '
+                'history count.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'add_tremor',
+            'description':
+                'Add a new Tremor performance alert at runtime. '
+                'Tremor types: fps (threshold), jankRate (threshold), '
+                'pageLoad (thresholdMs), memory (maxPillars), '
+                'rebuilds (threshold + widget), leaks, '
+                'apiLatency (thresholdMs), apiErrorRate (threshold). '
+                'All types accept optional severity (info/warning/error) '
+                'and once (bool) fields.',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'type': {
+                  'type': 'string',
+                  'description':
+                      'Tremor factory type: fps, jankRate, pageLoad, '
+                      'memory, rebuilds, leaks, apiLatency, apiErrorRate',
+                  'enum': [
+                    'fps',
+                    'jankRate',
+                    'pageLoad',
+                    'memory',
+                    'rebuilds',
+                    'leaks',
+                    'apiLatency',
+                    'apiErrorRate',
+                  ],
+                },
+                'threshold': {
+                  'type': 'number',
+                  'description':
+                      'Numeric threshold value. Used by fps (FPS below), '
+                      'jankRate (% above), rebuilds (count above), '
+                      'apiErrorRate (% above).',
+                },
+                'thresholdMs': {
+                  'type': 'integer',
+                  'description':
+                      'Duration threshold in milliseconds. Used by '
+                      'pageLoad and apiLatency.',
+                },
+                'maxPillars': {
+                  'type': 'integer',
+                  'description': 'Maximum Pillar count for memory tremor.',
+                },
+                'widget': {
+                  'type': 'string',
+                  'description': 'Widget label for rebuilds tremor.',
+                },
+                'severity': {
+                  'type': 'string',
+                  'description': 'Alert severity: info, warning, error.',
+                  'enum': ['info', 'warning', 'error'],
+                },
+                'once': {
+                  'type': 'boolean',
+                  'description': 'If true, tremor fires only once until reset.',
+                },
+              },
+              'required': ['type'],
+            },
+          },
+          {
+            'name': 'remove_tremor',
+            'description':
+                'Remove a Tremor performance alert by name. '
+                'Use get_tremors first to see available names. '
+                'Common names: fps_low, jank_rate, page_load_slow, '
+                'memory_high, excessive_rebuilds, leak_detected, '
+                'api_latency_high, api_error_rate.',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'name': {
+                  'type': 'string',
+                  'description': 'The name of the tremor to remove.',
+                },
+              },
+              'required': ['name'],
+            },
+          },
+          {
+            'name': 'reset_tremors',
+            'description':
+                'Reset all Tremor fired states, allowing once-mode '
+                'tremors to fire again. Optionally clears the alert '
+                'history as well.',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'clearHistory': {
+                  'type': 'boolean',
+                  'description':
+                      'If true, also clears the alert history. '
+                      'Default: false.',
+                },
+              },
+            },
+          },
         ],
       },
       'id': id,
@@ -865,6 +975,10 @@ class _BlueprintMcpServer {
       'export_blueprint',
       'get_api_metrics',
       'get_api_errors',
+      'get_tremors',
+      'add_tremor',
+      'remove_tremor',
+      'reset_tremors',
     };
 
     if (relayOnlyTools.contains(toolName)) {
@@ -891,6 +1005,10 @@ class _BlueprintMcpServer {
         'export_blueprint' => await _exportBlueprint(toolArgs),
         'get_api_metrics' => await _getApiMetrics(),
         'get_api_errors' => await _getApiErrors(),
+        'get_tremors' => await _getTremors(),
+        'add_tremor' => await _addTremor(toolArgs),
+        'remove_tremor' => await _removeTremor(toolArgs),
+        'reset_tremors' => await _resetTremors(toolArgs),
         _ => 'Unknown tool: $toolName',
       };
 
@@ -3903,6 +4021,159 @@ class _BlueprintMcpServer {
       );
     }
     buf.writeln();
+
+    return buf.toString();
+  }
+
+  // -----------------------------------------------------------------------
+  // Tremor Configuration (runtime management)
+  // -----------------------------------------------------------------------
+
+  /// Fetch current Tremor configuration from the running app.
+  Future<String> _getTremors() async {
+    return _fetchAndFormat('/tremors', _formatTremors);
+  }
+
+  /// Add a new Tremor at runtime via POST.
+  Future<String> _addTremor(Map<String, dynamic> args) async {
+    return _postAndFormat('/tremors/add', args, _formatTremorAction);
+  }
+
+  /// Remove a Tremor by name via POST.
+  Future<String> _removeTremor(Map<String, dynamic> args) async {
+    return _postAndFormat('/tremors/remove', args, _formatTremorAction);
+  }
+
+  /// Reset all Tremor fired states via POST.
+  Future<String> _resetTremors(Map<String, dynamic> args) async {
+    return _postAndFormat('/tremors/reset', args, _formatTremorAction);
+  }
+
+  /// POST JSON to the relay and format the response.
+  Future<String> _postAndFormat(
+    String path,
+    Map<String, dynamic> body,
+    String Function(Map<String, dynamic>) formatter,
+  ) async {
+    final client = HttpClient();
+    try {
+      client.connectionTimeout = const Duration(seconds: 5);
+
+      final request = await client.postUrl(_relayUri(path));
+      _relayHeaders.forEach(request.headers.set);
+      request.add(utf8.encode(jsonEncode(body)));
+
+      final response = await request.close().timeout(
+        const Duration(seconds: 5),
+      );
+
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode != 200) {
+        return 'Relay returned ${response.statusCode}: $responseBody';
+      }
+
+      final data = jsonDecode(responseBody) as Map<String, dynamic>;
+      return formatter(data);
+    } on SocketException {
+      return '# Tremor Action Unavailable\n\n'
+          'Relay is not running at '
+          'http://$_relayHost:$_relayPort\n\n'
+          'Start your app with `ColossusPlugin(enableRelay: true)` '
+          'first.';
+    } on TimeoutException {
+      return '# Tremor Action Unavailable\n\n'
+          'Relay did not respond (timeout).';
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Format Tremor list into Markdown.
+  String _formatTremors(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final count = data['count'] as int? ?? 0;
+    final tremors = data['tremors'] as List<dynamic>? ?? [];
+    final alertCount = data['alertHistoryCount'] as int? ?? 0;
+
+    buf.writeln('# Tremor Configuration');
+    buf.writeln();
+    buf.writeln(
+      '**Active Tremors:** $count | '
+      '**Alert History:** $alertCount entries',
+    );
+    buf.writeln();
+
+    if (tremors.isEmpty) {
+      buf.writeln(
+        'No tremors configured. Add tremors using `add_tremor` or '
+        'configure them in `Colossus.init(tremors: [...])`.\\n\\n'
+        'Available types: fps, jankRate, pageLoad, memory, rebuilds, '
+        'leaks, apiLatency, apiErrorRate.',
+      );
+      return buf.toString();
+    }
+
+    buf.writeln('| Name | Category | Severity | Once |');
+    buf.writeln('|------|----------|----------|------|');
+    for (final t in tremors) {
+      final entry = t as Map<String, dynamic>;
+      buf.writeln(
+        '| ${entry['name']} '
+        '| ${entry['category']} '
+        '| ${entry['severity']} '
+        '| ${entry['once'] == true ? 'Yes' : 'No'} |',
+      );
+    }
+    buf.writeln();
+
+    return buf.toString();
+  }
+
+  /// Format a Tremor action result (add/remove/reset) into Markdown.
+  String _formatTremorAction(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final success = data['success'] as bool? ?? false;
+
+    if (!success) {
+      buf.writeln('# Tremor Action Failed');
+      buf.writeln();
+      buf.writeln('**Error:** ${data['error'] ?? 'Unknown error'}');
+      return buf.toString();
+    }
+
+    buf.writeln('# Tremor Action Successful');
+    buf.writeln();
+
+    // Add tremor result
+    if (data.containsKey('tremor')) {
+      final tremor = data['tremor'] as Map<String, dynamic>;
+      buf.writeln(
+        '**Added:** ${tremor['name']} '
+        '(${tremor['category']}, ${tremor['severity']})',
+      );
+    }
+
+    // Remove tremor result
+    if (data.containsKey('name') && !data.containsKey('tremor')) {
+      buf.writeln('**Removed:** ${data['name']}');
+    }
+
+    // Reset result
+    if (data.containsKey('tremorsReset')) {
+      buf.writeln(
+        '**Tremors reset:** ${data['tremorsReset']} | '
+        '**History cleared:** ${data['historyCleared']}',
+      );
+    }
+
+    if (data.containsKey('totalTremors')) {
+      buf.writeln('**Total active tremors:** ${data['totalTremors']}');
+    }
+
+    if (data.containsKey('alertHistoryCount')) {
+      buf.writeln('**Alert history entries:** ${data['alertHistoryCount']}');
+    }
 
     return buf.toString();
   }

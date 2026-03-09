@@ -212,6 +212,18 @@ class RelayPlatform {
         case ('GET', '/api/errors'):
           _handleGetApiErrors(request);
 
+        case ('GET', '/tremors'):
+          _handleGetTremors(request);
+
+        case ('POST', '/tremors/add'):
+          await _handleAddTremor(request);
+
+        case ('POST', '/tremors/remove'):
+          await _handleRemoveTremor(request);
+
+        case ('POST', '/tremors/reset'):
+          await _handleResetTremors(request);
+
         default:
           _sendError(
             request.response,
@@ -827,5 +839,88 @@ class RelayPlatform {
     }
 
     _sendJson(request.response, handler.getApiErrors());
+  }
+
+  void _handleGetTremors(HttpRequest request) {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getTremors());
+  }
+
+  Future<void> _handleAddTremor(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    final body = await _readJsonBody(request);
+    if (body == null) {
+      _sendError(
+        request.response,
+        HttpStatus.badRequest,
+        'Missing JSON body with tremor configuration',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.addTremor(body));
+  }
+
+  Future<void> _handleRemoveTremor(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    final body = await _readJsonBody(request);
+    final name = body?['name'] as String?;
+    if (name == null) {
+      _sendError(
+        request.response,
+        HttpStatus.badRequest,
+        'Missing "name" in request body',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.removeTremor(name));
+  }
+
+  Future<void> _handleResetTremors(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    final body = await _readJsonBody(request);
+    final clearHistory = body?['clearHistory'] as bool? ?? false;
+
+    _sendJson(
+      request.response,
+      handler.resetTremors(clearHistory: clearHistory),
+    );
   }
 }

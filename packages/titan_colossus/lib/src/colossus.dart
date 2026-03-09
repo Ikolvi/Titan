@@ -191,6 +191,64 @@ class Colossus extends Pillar {
   /// ```
   List<ColossusTremor> get alertHistory => List.unmodifiable(_alertHistory);
 
+  /// Currently configured [Tremor] thresholds (read-only view).
+  ///
+  /// ```dart
+  /// final tremors = Colossus.instance.tremors;
+  /// print('Active tremors: ${tremors.map((t) => t.name)}');
+  /// ```
+  List<Tremor> get tremors => List.unmodifiable(_tremors);
+
+  /// Add a [Tremor] at runtime.
+  ///
+  /// The tremor will be evaluated on the next performance check cycle
+  /// (Pulse update, Vessel update, page load, or API metric).
+  ///
+  /// ```dart
+  /// Colossus.instance.addTremor(
+  ///   Tremor.apiLatency(threshold: Duration(milliseconds: 300)),
+  /// );
+  /// ```
+  void addTremor(Tremor tremor) {
+    _tremors.add(tremor);
+  }
+
+  /// Remove a [Tremor] by name.
+  ///
+  /// Returns `true` if a tremor with the given name was found and removed.
+  ///
+  /// ```dart
+  /// Colossus.instance.removeTremor('fps_low');
+  /// ```
+  bool removeTremor(String name) {
+    final index = _tremors.indexWhere((t) => t.name == name);
+    if (index == -1) return false;
+    _tremors.removeAt(index);
+    return true;
+  }
+
+  /// Reset the fired state of all [Tremor] thresholds.
+  ///
+  /// This allows `once`-mode tremors to fire again.
+  ///
+  /// ```dart
+  /// Colossus.instance.resetTremors();
+  /// ```
+  void resetTremors() {
+    for (final tremor in _tremors) {
+      tremor.reset();
+    }
+  }
+
+  /// Clear all entries from the alert history.
+  ///
+  /// ```dart
+  /// Colossus.instance.clearAlertHistory();
+  /// ```
+  void clearAlertHistory() {
+    _alertHistory.clear();
+  }
+
   // -----------------------------------------------------------------------
   // Framework error capture (FlutterError.onError)
   // -----------------------------------------------------------------------
@@ -444,7 +502,7 @@ class Colossus extends Pillar {
     required bool enableLensTab,
     required bool enableChronicle,
     required bool autoLearnSessions,
-  }) : _tremors = tremors,
+  }) : _tremors = List<Tremor>.of(tremors),
        _enableLensTab = enableLensTab,
        _enableChronicle = enableChronicle,
        _autoLearnSessions = autoLearnSessions;
@@ -1978,5 +2036,129 @@ class _ColossusRelayHandler implements RelayHandler {
         .toList();
 
     return {'totalErrors': errors.length, 'errors': errors};
+  }
+
+  @override
+  Map<String, dynamic> getTremors() {
+    final tremors = _colossus.tremors;
+    return {
+      'count': tremors.length,
+      'tremors': tremors
+          .map(
+            (t) => {
+              'name': t.name,
+              'category': t.category.name,
+              'severity': t.severity.name,
+              'once': t.once,
+            },
+          )
+          .toList(),
+      'alertHistoryCount': _colossus.alertHistory.length,
+    };
+  }
+
+  @override
+  Map<String, dynamic> addTremor(Map<String, dynamic> config) {
+    final type = config['type'] as String?;
+    if (type == null) {
+      return {'success': false, 'error': 'Missing required "type" field'};
+    }
+
+    final severity = _parseSeverity(config['severity'] as String?);
+    final once = config['once'] as bool? ?? false;
+
+    Tremor tremor;
+    try {
+      tremor = switch (type) {
+        'fps' => Tremor.fps(
+          threshold: (config['threshold'] as num?)?.toDouble() ?? 50,
+          severity: severity,
+          once: once,
+        ),
+        'jankRate' => Tremor.jankRate(
+          threshold: (config['threshold'] as num?)?.toDouble() ?? 5,
+          severity: severity,
+          once: once,
+        ),
+        'pageLoad' => Tremor.pageLoad(
+          threshold: Duration(
+            milliseconds: (config['thresholdMs'] as num?)?.toInt() ?? 1000,
+          ),
+          severity: severity,
+          once: once,
+        ),
+        'memory' => Tremor.memory(
+          maxPillars: (config['maxPillars'] as num?)?.toInt() ?? 50,
+          severity: severity,
+          once: once,
+        ),
+        'rebuilds' => Tremor.rebuilds(
+          threshold: (config['threshold'] as num?)?.toInt() ?? 100,
+          widget: config['widget'] as String? ?? '',
+          severity: severity,
+          once: once,
+        ),
+        'leaks' => Tremor.leaks(severity: severity, once: once),
+        'apiLatency' => Tremor.apiLatency(
+          threshold: Duration(
+            milliseconds: (config['thresholdMs'] as num?)?.toInt() ?? 500,
+          ),
+          severity: severity,
+          once: once,
+        ),
+        'apiErrorRate' => Tremor.apiErrorRate(
+          threshold: (config['threshold'] as num?)?.toDouble() ?? 10,
+          severity: severity,
+          once: once,
+        ),
+        _ => throw ArgumentError('Unknown tremor type: $type'),
+      };
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+
+    _colossus.addTremor(tremor);
+    return {
+      'success': true,
+      'tremor': {
+        'name': tremor.name,
+        'category': tremor.category.name,
+        'severity': tremor.severity.name,
+        'once': tremor.once,
+      },
+      'totalTremors': _colossus.tremors.length,
+    };
+  }
+
+  @override
+  Map<String, dynamic> removeTremor(String name) {
+    final removed = _colossus.removeTremor(name);
+    return {
+      'success': removed,
+      'name': name,
+      'totalTremors': _colossus.tremors.length,
+    };
+  }
+
+  @override
+  Map<String, dynamic> resetTremors({bool clearHistory = false}) {
+    _colossus.resetTremors();
+    if (clearHistory) {
+      _colossus.clearAlertHistory();
+    }
+    return {
+      'success': true,
+      'tremorsReset': _colossus.tremors.length,
+      'historyCleared': clearHistory,
+      'alertHistoryCount': _colossus.alertHistory.length,
+    };
+  }
+
+  static TremorSeverity _parseSeverity(String? value) {
+    return switch (value) {
+      'info' => TremorSeverity.info,
+      'error' => TremorSeverity.error,
+      _ => TremorSeverity.warning,
+    };
   }
 }

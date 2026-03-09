@@ -1256,4 +1256,49 @@ class _MockRelayHandler implements RelayHandler {
       ],
     };
   }
+
+  @override
+  Map<String, dynamic> getTremors() {
+    return {
+      'count': 1,
+      'tremors': [
+        {
+          'name': 'fps_low',
+          'category': 'frame',
+          'severity': 'warning',
+          'once': false,
+        },
+      ],
+      'alertHistoryCount': 0,
+    };
+  }
+
+  @override
+  Map<String, dynamic> addTremor(Map<String, dynamic> config) {
+    return {
+      'success': true,
+      'tremor': {
+        'name': 'mock_tremor',
+        'category': 'custom',
+        'severity': 'warning',
+        'once': false,
+      },
+      'totalTremors': 2,
+    };
+  }
+
+  @override
+  Map<String, dynamic> removeTremor(String name) {
+    return {'success': true, 'name': name, 'totalTremors': 0};
+  }
+
+  @override
+  Map<String, dynamic> resetTremors({bool clearHistory = false}) {
+    return {
+      'success': true,
+      'tremorsReset': 1,
+      'historyCleared': clearHistory,
+      'alertHistoryCount': 0,
+    };
+  }
 }
