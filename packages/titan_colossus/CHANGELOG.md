@@ -1,5 +1,94 @@
 # Changelog
 
+## [2.0.0] - 2026-03-09
+
+### Added
+
+#### Scry — Real-Time AI Agent Interface (18 Intelligence Capabilities)
+- **Scry** — AI agent loop: observe screen → decide → act → observe result. Returns structured `ScryGaze` with all visible elements, screen type classification, form status, and spatial analysis.
+- **ScryGaze** — Observation result with `ScryElement` list, `ScryScreenType`, alerts, and landmarks.
+- **ScryElement** — Screen element with kind, label, value, semantics, position, and reachability metadata.
+- **ScryDiff** — Compare screen states: appeared/disappeared/changed elements, route changes, overlay changes.
+- **18 intelligence capabilities**: spatial layout, reachability, scroll inventory, overlay detection, toggle states, tab order, target stability scoring, multiplicity, ancestor context, form validation, element grouping, landmarks, visual prominence, value type inference, action impact prediction, layout pattern detection.
+- **16 action types**: `tap`, `enterText`, `clearText`, `scroll`, `back`, `longPress`, `doubleTap`, `swipe`, `navigate`, `waitForElement`, `waitForElementGone`, `pressKey`, `submitField`, `toggleSwitch`, `toggleCheckbox`, `selectDropdown`.
+- **Multi-action support** — `scry_act` accepts an `actions` array for batched execution.
+- **Drag action** — `scry_act` supports `drag` with `value="x,y"` coordinate format.
+- **Screen type classification** — `ScryScreenType` enum: login, form, list, detail, settings, empty, error, dashboard, unknown.
+- **Alert detection** — `ScryAlert` with `ScryAlertSeverity` for framework error and performance issue highlighting.
+
+#### Relay — Cross-Platform HTTP Bridge
+- **Relay** — Platform-agnostic HTTP bridge connecting MCP server to running Flutter app.
+  - **Native** (Android, iOS, macOS, Windows, Linux): HTTP server on port 8642
+  - **Web** (Chrome, Firefox, Edge): WebSocket client connecting to MCP server's `/relay` endpoint (reversed connection)
+- **RelayConfig** — Configuration with host, port, authToken, targetUrl.
+- **RelayHandler** — 36 route handlers for all MCP tools.
+- **RelayStatus** — Health reporting with uptime and platform info.
+- **Graceful port-in-use handling** — WebSocket relay silently falls back on busy ports.
+
+#### MCP Server — 48 Tools, 5 Transports
+- **Blueprint MCP Server** — Full Model Context Protocol server with 48 tools across 11 categories.
+- **5 Transport protocols**: stdio, HTTP+SSE, WebSocket, Streamable HTTP (MCP 2025-03-26), auto-detect (all-in-one).
+- **TLS/SSL support** — `--tls-cert` and `--tls-key` for encrypted connections across all HTTP transports.
+- **Bearer token authentication** — `--auth-token` (repeatable) for secure access. Health endpoint remains public.
+- **API key rotation** — `--auth-tokens-file` with hot-reload: file changes detected automatically, zero-downtime key rotation without server restart.
+- **McpWebSocketClient** — Dart client with auto-reconnect, exponential backoff (±25% jitter), heartbeat/pong, message queuing, and `McpConnectionStatus` stream.
+- **Screenshot vision** — `capture_screenshot` saves PNG to `.titan/screenshots/` and returns MCP image content for AI visual analysis.
+- **toggle_lens** — Show/hide Lens FAB during MCP sessions.
+
+##### New MCP Tools (17 tools added since 1.3.0)
+- `get_api_metrics` — API metrics with latency percentiles (p50/p95/p99), success rate, endpoint grouping
+- `get_api_errors` — Failed API requests for quick error triage
+- `get_tremors` — Current Tremor alert thresholds
+- `add_tremor` — Add Tremor alerts at runtime (8 types: fps, jankRate, pageLoad, memory, rebuilds, leaks, apiLatency, apiErrorRate)
+- `remove_tremor` — Remove Tremor by name
+- `reset_tremors` — Reset all Tremor fired states
+- `get_widget_tree` — Widget tree statistics (element count, max depth, top 20 types)
+- `get_events` — Integration events from Colossus bridges (atlas, basalt, argus, bastion)
+- `get_route_history` — Navigation route history in chronological order
+- `replay_session` — Replay saved Shade sessions via Phantom
+- `capture_screenshot` — Screenshot with disk save + inline image content
+- `audit_accessibility` — Accessibility audit (labels, touch targets, semantic roles)
+- `inspect_di` — Titan DI container (Vault) inspection
+- `inspect_envoy` — Envoy HTTP client configuration and courier chain
+- `configure_envoy` — Runtime Envoy configuration (base URL, timeouts, headers, couriers)
+- `reload_page` — Re-navigate current route or full widget tree rebuild
+- `toggle_lens` — Show/hide Lens debug FAB
+
+#### Cross-Package Integration Bridges
+- **ColossusEnvoy** — Auto-wires Envoy `MetricsCourier` metrics to Colossus for API tracking.
+- **ColossusBasalt** — Bridge for Basalt infrastructure events (circuit trips, saga steps, etc.).
+- **ColossusBastion** — Bridge for Bastion widget lifecycle events.
+- **ColossusAtlasObserver** — Bridge for Atlas navigation events and page load timing.
+- **ColossusArgus** — Bridge for Argus authentication state changes.
+- **`Colossus.trackEvent()`** — Unified event ingestion from all bridges.
+
+#### Lens Integration Tabs
+- **BridgeLensTab** — Cross-package event visualization with source filtering.
+- **EnvoyLensTab** — HTTP traffic visualization (requests, latency, errors, courier chain).
+- **ArgusLensTab** — Auth session tracking (sign-in/sign-out events, token refreshes).
+
+#### Error Detection
+- **FrameworkError** — Captures `FlutterError.onError` and `ErrorWidget` instances for overflow, build, layout, paint, and gesture errors.
+- `get_framework_errors` MCP tool for error reporting.
+
+#### Performance Monitoring Enhancements
+- **API Tremors** — `apiLatency` and `apiErrorRate` Tremor types for HTTP monitoring.
+- **MarkCategory.api** — New metric category for API-related marks.
+- **Richer API reporting** — Latency percentiles, endpoint auto-grouping (numeric IDs and UUIDs normalized).
+
+### Changed
+- **FAB hidden during recording** — Lens FAB auto-hides when Shade recording is active.
+- **Tooltip → Semantics** — Lens FAB uses `Semantics` widget instead of `Tooltip` to avoid "No Overlay" crash (Lens wraps above `MaterialApp`).
+- **Lens.relayConnected** — `ValueNotifier<bool>` for reactive FAB visibility control via MCP.
+- **Updated dependencies** — `titan_atlas: ^1.1.1`, `titan_argus: ^1.0.4`.
+
+### Fixed
+- **Web relay query params** — WebSocket relay now parses path with `Uri.tryParse()` to strip query params before route matching.
+- **Scry proximity pairs** — Reject distant horizontal proximity pairs.
+- **Interactive multiplicity** — Suppress duplicate interactive element detection.
+- **NavigationBar targeting** — Classify `NavigationDestination` as interactive for correct tap targeting.
+- **Semantics label discovery** — `widget.properties.label` for Lens FAB detection in Scry glyph scanner.
+
 ## [1.3.0] - 2026-03-06
 
 ### Added
