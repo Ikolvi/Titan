@@ -437,6 +437,21 @@ class _BlueprintMcpServer {
         final socket = await WebSocketTransformer.upgrade(request);
         stderr.writeln('WebSocket client connected');
 
+        // Heartbeat ping every 30s to detect dead connections
+        final heartbeat = Timer.periodic(
+          const Duration(seconds: 30),
+          (_) {
+            try {
+              socket.add(jsonEncode({
+                'jsonrpc': '2.0',
+                'method': 'ping',
+              }));
+            } catch (_) {
+              // Connection dead — will be cleaned up by onDone
+            }
+          },
+        );
+
         socket.listen(
           (data) async {
             if (data is! String) return;
@@ -457,9 +472,11 @@ class _BlueprintMcpServer {
             }
           },
           onDone: () {
+            heartbeat.cancel();
             stderr.writeln('WebSocket client disconnected');
           },
           onError: (Object error) {
+            heartbeat.cancel();
             stderr.writeln('WebSocket error: $error');
           },
         );
@@ -834,6 +851,21 @@ class _BlueprintMcpServer {
         final socket = await WebSocketTransformer.upgrade(request);
         stderr.writeln('WebSocket client connected (auto)');
 
+        // Heartbeat ping every 30s to detect dead connections
+        final heartbeat = Timer.periodic(
+          const Duration(seconds: 30),
+          (_) {
+            try {
+              socket.add(jsonEncode({
+                'jsonrpc': '2.0',
+                'method': 'ping',
+              }));
+            } catch (_) {
+              // Connection dead — will be cleaned up by onDone
+            }
+          },
+        );
+
         socket.listen(
           (data) async {
             if (data is! String) return;
@@ -853,8 +885,14 @@ class _BlueprintMcpServer {
               );
             }
           },
-          onDone: () => stderr.writeln('WebSocket client disconnected (auto)'),
-          onError: (Object e) => stderr.writeln('WebSocket error: $e'),
+          onDone: () {
+            heartbeat.cancel();
+            stderr.writeln('WebSocket client disconnected (auto)');
+          },
+          onError: (Object e) {
+            heartbeat.cancel();
+            stderr.writeln('WebSocket error: $e');
+          },
         );
         continue;
       }

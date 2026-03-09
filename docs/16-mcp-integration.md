@@ -398,6 +398,51 @@ Configure VS Code (Streamable HTTP is recommended for new clients):
 | `POST` | `/message` | Legacy SSE JSON-RPC (2024-11-05) |
 | `GET` | `/health` | Health check (lists available transports) |
 
+#### WebSocket Client (Dart)
+
+The `McpWebSocketClient` provides a Dart client with **auto-reconnect** and
+**exponential backoff** for connecting to the MCP server over WebSocket:
+
+```dart
+import 'package:titan_colossus/titan_colossus.dart';
+
+final client = McpWebSocketClient(
+  Uri.parse('ws://localhost:3001/ws'),
+  maxRetries: 10,          // Max consecutive retry attempts
+  baseDelay: Duration(milliseconds: 500), // Initial backoff delay
+  maxDelay: Duration(seconds: 30),        // Backoff cap
+  heartbeatTimeout: Duration(seconds: 90), // Reconnect if no ping
+);
+
+await client.connect();
+
+// Send JSON-RPC requests (returns full response map)
+final response = await client.request('tools/list');
+final tools = response['result']['tools'] as List;
+print('${tools.length} tools available');
+
+// Listen for server notifications
+client.messages.listen((msg) {
+  print('Notification: ${msg['method']}');
+});
+
+// Monitor connection status
+client.status.listen((status) {
+  print('Status: $status'); // connecting, connected, reconnecting, ...
+});
+
+await client.close();
+```
+
+**Features:**
+
+| Feature | Description |
+|---------|-------------|
+| Auto-reconnect | Exponential backoff with ±25% jitter |
+| Heartbeat | Responds to server `ping` with `pong`; reconnects on timeout |
+| Message queue | Requests sent while disconnected are queued and flushed on reconnect |
+| Status stream | `McpConnectionStatus` enum: `connecting`, `connected`, `disconnected`, `reconnecting`, `error`, `failed`, `closed` |
+
 #### Verification
 
 1. Open the Copilot Chat panel

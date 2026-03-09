@@ -92,6 +92,9 @@ export 'src/colossus_plugin.dart';
 // Relay — HTTP bridge for AI-driven automation
 export 'src/relay.dart';
 
+// MCP — WebSocket client with auto-reconnect
+export 'src/mcp/mcp_ws_client.dart';
+
 // Integrations
 export 'src/integration/blueprint_lens_tab.dart';
 export 'src/integration/bridge_lens_tab.dart';
