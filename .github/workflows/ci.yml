@@ -25,6 +25,9 @@ jobs:
       - name: Bootstrap
         run: melos bootstrap
 
+      - name: Check sibling version constraints
+        run: dart run tools/check_versions.dart
+
       - name: Analyze titan
         working-directory: packages/titan
         run: dart analyze --fatal-infos
