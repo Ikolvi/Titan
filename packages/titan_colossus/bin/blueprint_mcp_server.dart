@@ -3255,16 +3255,25 @@ class _BlueprintMcpServer {
     final port = _relayWsPort;
     if (port == null) return;
 
-    final server = await _bindServer('127.0.0.1', port);
-    _relayWsServer = server;
+    try {
+      final server = await _bindServer('127.0.0.1', port);
+      _relayWsServer = server;
 
-    stderr.writeln(
-      'Relay WebSocket server listening on '
-      '$_scheme://127.0.0.1:$port/relay',
-    );
+      stderr.writeln(
+        'Relay WebSocket server listening on '
+        '$_scheme://127.0.0.1:$port/relay',
+      );
 
-    // Process incoming connections.
-    unawaited(_handleRelayWsConnections(server));
+      // Process incoming connections.
+      unawaited(_handleRelayWsConnections(server));
+    } on SocketException catch (e) {
+      stderr.writeln(
+        'WARNING: Could not start Relay WebSocket server on port $port: $e\n'
+        'The MCP server will continue without web relay support.\n'
+        'Kill the process using port $port or use a different '
+        '--relay-ws-port.',
+      );
+    }
   }
 
   Future<void> _handleRelayWsConnections(HttpServer server) async {
