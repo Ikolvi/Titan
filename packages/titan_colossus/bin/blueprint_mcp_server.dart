@@ -6048,13 +6048,71 @@ class _BlueprintMcpServer {
   // Enterprise MCP tools (screenshot, accessibility, DI inspection)
   // -----------------------------------------------------------------------
 
-  /// Capture a screenshot via GET from Relay.
+  /// Capture a screenshot via Relay, decode, and save to disk.
+  ///
+  /// Saves the PNG to `.titan/screenshots/screenshot-{timestamp}.png`
+  /// and returns the file path. Works identically across native and
+  /// web relays — the MCP server always runs on the host machine
+  /// with filesystem access.
   Future<String> _captureScreenshot(Map<String, dynamic> args) async {
     final pixelRatio = args['pixelRatio'] as num?;
     final path = pixelRatio != null
         ? '/screenshot?pixelRatio=$pixelRatio'
         : '/screenshot';
-    return _fetchAndFormat(path, _formatScreenshot);
+
+    try {
+      final data = _hasWebRelay
+          ? await _relayWsRequest('GET', path)
+          : await _relayGet(path);
+
+      final success = data['success'] as bool? ?? false;
+      if (!success) {
+        return '# Screenshot Failed\n\n'
+            '**Error:** ${data['error'] ?? 'Unknown'}';
+      }
+
+      final base64Str = data['base64'] as String?;
+      if (base64Str == null || base64Str.isEmpty) {
+        return '# Screenshot Failed\n\nNo image data returned.';
+      }
+
+      // Decode and save to disk.
+      final bytes = base64.decode(base64Str);
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .replaceAll('.', '-');
+      final screenshotDir = Directory('$_blueprintDir/screenshots');
+      if (!screenshotDir.existsSync()) {
+        screenshotDir.createSync(recursive: true);
+      }
+      final filePath = '${screenshotDir.path}/screenshot-$timestamp.png';
+      File(filePath).writeAsBytesSync(bytes);
+
+      final sizeKb = (bytes.length / 1024).toStringAsFixed(1);
+      final buf = StringBuffer();
+      buf.writeln('# Screenshot Captured');
+      buf.writeln();
+      buf.writeln('| Property | Value |');
+      buf.writeln('|----------|-------|');
+      buf.writeln('| File | `$filePath` |');
+      buf.writeln('| Size | $sizeKb KB (${bytes.length} bytes) |');
+      buf.writeln(
+        '| Pixel Ratio | ${data['pixelRatio'] ?? pixelRatio ?? 0.5} |',
+      );
+      buf.writeln();
+      buf.writeln('Screenshot saved to disk. Open the file to view.');
+      return buf.toString();
+    } on SocketException {
+      return '# Screenshot Unavailable\n\n'
+          'Relay is not running. Start your app with '
+          '`ColossusPlugin(enableRelay: true)`.';
+    } on TimeoutException {
+      return '# Screenshot Unavailable\n\n'
+          'Relay did not respond (timeout).';
+    } catch (e) {
+      return '# Screenshot Error\n\n$e';
+    }
   }
 
   /// Audit accessibility via GET from Relay.
@@ -6094,44 +6152,6 @@ class _BlueprintMcpServer {
     } catch (e) {
       return 'Error: $e';
     }
-  }
-
-  /// Format screenshot capture result.
-  String _formatScreenshot(Map<String, dynamic> data) {
-    final buf = StringBuffer();
-    final success = data['success'] as bool? ?? false;
-
-    buf.writeln('# Screenshot Capture');
-    buf.writeln();
-
-    if (!success) {
-      buf.writeln('**Failed:** ${data['error'] ?? 'Unknown error'}');
-      return buf.toString();
-    }
-
-    buf.writeln('| Property | Value |');
-    buf.writeln('|----------|-------|');
-    buf.writeln('| Size | ${data['sizeBytes']} bytes |');
-    buf.writeln('| Pixel Ratio | ${data['pixelRatio']} |');
-    buf.writeln();
-
-    final base64 = data['base64'] as String?;
-    if (base64 != null) {
-      buf.writeln('## Image (base64 PNG)');
-      buf.writeln();
-      buf.writeln('```');
-      // Show first 200 chars to avoid flooding the context
-      if (base64.length > 200) {
-        buf.writeln('${base64.substring(0, 200)}...');
-        buf.writeln('(${base64.length} total characters)');
-      } else {
-        buf.writeln(base64);
-      }
-      buf.writeln('```');
-      buf.writeln();
-    }
-
-    return buf.toString();
   }
 
   /// Format accessibility audit result into Markdown.
