@@ -102,6 +102,9 @@ import 'package:titan_colossus/src/testing/scry.dart';
 ///   for client→server. Use `--transport sse --sse-port 3000`.
 /// - **ws**: WebSocket — bidirectional JSON-RPC over a single WebSocket
 ///   connection. Use `--transport ws --ws-port 3001`.
+/// - **streamable**: Streamable HTTP (MCP 2025-03-26) — single `/mcp`
+///   endpoint, POST for requests, GET for server-push SSE, session
+///   management via `Mcp-Session-Id`. Use `--transport streamable`.
 Future<void> main(List<String> args) async {
   // Ensure stdout handles UTF-8 (em-dash etc. in generated content)
   stdout.encoding = utf8;
@@ -131,6 +134,10 @@ Future<void> main(List<String> args) async {
           server._wsPort = int.parse(args[i + 1]);
         case '--ws-host':
           server._wsHost = args[i + 1];
+        case '--streamable-port':
+          server._streamablePort = int.parse(args[i + 1]);
+        case '--streamable-host':
+          server._streamableHost = args[i + 1];
       }
     }
   }
@@ -142,9 +149,12 @@ Future<void> main(List<String> args) async {
       await server.runSse();
     case 'ws':
       await server.runWs();
+    case 'streamable':
+      await server.runStreamable();
     default:
       stderr.writeln(
-        'Unknown transport: $transport (use "stdio", "sse", or "ws")',
+        'Unknown transport: $transport '
+        '(use "stdio", "sse", "ws", or "streamable")',
       );
       exit(1);
   }
@@ -161,6 +171,8 @@ class _BlueprintMcpServer {
   String _sseHost = '127.0.0.1';
   int _wsPort = 3001;
   String _wsHost = '127.0.0.1';
+  int _streamablePort = 3002;
+  String _streamableHost = '127.0.0.1';
 
   /// Directory containing the blueprint files, derived from [_blueprintPath].
   String get _blueprintDir => _blueprintPath.contains('/')
@@ -452,6 +464,270 @@ class _BlueprintMcpServer {
           jsonEncode({
             'error': 'Not found. Use GET /ws for WebSocket or GET /health.',
           }),
+        )
+        ..close();
+    }
+  }
+
+  /// Runs the MCP server using Streamable HTTP (MCP spec 2025-03-26).
+  ///
+  /// This is the latest standard MCP HTTP transport, superseding the older
+  /// HTTP+SSE transport. A single `/mcp` endpoint handles all communication:
+  ///
+  /// - `POST /mcp` — Client sends JSON-RPC requests/notifications/responses.
+  ///   Server returns `application/json` for requests, `202 Accepted` for
+  ///   notifications/responses.
+  /// - `GET /mcp` — Opens an SSE stream for server-initiated messages.
+  /// - `DELETE /mcp` — Terminates the session.
+  /// - `GET /health` — Returns 200 OK for liveness checks.
+  ///
+  /// Session management uses the `Mcp-Session-Id` header per the spec.
+  Future<void> runStreamable() async {
+    final httpServer = await HttpServer.bind(_streamableHost, _streamablePort);
+    stderr.writeln(
+      'MCP Streamable HTTP server listening on '
+      'http://$_streamableHost:$_streamablePort',
+    );
+    stderr.writeln('  MCP endpoint:  POST/GET/DELETE /mcp');
+    stderr.writeln('  Health check:  GET /health');
+
+    // Session state: maps session ID → SSE clients for server push.
+    final sessions = <String, List<HttpResponse>>{};
+
+    // Helper to generate a session ID.
+    String generateSessionId() {
+      final random = DateTime.now().microsecondsSinceEpoch;
+      final hash = random.hashCode.toRadixString(36);
+      return 'mcp-$hash-${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    await for (final request in httpServer) {
+      final path = request.uri.path;
+      final method = request.method;
+
+      // CORS headers
+      request.response.headers
+        ..set('Access-Control-Allow-Origin', '*')
+        ..set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+        ..set(
+          'Access-Control-Allow-Headers',
+          'Content-Type, Accept, Authorization, Mcp-Session-Id',
+        )
+        ..set('Access-Control-Expose-Headers', 'Mcp-Session-Id')
+        ..set('Access-Control-Max-Age', '86400');
+
+      // CORS preflight
+      if (method == 'OPTIONS') {
+        request.response
+          ..statusCode = 204
+          ..close();
+        continue;
+      }
+
+      // Health check
+      if (method == 'GET' && path == '/health') {
+        request.response
+          ..statusCode = 200
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode({
+              'status': 'ok',
+              'transport': 'streamable',
+              'protocol': '2025-03-26',
+            }),
+          )
+          ..close();
+        continue;
+      }
+
+      // --- MCP endpoint ---
+      if (path == '/mcp') {
+        // DELETE — terminate session
+        if (method == 'DELETE') {
+          final sessionId = request.headers.value('mcp-session-id');
+          if (sessionId != null && sessions.containsKey(sessionId)) {
+            // Close all SSE streams for this session
+            final clients = sessions.remove(sessionId) ?? [];
+            for (final client in clients) {
+              try {
+                client.close();
+              } catch (_) {}
+            }
+            stderr.writeln('Session terminated: $sessionId');
+            request.response
+              ..statusCode = 200
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'terminated': true}))
+              ..close();
+          } else {
+            request.response
+              ..statusCode = 404
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'error': 'Session not found'}))
+              ..close();
+          }
+          continue;
+        }
+
+        // GET — open SSE stream for server-initiated messages
+        if (method == 'GET') {
+          final accept = request.headers.value('accept') ?? '';
+          if (!accept.contains('text/event-stream')) {
+            request.response
+              ..statusCode = 406
+              ..headers.contentType = ContentType.json
+              ..write(
+                jsonEncode({
+                  'error': 'Accept header must include text/event-stream',
+                }),
+              )
+              ..close();
+            continue;
+          }
+
+          final sessionId = request.headers.value('mcp-session-id');
+          if (sessionId == null || !sessions.containsKey(sessionId)) {
+            request.response
+              ..statusCode = 400
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'error': 'Valid Mcp-Session-Id required'}))
+              ..close();
+            continue;
+          }
+
+          request.response.headers
+            ..set('Content-Type', 'text/event-stream')
+            ..set('Cache-Control', 'no-cache')
+            ..set('Connection', 'keep-alive');
+          request.response.bufferOutput = false;
+
+          sessions[sessionId]!.add(request.response);
+          stderr.writeln(
+            'SSE listener connected for session $sessionId '
+            '(${sessions[sessionId]!.length} active)',
+          );
+
+          // Detect disconnect
+          request.response.done.then((_) {
+            sessions[sessionId]?.remove(request.response);
+            stderr.writeln('SSE listener disconnected for session $sessionId');
+          }).ignore();
+
+          // Keep connection open
+          continue;
+        }
+
+        // POST — client sends JSON-RPC messages
+        if (method == 'POST') {
+          try {
+            final body = await utf8.decodeStream(request);
+            final decoded = jsonDecode(body);
+
+            // Check if it's a batch or single message
+            final isBatch = decoded is List;
+            final messages = isBatch
+                ? decoded.cast<Map<String, dynamic>>()
+                : <Map<String, dynamic>>[decoded as Map<String, dynamic>];
+
+            // Separate requests (have 'method' + 'id') from
+            // notifications (have 'method' but no 'id') and
+            // responses (have 'result' or 'error').
+            final requests = <Map<String, dynamic>>[];
+            final nonRequests = <Map<String, dynamic>>[];
+
+            for (final msg in messages) {
+              if (msg.containsKey('method') && msg.containsKey('id')) {
+                requests.add(msg);
+              } else {
+                nonRequests.add(msg);
+              }
+            }
+
+            // If only notifications/responses, return 202 Accepted
+            if (requests.isEmpty) {
+              request.response
+                ..statusCode = 202
+                ..close();
+              continue;
+            }
+
+            // Process all requests
+            final responses = <Map<String, dynamic>>[];
+            String? newSessionId;
+
+            for (final rpcRequest in requests) {
+              final response = await _handleRequest(rpcRequest);
+              if (response != null) {
+                responses.add(response);
+
+                // If this was an initialize request, create a session
+                if (rpcRequest['method'] == 'initialize') {
+                  newSessionId = generateSessionId();
+                  sessions[newSessionId] = [];
+                }
+              }
+            }
+
+            // Set session ID header if one was created
+            if (newSessionId != null) {
+              request.response.headers.set('Mcp-Session-Id', newSessionId);
+              stderr.writeln('Session created: $newSessionId');
+            }
+
+            // Return response(s)
+            if (responses.isEmpty) {
+              request.response
+                ..statusCode = 202
+                ..close();
+            } else if (responses.length == 1 && !isBatch) {
+              // Single response — return as application/json
+              request.response
+                ..statusCode = 200
+                ..headers.contentType = ContentType.json
+                ..write(jsonEncode(responses.first))
+                ..close();
+            } else {
+              // Batch response — return as application/json array
+              request.response
+                ..statusCode = 200
+                ..headers.contentType = ContentType.json
+                ..write(jsonEncode(responses))
+                ..close();
+            }
+          } catch (e) {
+            final errorResponse = {
+              'jsonrpc': '2.0',
+              'error': {'code': -32700, 'message': 'Parse error: $e'},
+              'id': null,
+            };
+            request.response
+              ..statusCode = 400
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode(errorResponse))
+              ..close();
+          }
+          continue;
+        }
+
+        // Unsupported method on /mcp
+        request.response
+          ..statusCode = 405
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode({
+              'error': 'Method not allowed. Use POST, GET, or DELETE.',
+            }),
+          )
+          ..close();
+        continue;
+      }
+
+      // Unknown route
+      request.response
+        ..statusCode = 404
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({'error': 'Not found. Use /mcp endpoint or GET /health.'}),
         )
         ..close();
     }

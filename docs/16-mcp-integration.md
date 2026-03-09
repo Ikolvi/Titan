@@ -250,7 +250,7 @@ Additional CLI options for SSE:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--transport` | `stdio` | Transport type: `stdio`, `sse`, or `ws` |
+| `--transport` | `stdio` | Transport type: `stdio`, `sse`, `ws`, or `streamable` |
 | `--sse-port` | `3000` | Port for the SSE HTTP server |
 | `--sse-host` | `127.0.0.1` | Bind address (`0.0.0.0` for remote access) |
 | `--relay-host` | `127.0.0.1` | Relay host (same as stdio mode) |
@@ -292,7 +292,7 @@ Additional CLI options for WebSocket:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--transport` | `stdio` | Transport type: `stdio`, `sse`, or `ws` |
+| `--transport` | `stdio` | Transport type: `stdio`, `sse`, `ws`, or `streamable` |
 | `--ws-port` | `3001` | Port for the WebSocket HTTP server |
 | `--ws-host` | `127.0.0.1` | Bind address (`0.0.0.0` for remote access) |
 | `--relay-host` | `127.0.0.1` | Relay host (same as stdio mode) |
@@ -304,6 +304,57 @@ Additional CLI options for WebSocket:
 |--------|------|---------|
 | `GET` | `/ws` | WebSocket upgrade — bidirectional JSON-RPC |
 | `GET` | `/health` | Health check (returns transport info) |
+
+#### Option G: Streamable HTTP transport (MCP 2025-03-26)
+
+The Streamable HTTP transport implements the latest MCP specification (2025-03-26),
+superseding the older HTTP+SSE transport. It uses a single `/mcp` endpoint for
+all communication, with optional session management via `Mcp-Session-Id`:
+
+```bash
+# Start the MCP server with Streamable HTTP transport
+dart run titan_colossus:blueprint_mcp_server \
+  --transport streamable --streamable-port 3002
+```
+
+Configure VS Code to connect via Streamable HTTP:
+
+```json
+{
+  "github.copilot.chat.mcpServers": {
+    "titan-blueprint": {
+      "type": "streamableHttp",
+      "url": "http://localhost:3002/mcp"
+    }
+  }
+}
+```
+
+Additional CLI options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--transport` | `stdio` | Transport type: `stdio`, `sse`, `ws`, or `streamable` |
+| `--streamable-port` | `3002` | Port for the Streamable HTTP server |
+| `--streamable-host` | `127.0.0.1` | Bind address (`0.0.0.0` for remote access) |
+| `--relay-host` | `127.0.0.1` | Relay host (same as stdio mode) |
+| `--relay-port` | `8642` | Relay port (same as stdio mode) |
+
+**Endpoints:**
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/mcp` | Client sends JSON-RPC requests/notifications |
+| `GET` | `/mcp` | Opens SSE stream for server-initiated messages |
+| `DELETE` | `/mcp` | Terminates session (requires `Mcp-Session-Id`) |
+| `GET` | `/health` | Health check (returns transport info) |
+
+**Key features:**
+
+- **Session management**: `initialize` returns an `Mcp-Session-Id` header
+- **Direct JSON responses**: POST returns `application/json` (no SSE needed)
+- **Batch support**: Send multiple JSON-RPC requests in a single POST
+- **Clean shutdown**: DELETE terminates the session
 
 #### Verification
 
