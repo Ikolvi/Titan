@@ -397,13 +397,6 @@ class Relay {
   /// Whether the Relay server is currently running.
   bool get isRunning => _platform.status.isRunning;
 
-  /// Optional callback invoked when the connection status changes.
-  ///
-  /// Called with `true` when the relay connects (WebSocket opens)
-  /// and `false` when it disconnects (WebSocket closes).
-  /// Used by [ColossusPlugin] to reactively hide/show the Lens FAB.
-  void Function(bool connected)? onStatusChange;
-
   /// Start the Relay HTTP server.
   ///
   /// Binds to [config.host]:[config.port] and begins accepting
@@ -420,11 +413,7 @@ class Relay {
   Future<void> start({
     required RelayConfig config,
     required RelayHandler handler,
-  }) => _platform.start(
-    config: config,
-    handler: handler,
-    onStatusChange: onStatusChange,
-  );
+  }) => _platform.start(config: config, handler: handler);
 
   /// Stop the Relay HTTP server.
   ///

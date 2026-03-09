@@ -170,7 +170,7 @@ class Lens extends StatefulWidget {
   // MCP Relay connection — hides the FAB when agents are in control
   // -------------------------------------------------------------------------
 
-  /// Notifier set by [ColossusPlugin] when the MCP Relay connects.
+  /// Notifier toggled by the `toggle_lens` MCP tool.
   ///
   /// When `true`, the FAB is hidden because AI agents interact via
   /// Scry tools — no manual toggle is needed. The Lens panel can

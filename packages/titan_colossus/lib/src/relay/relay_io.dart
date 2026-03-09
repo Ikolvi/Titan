@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:titan/titan.dart';
 
+import '../integration/lens.dart';
 import 'relay.dart';
 
 /// Platform implementation of Relay using `dart:io` [HttpServer].
@@ -43,7 +44,6 @@ class RelayPlatform {
   Future<void> start({
     required RelayConfig config,
     required RelayHandler handler,
-    void Function(bool connected)? onStatusChange,
   }) async {
     if (_server != null) return; // Already running
 
@@ -65,8 +65,6 @@ class RelayPlatform {
       if (config.authToken != null) {
         _chronicle?.info('Auth token: ${config.authToken}');
       }
-
-      onStatusChange?.call(true);
 
       // Process requests without blocking the caller
       unawaited(_listen());
@@ -256,6 +254,9 @@ class RelayPlatform {
 
         case ('POST', '/envoy/configure'):
           await _handleConfigureEnvoy(request);
+
+        case ('POST', '/lens'):
+          await _handleSetLens(request);
 
         default:
           _sendError(
@@ -1137,5 +1138,16 @@ class RelayPlatform {
     }
 
     _sendJson(request.response, handler.configureEnvoy(config));
+  }
+
+  // -----------------------------------------------------------------------
+  // Lens FAB visibility
+  // -----------------------------------------------------------------------
+
+  Future<void> _handleSetLens(HttpRequest request) async {
+    final body = await _readJsonBody(request);
+    final visible = body?['visible'] as bool? ?? true;
+    Lens.relayConnected.value = !visible;
+    _sendJson(request.response, {'visible': visible, 'fabHidden': !visible});
   }
 }

@@ -355,11 +355,7 @@ class ColossusPlugin extends TitanPlugin {
 
     // Start Relay HTTP server for AI-driven campaign execution.
     // Scheduled post-frame so Colossus is fully initialized first.
-    // The onStatusChange callback reactively hides/shows the FAB.
     if (enableRelay) {
-      instance.relay.onStatusChange = (connected) {
-        Lens.relayConnected.value = connected;
-      };
       SchedulerBinding.instance.addPostFrameCallback((_) {
         instance.startRelay(config: relayConfig);
       });
@@ -391,8 +387,8 @@ class ColossusPlugin extends TitanPlugin {
 
     // Check whether the MCP Relay is connected — used to hide the
     // ShadeListener indicator (MCP agents control recording via Scry
-    // tools instead). The Lens FAB uses Lens.relayConnected notifier
-    // for reactive hiding (set via Relay.onStatusChange callback).
+    // tools instead). The Lens FAB visibility is controlled via the
+    // toggle_lens MCP tool (sets Lens.relayConnected notifier).
     final relayRunning = enableRelay && Colossus.isActive
         ? Colossus.instance.relay.status.isRunning
         : false;

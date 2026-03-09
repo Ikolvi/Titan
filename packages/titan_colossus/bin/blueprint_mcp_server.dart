@@ -2388,6 +2388,28 @@ class _BlueprintMcpServer {
               },
             },
           },
+          {
+            'name': 'toggle_lens',
+            'description':
+                'Show or hide the Lens debug FAB (floating action '
+                'button) in the running app. Use visible=false to '
+                'hide the FAB when AI agents are in control — the '
+                'manual debug button is unnecessary during MCP '
+                'sessions. The Lens panel can still be opened '
+                'programmatically via Lens.show(). Call with '
+                'visible=true to restore the FAB.',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'visible': {
+                  'type': 'boolean',
+                  'description':
+                      'Set to false to hide the Lens FAB, true to '
+                      'show it. Defaults to false (hide).',
+                },
+              },
+            },
+          },
         ],
       },
       'id': id,
@@ -2442,6 +2464,7 @@ class _BlueprintMcpServer {
       'inspect_di',
       'inspect_envoy',
       'configure_envoy',
+      'toggle_lens',
     };
 
     if (relayOnlyTools.contains(toolName)) {
@@ -2482,6 +2505,7 @@ class _BlueprintMcpServer {
         'inspect_di' => await _inspectDi(),
         'inspect_envoy' => await _inspectEnvoy(),
         'configure_envoy' => await _configureEnvoy(toolArgs),
+        'toggle_lens' => await _toggleLens(toolArgs),
         _ => 'Unknown tool: $toolName',
       };
 
@@ -6051,6 +6075,25 @@ class _BlueprintMcpServer {
   /// Configure Envoy HTTP client via POST to Relay.
   Future<String> _configureEnvoy(Map<String, dynamic> args) async {
     return _postAndFormat('/envoy/configure', args, _formatEnvoyConfiguration);
+  }
+
+  /// Show or hide the Lens debug FAB via the Relay.
+  Future<String> _toggleLens(Map<String, dynamic> args) async {
+    final visible = args['visible'] as bool? ?? false;
+    try {
+      final data = await _relayPost('/lens', {'visible': visible});
+      final fabHidden = data['fabHidden'] as bool? ?? false;
+      return fabHidden
+          ? 'Lens FAB hidden — AI agents are in control.'
+          : 'Lens FAB visible — manual debug toggle restored.';
+    } on SocketException {
+      return 'Error: Relay not available. Is the app running with '
+          'enableRelay: true?';
+    } on TimeoutException {
+      return 'Error: Relay request timed out.';
+    } catch (e) {
+      return 'Error: $e';
+    }
   }
 
   /// Format screenshot capture result.
