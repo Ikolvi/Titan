@@ -83,8 +83,7 @@ envoy.addCourier(AuthCourier(
 // Add response caching
 envoy.addCourier(CacheCourier(
   cache: MemoryCache(maxEntries: 100),
-  policy: CachePolicy(
-    strategy: CacheStrategy.staleWhileRevalidate,
+  defaultPolicy: const CachePolicy.staleWhileRevalidate(
     ttl: Duration(minutes: 5),
   ),
 ));
@@ -115,19 +114,19 @@ Five built-in cache strategies:
 
 ```dart
 // Network first, fall back to cache
-CachePolicy(strategy: CacheStrategy.networkFirst, ttl: Duration(minutes: 10))
+const CachePolicy.networkFirst(ttl: Duration(minutes: 10))
 
 // Cache first, fetch if missing or expired
-CachePolicy(strategy: CacheStrategy.cacheFirst, ttl: Duration(hours: 1))
+const CachePolicy.cacheFirst(ttl: Duration(hours: 1))
 
 // Return stale data immediately, revalidate in background
-CachePolicy(strategy: CacheStrategy.staleWhileRevalidate, ttl: Duration(minutes: 5))
+const CachePolicy.staleWhileRevalidate(ttl: Duration(minutes: 5))
 
 // Always network, never cache
-CachePolicy(strategy: CacheStrategy.networkOnly)
+const CachePolicy.networkOnly()
 
 // Always cache, never network
-CachePolicy(strategy: CacheStrategy.cacheOnly)
+const CachePolicy.cacheOnly()
 ```
 
 ## Cancel Requests
@@ -145,10 +144,10 @@ recall.cancel('User navigated away');
 ## Request Throttling (Gate)
 
 ```dart
-final envoy = Envoy(
-  baseUrl: 'https://api.example.com',
-  gate: Gate(maxConcurrent: 4), // max 4 concurrent requests
-);
+final envoy = Envoy(baseUrl: 'https://api.example.com');
+
+// Gate is a Courier — max 4 concurrent requests, others queue
+envoy.addCourier(Gate(maxConcurrent: 4));
 ```
 
 ## WebSocket
@@ -295,15 +294,13 @@ try {
   final dispatch = await envoy.get('/users');
 } on EnvoyError catch (e) {
   switch (e.type) {
-    case EnvoyErrorType.connectTimeout:
-      print('Connection timed out');
-    case EnvoyErrorType.receiveTimeout:
-      print('Response timed out');
-    case EnvoyErrorType.cancel:
+    case EnvoyErrorType.timeout:
+      print('Request timed out');
+    case EnvoyErrorType.cancelled:
       print('Request was cancelled');
-    case EnvoyErrorType.response:
-      print('Server error: ${e.response?.statusCode}');
-    case EnvoyErrorType.other:
+    case EnvoyErrorType.badResponse:
+      print('Server error: ${e.dispatch?.statusCode}');
+    case EnvoyErrorType.unknown:
       print('Unknown error: ${e.message}');
     default:
       print('Error: ${e.message}');

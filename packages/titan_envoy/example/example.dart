@@ -22,17 +22,23 @@ Future<void> basicRequests() async {
 
   // GET
   final dispatch = await envoy.get('/posts/1');
-  print('Title: ${dispatch.data['title']}');
+  print('Title: ${(dispatch.data as Map<String, dynamic>?)?['title']}');
 
   // POST
-  final created = await envoy.post('/posts', data: {
-    'title': 'Hello from Envoy',
-    'body': 'Titan HTTP client',
-    'userId': 1,
-  });
-  print('Created post ID: ${created.data['id']}');
+  final created = await envoy.post(
+    '/posts',
+    data: {
+      'title': 'Hello from Envoy',
+      'body': 'Titan HTTP client',
+      'userId': 1,
+    },
+  );
+  print(
+    'Created post ID: '
+    '${(created.data as Map<String, dynamic>?)?['id']}',
+  );
 
-  envoy.dispose();
+  envoy.close();
 }
 
 // ---------------------------------------------------------------------------
@@ -45,19 +51,20 @@ Future<void> courierPipeline() async {
   // Add logging, retry, and caching
   envoy.addCourier(LogCourier());
   envoy.addCourier(RetryCourier(maxRetries: 3));
-  envoy.addCourier(CacheCourier(
-    cache: MemoryCache(maxEntries: 50),
-    policy: CachePolicy(
-      strategy: CacheStrategy.staleWhileRevalidate,
-      ttl: Duration(minutes: 5),
+  envoy.addCourier(
+    CacheCourier(
+      cache: MemoryCache(maxEntries: 50),
+      defaultPolicy: const CachePolicy.staleWhileRevalidate(
+        ttl: Duration(minutes: 5),
+      ),
     ),
-  ));
+  );
 
   // Requests now flow through the courier pipeline
   final dispatch = await envoy.get('/posts');
   print('Fetched ${(dispatch.data as List).length} posts');
 
-  envoy.dispose();
+  envoy.close();
 }
 
 // ---------------------------------------------------------------------------
@@ -73,34 +80,29 @@ Future<void> cancellation() async {
     envoy.get('/posts', recall: recall);
     recall.cancel('User navigated away');
   } on EnvoyError catch (e) {
-    if (e.type == EnvoyErrorType.cancel) {
+    if (e.type == EnvoyErrorType.cancelled) {
       print('Request cancelled: ${e.message}');
     }
   }
 
-  envoy.dispose();
+  envoy.close();
 }
 
 // ---------------------------------------------------------------------------
-// Request throttling
+// Request throttling via Gate courier
 // ---------------------------------------------------------------------------
 
 Future<void> throttling() async {
-  final envoy = Envoy(
-    baseUrl: 'https://jsonplaceholder.typicode.com',
-    gate: Gate(maxConcurrent: 2), // max 2 concurrent requests
-  );
+  final envoy = Envoy(baseUrl: 'https://jsonplaceholder.typicode.com');
 
-  // Only 2 requests execute at a time; others queue automatically
-  final futures = List.generate(
-    10,
-    (i) => envoy.get('/posts/${i + 1}'),
-  );
+  // Gate is a Courier — max 2 concurrent requests, others queue
+  envoy.addCourier(Gate(maxConcurrent: 2));
+  final futures = List.generate(10, (i) => envoy.get('/posts/${i + 1}'));
 
   final results = await Future.wait(futures);
   print('Fetched ${results.length} posts with throttling');
 
-  envoy.dispose();
+  envoy.close();
 }
 
 // ---------------------------------------------------------------------------
