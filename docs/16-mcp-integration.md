@@ -356,6 +356,48 @@ Additional CLI options:
 - **Batch support**: Send multiple JSON-RPC requests in a single POST
 - **Clean shutdown**: DELETE terminates the session
 
+#### Option H: Auto-detect transport (all-in-one)
+
+Runs all HTTP transports on a single port, auto-detecting the protocol based
+on the request path and headers. This is the most flexible option:
+
+```bash
+# Start with auto-detection on port 3000
+dart run titan_colossus:blueprint_mcp_server \
+  --transport auto --port 3000
+```
+
+Configure VS Code (Streamable HTTP is recommended for new clients):
+
+```json
+{
+  "github.copilot.chat.mcpServers": {
+    "titan-blueprint": {
+      "type": "streamableHttp",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--transport` | `stdio` | Set to `auto` for all-in-one |
+| `--port` | `3000` | Port for the auto-detect server |
+| `--host` | `127.0.0.1` | Bind address |
+
+**All endpoints available on one port:**
+
+| Method | Path | Transport |
+|--------|------|-----------|
+| `POST` | `/mcp` | Streamable HTTP (2025-03-26) |
+| `GET` | `/mcp` | Streamable HTTP server-push SSE |
+| `DELETE` | `/mcp` | Streamable HTTP session termination |
+| `GET` | `/ws` | WebSocket upgrade |
+| `GET` | `/sse` | Legacy SSE stream (2024-11-05) |
+| `POST` | `/message` | Legacy SSE JSON-RPC (2024-11-05) |
+| `GET` | `/health` | Health check (lists available transports) |
+
 #### Verification
 
 1. Open the Copilot Chat panel
