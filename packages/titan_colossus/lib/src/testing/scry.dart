@@ -1858,6 +1858,8 @@ class Scry {
     String? value,
     String? key,
     int timeout = 5000,
+    double? dragToX,
+    double? dragToY,
   }) {
     final target = <String, dynamic>{};
     if (key != null) {
@@ -1897,6 +1899,8 @@ class Scry {
       if (action == 'enterText') 'clearFirst': true,
       if (action == 'waitForElement' || action == 'waitForElementGone')
         'timeout': timeout,
+      if (action == 'drag' && dragToX != null && dragToY != null)
+        'dragTo': {'x': dragToX, 'y': dragToY},
     };
 
     // For back/navigate, add route
@@ -1952,6 +1956,8 @@ class Scry {
       final label = entry['label'] as String?;
       final value = entry['value'] as String?;
       final key = entry['key'] as String?;
+      final dragToX = (entry['dragToX'] as num?)?.toDouble();
+      final dragToY = (entry['dragToY'] as num?)?.toDouble();
 
       final target = <String, dynamic>{};
       if (key != null) {
@@ -1983,6 +1989,8 @@ class Scry {
         if (action == 'enterText') 'clearFirst': true,
         if (action == 'waitForElement' || action == 'waitForElementGone')
           'timeout': timeout,
+        if (action == 'drag' && dragToX != null && dragToY != null)
+          'dragTo': {'x': dragToX, 'y': dragToY},
       };
 
       if (action == 'navigate' && value != null) {

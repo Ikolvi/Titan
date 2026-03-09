@@ -430,24 +430,40 @@ class _LensFabState extends State<_LensFab> {
       fabIcon = Icons.bug_report;
     }
 
-    return Material(
-      elevation: 6,
-      shape: const CircleBorder(),
-      color: fabColor,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: widget.onPressed,
-        child: Container(
-          width: 48,
-          height: 48,
-          alignment: Alignment.center,
-          child: isRecording
-              ? const _PulsingIcon(
-                  icon: Icons.stop_circle,
-                  color: Colors.white,
-                  size: 24,
-                )
-              : Icon(fabIcon, color: Colors.white, size: 24),
+    final String tooltip;
+    if (isRecording) {
+      tooltip = 'Stop Recording';
+    } else if (widget.isOpen) {
+      tooltip = 'Close Debug Menu';
+    } else {
+      tooltip = 'Debug Menu';
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        label: tooltip,
+        button: true,
+        child: Material(
+          elevation: 6,
+          shape: const CircleBorder(),
+          color: fabColor,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: widget.onPressed,
+            child: Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              child: isRecording
+                  ? const _PulsingIcon(
+                      icon: Icons.stop_circle,
+                      color: Colors.white,
+                      size: 24,
+                    )
+                  : Icon(fabIcon, color: Colors.white, size: 24),
+            ),
+          ),
         ),
       ),
     );

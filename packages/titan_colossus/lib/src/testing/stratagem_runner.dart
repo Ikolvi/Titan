@@ -443,8 +443,15 @@ class StratagemRunner {
         );
 
       case StratagemAction.drag:
-        if (step.dragFrom != null && step.dragTo != null) {
-          await _dispatchDrag(step.dragFrom!, step.dragTo!);
+        // Two modes:
+        // 1) Explicit coordinates: dragFrom + dragTo
+        // 2) Target-based: resolve target center as dragFrom, use dragTo
+        final from =
+            step.dragFrom ??
+            (target != null ? Offset(target.centerX, target.centerY) : null);
+        final to = step.dragTo;
+        if (from != null && to != null) {
+          await _dispatchDrag(from, to);
         }
 
       case StratagemAction.toggleSwitch:
@@ -1311,6 +1318,7 @@ class StratagemRunner {
       StratagemAction.selectDate => true,
       StratagemAction.selectSegment => true,
       StratagemAction.swipe => true,
+      StratagemAction.drag => true,
       StratagemAction.scrollUntilVisible => false,
       _ => false,
     };
@@ -1332,6 +1340,7 @@ class StratagemRunner {
       StratagemAction.selectDropdown => true,
       StratagemAction.selectDate => true,
       StratagemAction.selectSegment => true,
+      StratagemAction.drag => true,
       _ => false,
     };
   }

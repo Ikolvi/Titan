@@ -155,6 +155,7 @@ void main() {
       StratagemAction.selectDate,
       StratagemAction.selectSegment,
       StratagemAction.swipe,
+      StratagemAction.drag,
     };
 
     for (final action in StratagemAction.values) {
@@ -181,6 +182,7 @@ void main() {
       StratagemAction.selectDropdown,
       StratagemAction.selectDate,
       StratagemAction.selectSegment,
+      StratagemAction.drag,
     };
 
     for (final action in StratagemAction.values) {

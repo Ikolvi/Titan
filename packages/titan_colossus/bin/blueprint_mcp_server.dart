@@ -1863,9 +1863,12 @@ class _BlueprintMcpServer {
                   'description':
                       'Single action to perform. One of: tap, '
                       'enterText, clearText, scroll, back, longPress, '
-                      'doubleTap, swipe, navigate, waitForElement, '
-                      'waitForElementGone, pressKey, submitField, '
-                      'toggleSwitch, toggleCheckbox, selectDropdown. '
+                      'doubleTap, swipe, drag, navigate, '
+                      'waitForElement, waitForElementGone, pressKey, '
+                      'submitField, toggleSwitch, toggleCheckbox, '
+                      'selectDropdown. For drag: specify the '
+                      'element to drag via label/key and the '
+                      'destination via dragToX/dragToY. '
                       'Use this OR actions array, not both.',
                 },
                 'label': {
@@ -1896,6 +1899,20 @@ class _BlueprintMcpServer {
                   'description':
                       'Value to enter (for enterText) or route path '
                       '(for navigate). Used in single action mode.',
+                },
+                'dragToX': {
+                  'type': 'number',
+                  'description':
+                      'Destination X coordinate for drag action. '
+                      'The drag starts from the center of the '
+                      'targeted element (by label/key).',
+                },
+                'dragToY': {
+                  'type': 'number',
+                  'description':
+                      'Destination Y coordinate for drag action. '
+                      'The drag starts from the center of the '
+                      'targeted element (by label/key).',
                 },
                 'actions': {
                   'type': 'array',
@@ -1933,6 +1950,14 @@ class _BlueprintMcpServer {
                       'value': {
                         'type': 'string',
                         'description': 'Text to enter or route to navigate to.',
+                      },
+                      'dragToX': {
+                        'type': 'number',
+                        'description': 'Destination X for drag action.',
+                      },
+                      'dragToY': {
+                        'type': 'number',
+                        'description': 'Destination Y for drag action.',
                       },
                     },
                   },
@@ -5222,7 +5247,7 @@ class _BlueprintMcpServer {
           'Missing required parameter: provide either `action` (single) '
           'or `actions` (array) parameter. '
           'Available actions: tap, enterText, clearText, scroll, back, '
-          'longPress, doubleTap, swipe, navigate, waitForElement, '
+          'longPress, doubleTap, swipe, drag, navigate, waitForElement, '
           'waitForElementGone, pressKey, submitField, dismissKeyboard.';
     }
 
@@ -5230,6 +5255,8 @@ class _BlueprintMcpServer {
     final fieldId = args['fieldId'] as String?;
     final value = args['value'] as String?;
     final key = args['key'] as String?;
+    final dragToX = (args['dragToX'] as num?)?.toDouble();
+    final dragToY = (args['dragToY'] as num?)?.toDouble();
 
     if (label == null &&
         fieldId == null &&
@@ -5262,6 +5289,8 @@ class _BlueprintMcpServer {
         label: label,
         value: value,
         key: key,
+        dragToX: dragToX,
+        dragToY: dragToY,
       );
 
       final result = await _executeRawCampaign(campaign);
@@ -5306,6 +5335,8 @@ class _BlueprintMcpServer {
         final fieldId = entry['fieldId'] as String?;
         final value = entry['value'] as String?;
         final key = entry['key'] as String?;
+        final entryDragToX = (entry['dragToX'] as num?)?.toDouble();
+        final entryDragToY = (entry['dragToY'] as num?)?.toDouble();
 
         // Resolve fieldId → label
         if (label == null && fieldId != null) {
@@ -5345,6 +5376,10 @@ class _BlueprintMcpServer {
           if (key != null) 'key': key,
           // ignore: use_null_aware_elements
           if (value != null) 'value': value,
+          // ignore: use_null_aware_elements
+          if (entryDragToX != null) 'dragToX': entryDragToX,
+          // ignore: use_null_aware_elements
+          if (entryDragToY != null) 'dragToY': entryDragToY,
         });
       }
 
