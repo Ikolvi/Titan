@@ -130,20 +130,8 @@ class Lens extends StatefulWidget {
   /// Typically set to `kDebugMode`.
   final bool enabled;
 
-  /// Whether to show the floating action button.
-  ///
-  /// When `false` (e.g. when MCP Relay is connected), the FAB is hidden
-  /// because AI agents interact via Scry tools — no manual toggle needed.
-  /// The Lens panel can still be opened programmatically via [Lens.show].
-  final bool showFab;
-
   /// Creates a debug overlay wrapping [child].
-  const Lens({
-    super.key,
-    required this.child,
-    this.enabled = true,
-    this.showFab = true,
-  });
+  const Lens({super.key, required this.child, this.enabled = true});
 
   // -------------------------------------------------------------------------
   // Static control — allows programmatic toggle from anywhere
@@ -177,6 +165,17 @@ class Lens extends StatefulWidget {
   /// Callback invoked when the FAB is tapped while [activeRecording]
   /// is `true`. Typically stops recording and saves the session.
   static VoidCallback? onStopRecording;
+
+  // -------------------------------------------------------------------------
+  // MCP Relay connection — hides the FAB when agents are in control
+  // -------------------------------------------------------------------------
+
+  /// Notifier set by [ColossusPlugin] when the MCP Relay connects.
+  ///
+  /// When `true`, the FAB is hidden because AI agents interact via
+  /// Scry tools — no manual toggle is needed. The Lens panel can
+  /// still be opened programmatically via [Lens.show].
+  static final ValueNotifier<bool> relayConnected = ValueNotifier(false);
 
   // -------------------------------------------------------------------------
   // FAB position — persists across open/close cycles
@@ -334,33 +333,39 @@ class _LensState extends State<Lens> {
           // Position persists across Lens open/close cycles via static fields.
           // Hidden entirely during active Shade recording — the ShadeListener
           // recording indicator (top-left status pill) is sufficient feedback.
-          // Also hidden when MCP Relay is connected (showFab == false) —
-          // AI agents use Scry tools, so the manual FAB is unnecessary.
-          if (widget.showFab)
-            ValueListenableBuilder<bool>(
-            valueListenable: Lens.activeRecording,
-            builder: (context, isRecording, child) {
-              if (isRecording) return const SizedBox.shrink();
+          // Also hidden when MCP Relay is connected — AI agents use Scry
+          // tools, so the manual FAB is unnecessary.
+          ValueListenableBuilder<bool>(
+            valueListenable: Lens.relayConnected,
+            builder: (context, relayActive, child) {
+              if (relayActive) return const SizedBox.shrink();
               return child!;
             },
-            child: Positioned(
-              right: Lens._fabRight,
-              bottom: Lens._fabBottom,
-              child: GestureDetector(
-                onPanUpdate: (details) {
-                  setState(() {
-                    Lens._fabRight -= details.delta.dx;
-                    Lens._fabBottom -= details.delta.dy;
-                    // Clamp to screen bounds (account for FAB size of 48)
-                    final size = MediaQuery.sizeOf(context);
-                    Lens._fabRight = Lens._fabRight.clamp(0, size.width - 48);
-                    Lens._fabBottom = Lens._fabBottom.clamp(
-                      0,
-                      size.height - 48,
-                    );
-                  });
-                },
-                child: _LensFab(onPressed: _toggle, isOpen: _visible),
+            child: ValueListenableBuilder<bool>(
+              valueListenable: Lens.activeRecording,
+              builder: (context, isRecording, child) {
+                if (isRecording) return const SizedBox.shrink();
+                return child!;
+              },
+              child: Positioned(
+                right: Lens._fabRight,
+                bottom: Lens._fabBottom,
+                child: GestureDetector(
+                  onPanUpdate: (details) {
+                    setState(() {
+                      Lens._fabRight -= details.delta.dx;
+                      Lens._fabBottom -= details.delta.dy;
+                      // Clamp to screen bounds (account for FAB size of 48)
+                      final size = MediaQuery.sizeOf(context);
+                      Lens._fabRight = Lens._fabRight.clamp(0, size.width - 48);
+                      Lens._fabBottom = Lens._fabBottom.clamp(
+                        0,
+                        size.height - 48,
+                      );
+                    });
+                  },
+                  child: _LensFab(onPressed: _toggle, isOpen: _visible),
+                ),
               ),
             ),
           ),
