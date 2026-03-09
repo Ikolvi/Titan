@@ -250,7 +250,7 @@ Additional CLI options for SSE:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--transport` | `stdio` | Transport type: `stdio` or `sse` |
+| `--transport` | `stdio` | Transport type: `stdio`, `sse`, or `ws` |
 | `--sse-port` | `3000` | Port for the SSE HTTP server |
 | `--sse-host` | `127.0.0.1` | Bind address (`0.0.0.0` for remote access) |
 | `--relay-host` | `127.0.0.1` | Relay host (same as stdio mode) |
@@ -262,6 +262,47 @@ Additional CLI options for SSE:
 |--------|------|---------|
 | `GET` | `/sse` | SSE stream — server→client JSON-RPC responses |
 | `POST` | `/message` | Client→server JSON-RPC requests |
+| `GET` | `/health` | Health check (returns transport info) |
+
+#### Option F: WebSocket transport (bidirectional)
+
+For full-duplex communication over a single connection, use the WebSocket
+transport. Both JSON-RPC requests and responses flow over the same socket:
+
+```bash
+# Start the MCP server with WebSocket transport
+dart run titan_colossus:blueprint_mcp_server \
+  --transport ws --ws-port 3001
+```
+
+Configure a WebSocket-capable MCP client:
+
+```json
+{
+  "github.copilot.chat.mcpServers": {
+    "titan-blueprint": {
+      "type": "ws",
+      "url": "ws://localhost:3001/ws"
+    }
+  }
+}
+```
+
+Additional CLI options for WebSocket:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--transport` | `stdio` | Transport type: `stdio`, `sse`, or `ws` |
+| `--ws-port` | `3001` | Port for the WebSocket HTTP server |
+| `--ws-host` | `127.0.0.1` | Bind address (`0.0.0.0` for remote access) |
+| `--relay-host` | `127.0.0.1` | Relay host (same as stdio mode) |
+| `--relay-port` | `8642` | Relay port (same as stdio mode) |
+
+**Endpoints:**
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/ws` | WebSocket upgrade — bidirectional JSON-RPC |
 | `GET` | `/health` | Health check (returns transport info) |
 
 #### Verification

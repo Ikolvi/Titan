@@ -100,6 +100,8 @@ import 'package:titan_colossus/src/testing/scry.dart';
 /// - **stdio** (default): JSON-RPC over stdin/stdout — standard MCP
 /// - **sse**: HTTP+SSE — `GET /sse` for server→client, `POST /message`
 ///   for client→server. Use `--transport sse --sse-port 3000`.
+/// - **ws**: WebSocket — bidirectional JSON-RPC over a single WebSocket
+///   connection. Use `--transport ws --ws-port 3001`.
 Future<void> main(List<String> args) async {
   // Ensure stdout handles UTF-8 (em-dash etc. in generated content)
   stdout.encoding = utf8;
@@ -125,6 +127,10 @@ Future<void> main(List<String> args) async {
           server._ssePort = int.parse(args[i + 1]);
         case '--sse-host':
           server._sseHost = args[i + 1];
+        case '--ws-port':
+          server._wsPort = int.parse(args[i + 1]);
+        case '--ws-host':
+          server._wsHost = args[i + 1];
       }
     }
   }
@@ -134,8 +140,12 @@ Future<void> main(List<String> args) async {
       await server.run();
     case 'sse':
       await server.runSse();
+    case 'ws':
+      await server.runWs();
     default:
-      stderr.writeln('Unknown transport: $transport (use "stdio" or "sse")');
+      stderr.writeln(
+        'Unknown transport: $transport (use "stdio", "sse", or "ws")',
+      );
       exit(1);
   }
 }
@@ -149,6 +159,8 @@ class _BlueprintMcpServer {
   String? _relayAuthToken;
   int _ssePort = 3000;
   String _sseHost = '127.0.0.1';
+  int _wsPort = 3001;
+  String _wsHost = '127.0.0.1';
 
   /// Directory containing the blueprint files, derived from [_blueprintPath].
   String get _blueprintDir => _blueprintPath.contains('/')
@@ -328,6 +340,118 @@ class _BlueprintMcpServer {
         ..headers.contentType = ContentType.json
         ..write(
           jsonEncode({'error': 'Not found. Use GET /sse or POST /message.'}),
+        )
+        ..close();
+    }
+  }
+
+  /// Runs the MCP server over WebSocket (bidirectional transport).
+  ///
+  /// - `GET /ws` — Upgrades to a WebSocket connection for bidirectional
+  ///   JSON-RPC messaging over a single persistent connection.
+  /// - `GET /health` — Returns 200 OK for liveness checks.
+  ///
+  /// Unlike SSE (which uses separate GET and POST channels), WebSocket
+  /// provides full-duplex communication on a single connection. Each
+  /// message is a complete JSON-RPC request or response.
+  Future<void> runWs() async {
+    final httpServer = await HttpServer.bind(_wsHost, _wsPort);
+    stderr.writeln(
+      'MCP WebSocket server listening on http://$_wsHost:$_wsPort',
+    );
+    stderr.writeln('  WebSocket endpoint: GET  /ws');
+    stderr.writeln('  Health check:       GET  /health');
+
+    await for (final request in httpServer) {
+      final path = request.uri.path;
+      final method = request.method;
+
+      // CORS headers for browser access
+      request.response.headers
+        ..set('Access-Control-Allow-Origin', '*')
+        ..set('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        ..set(
+          'Access-Control-Allow-Headers',
+          'Content-Type, Authorization, Upgrade',
+        )
+        ..set('Access-Control-Max-Age', '86400');
+
+      // Handle CORS preflight
+      if (method == 'OPTIONS') {
+        request.response
+          ..statusCode = 204
+          ..close();
+        continue;
+      }
+
+      // Health check
+      if (method == 'GET' && path == '/health') {
+        request.response
+          ..statusCode = 200
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode({
+              'status': 'ok',
+              'transport': 'ws',
+              'protocol': '2024-11-05',
+            }),
+          )
+          ..close();
+        continue;
+      }
+
+      // WebSocket upgrade
+      if (method == 'GET' && path == '/ws') {
+        final isUpgrade = WebSocketTransformer.isUpgradeRequest(request);
+        if (!isUpgrade) {
+          request.response
+            ..statusCode = 400
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode({'error': 'WebSocket upgrade required'}))
+            ..close();
+          continue;
+        }
+
+        final socket = await WebSocketTransformer.upgrade(request);
+        stderr.writeln('WebSocket client connected');
+
+        socket.listen(
+          (data) async {
+            if (data is! String) return;
+
+            try {
+              final rpcRequest = jsonDecode(data) as Map<String, dynamic>;
+              final response = await _handleRequest(rpcRequest);
+              if (response != null) {
+                socket.add(jsonEncode(response));
+              }
+            } catch (e) {
+              final errorResponse = {
+                'jsonrpc': '2.0',
+                'error': {'code': -32700, 'message': 'Parse error: $e'},
+                'id': null,
+              };
+              socket.add(jsonEncode(errorResponse));
+            }
+          },
+          onDone: () {
+            stderr.writeln('WebSocket client disconnected');
+          },
+          onError: (Object error) {
+            stderr.writeln('WebSocket error: $error');
+          },
+        );
+        continue;
+      }
+
+      // Unknown route
+      request.response
+        ..statusCode = 404
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode({
+            'error': 'Not found. Use GET /ws for WebSocket or GET /health.',
+          }),
         )
         ..close();
     }
