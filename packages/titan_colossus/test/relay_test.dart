@@ -657,6 +657,39 @@ void main() {
       expect(couriers[1]['type'], 'RetryCourier');
     });
 
+    // -- Envoy configure --
+
+    test('POST /envoy/configure applies changes', () async {
+      await startRelay();
+
+      final request = await client.post('127.0.0.1', port, '/envoy/configure');
+      request.headers.contentType = ContentType.json;
+      request.write(
+        jsonEncode({
+          'baseUrl': 'https://new-api.com',
+          'addCourier': 'DedupCourier',
+        }),
+      );
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['success'], isTrue);
+      expect(body['changesApplied'], 2);
+      expect(body['changes'], isList);
+      expect(body['currentState'], isA<Map>());
+    });
+
+    test('POST /envoy/configure rejects empty body', () async {
+      await startRelay();
+
+      final request = await client.post('127.0.0.1', port, '/envoy/configure');
+      request.headers.contentType = ContentType.json;
+      final response = await request.close();
+
+      expect(response.statusCode, 400);
+    });
+
     // -- Unknown endpoint --
 
     test('unknown endpoint returns 404', () async {
@@ -1470,6 +1503,23 @@ class _MockRelayHandler implements RelayHandler {
           },
         },
       ],
+    };
+  }
+
+  @override
+  Map<String, dynamic> configureEnvoy(Map<String, dynamic> config) {
+    final changes = <String>[];
+    if (config.containsKey('baseUrl')) {
+      changes.add('baseUrl: old → ${config['baseUrl']}');
+    }
+    if (config.containsKey('addCourier')) {
+      changes.add('addCourier: ${config['addCourier']}');
+    }
+    return {
+      'success': true,
+      'changesApplied': changes.length,
+      'changes': changes,
+      'currentState': inspectEnvoy(),
     };
   }
 }

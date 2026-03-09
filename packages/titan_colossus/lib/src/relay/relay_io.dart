@@ -251,6 +251,9 @@ class RelayPlatform {
         case ('GET', '/envoy/inspect'):
           _handleInspectEnvoy(request);
 
+        case ('POST', '/envoy/configure'):
+          await _handleConfigureEnvoy(request);
+
         default:
           _sendError(
             request.response,
@@ -1099,5 +1102,37 @@ class RelayPlatform {
     }
 
     _sendJson(request.response, handler.inspectEnvoy());
+  }
+
+  Future<void> _handleConfigureEnvoy(HttpRequest request) async {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    final body = await utf8.decoder.bind(request).join();
+    if (body.isEmpty) {
+      _sendError(
+        request.response,
+        HttpStatus.badRequest,
+        'Request body is required',
+      );
+      return;
+    }
+
+    final Map<String, dynamic> config;
+    try {
+      config = jsonDecode(body) as Map<String, dynamic>;
+    } catch (_) {
+      _sendError(request.response, HttpStatus.badRequest, 'Invalid JSON body');
+      return;
+    }
+
+    _sendJson(request.response, handler.configureEnvoy(config));
   }
 }

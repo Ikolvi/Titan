@@ -336,4 +336,80 @@ void main() {
       expect(resolved.defaultHeaders['Accept'], 'application/json');
     });
   });
+
+  group('Envoy configuration via mutation', () {
+    late Colossus colossus;
+
+    setUp(() {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      colossus = Colossus.init(enableLensTab: false);
+    });
+
+    tearDown(() {
+      Titan.reset();
+      colossus.dispose();
+    });
+
+    test('baseUrl can be changed at runtime', () {
+      final envoy = Envoy(baseUrl: 'https://old.api.com');
+      Titan.put(envoy);
+
+      envoy.baseUrl = 'https://new.api.com';
+
+      expect(Titan.find<Envoy>()!.baseUrl, 'https://new.api.com');
+    });
+
+    test('couriers can be added and removed at runtime', () {
+      final envoy = Envoy(baseUrl: 'https://api.com');
+      Titan.put(envoy);
+
+      expect(envoy.couriers, isEmpty);
+
+      envoy.addCourier(LogCourier());
+      expect(envoy.couriers, hasLength(1));
+      expect(envoy.couriers[0], isA<LogCourier>());
+
+      envoy.addCourier(RetryCourier());
+      expect(envoy.couriers, hasLength(2));
+
+      // Remove by reference (same as configureEnvoy does by index)
+      final toRemove = envoy.couriers[0];
+      envoy.removeCourier(toRemove);
+      expect(envoy.couriers, hasLength(1));
+      expect(envoy.couriers[0], isA<RetryCourier>());
+
+      envoy.clearCouriers();
+      expect(envoy.couriers, isEmpty);
+    });
+
+    test('headers can be added and removed at runtime', () {
+      final envoy = Envoy(
+        baseUrl: 'https://api.com',
+        headers: {'Accept': 'application/json'},
+      );
+      Titan.put(envoy);
+
+      envoy.defaultHeaders['X-Custom'] = 'value';
+      expect(envoy.defaultHeaders, hasLength(2));
+
+      envoy.defaultHeaders.remove('Accept');
+      expect(envoy.defaultHeaders, hasLength(1));
+      expect(envoy.defaultHeaders.containsKey('Accept'), isFalse);
+    });
+
+    test('timeouts can be changed at runtime', () {
+      final envoy = Envoy(baseUrl: 'https://api.com');
+      Titan.put(envoy);
+
+      expect(envoy.connectTimeout, isNull);
+
+      envoy.connectTimeout = const Duration(seconds: 5);
+      envoy.sendTimeout = const Duration(seconds: 15);
+      envoy.receiveTimeout = const Duration(seconds: 30);
+
+      expect(envoy.connectTimeout!.inMilliseconds, 5000);
+      expect(envoy.sendTimeout!.inMilliseconds, 15000);
+      expect(envoy.receiveTimeout!.inMilliseconds, 30000);
+    });
+  });
 }

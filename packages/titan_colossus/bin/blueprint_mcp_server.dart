@@ -1066,6 +1066,71 @@ class _BlueprintMcpServer {
                 '(retry policy, auth settings, cache strategy, etc.).',
             'inputSchema': {'type': 'object', 'properties': {}},
           },
+          {
+            'name': 'configure_envoy',
+            'description':
+                'Configure the Envoy HTTP client at runtime. Can change '
+                'base URL, timeouts, redirect settings, add/remove '
+                'default headers, add/remove couriers (interceptors), '
+                'or clear all couriers. Returns applied changes and '
+                'the resulting configuration.',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'baseUrl': {
+                  'type': 'string',
+                  'description': 'Set the base URL for all requests.',
+                },
+                'connectTimeout': {
+                  'type': 'integer',
+                  'description': 'Connection timeout in milliseconds.',
+                },
+                'sendTimeout': {
+                  'type': 'integer',
+                  'description': 'Send timeout in milliseconds.',
+                },
+                'receiveTimeout': {
+                  'type': 'integer',
+                  'description': 'Receive timeout in milliseconds.',
+                },
+                'followRedirects': {
+                  'type': 'boolean',
+                  'description': 'Whether to follow HTTP redirects.',
+                },
+                'maxRedirects': {
+                  'type': 'integer',
+                  'description': 'Maximum number of redirect hops.',
+                },
+                'setHeaders': {
+                  'type': 'object',
+                  'description':
+                      'Headers to add or overwrite (key-value pairs).',
+                },
+                'removeHeaders': {
+                  'type': 'array',
+                  'items': {'type': 'string'},
+                  'description': 'Header names to remove from defaults.',
+                },
+                'addCourier': {
+                  'type': 'string',
+                  'description':
+                      'Add a courier by type name. Supported defaults: '
+                      'LogCourier, RetryCourier, DedupCourier, '
+                      'CookieCourier. AuthCourier, CacheCourier, and '
+                      'MetricsCourier require configuration and cannot '
+                      'be added via this tool.',
+                },
+                'removeCourierAt': {
+                  'type': 'integer',
+                  'description': 'Remove a courier by its index in the chain.',
+                },
+                'clearCouriers': {
+                  'type': 'boolean',
+                  'description': 'Remove all couriers from the chain.',
+                },
+              },
+            },
+          },
         ],
       },
       'id': id,
@@ -1119,6 +1184,7 @@ class _BlueprintMcpServer {
       'audit_accessibility',
       'inspect_di',
       'inspect_envoy',
+      'configure_envoy',
     };
 
     if (relayOnlyTools.contains(toolName)) {
@@ -1158,6 +1224,7 @@ class _BlueprintMcpServer {
         'audit_accessibility' => await _auditAccessibility(),
         'inspect_di' => await _inspectDi(),
         'inspect_envoy' => await _inspectEnvoy(),
+        'configure_envoy' => await _configureEnvoy(toolArgs),
         _ => 'Unknown tool: $toolName',
       };
 
@@ -4386,6 +4453,11 @@ class _BlueprintMcpServer {
     return _fetchAndFormat('/envoy/inspect', _formatEnvoyInspection);
   }
 
+  /// Configure Envoy HTTP client via POST to Relay.
+  Future<String> _configureEnvoy(Map<String, dynamic> args) async {
+    return _postAndFormat('/envoy/configure', args, _formatEnvoyConfiguration);
+  }
+
   /// Format screenshot capture result.
   String _formatScreenshot(Map<String, dynamic> data) {
     final buf = StringBuffer();
@@ -4580,6 +4652,44 @@ class _BlueprintMcpServer {
         );
       }
       buf.writeln();
+    }
+
+    return buf.toString();
+  }
+
+  /// Format Envoy configuration result.
+  String _formatEnvoyConfiguration(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+
+    if (data['success'] != true) {
+      buf.writeln('# Envoy Configuration Failed');
+      buf.writeln();
+      buf.writeln('**Error:** ${data['error'] ?? 'Unknown'}');
+      return buf.toString();
+    }
+
+    final changesApplied = data['changesApplied'] as int? ?? 0;
+    buf.writeln('# Envoy Configuration Updated');
+    buf.writeln();
+    buf.writeln('**Changes applied:** $changesApplied');
+    buf.writeln();
+
+    final changes = data['changes'] as List<dynamic>? ?? [];
+    if (changes.isNotEmpty) {
+      buf.writeln('## Changes');
+      buf.writeln();
+      for (final change in changes) {
+        buf.writeln('- $change');
+      }
+      buf.writeln();
+    }
+
+    // Append the current state using the inspection formatter
+    final currentState = data['currentState'] as Map<String, dynamic>? ?? {};
+    if (currentState.isNotEmpty) {
+      buf.writeln('---');
+      buf.writeln();
+      buf.write(_formatEnvoyInspection(currentState));
     }
 
     return buf.toString();

@@ -304,6 +304,21 @@ abstract interface class RelayHandler {
   /// of active couriers with their per-type configuration.
   /// Looks up Envoy from [Titan] DI container.
   Map<String, dynamic> inspectEnvoy();
+
+  /// Configure the Envoy HTTP client at runtime.
+  ///
+  /// Accepts a [config] map with optional keys:
+  /// - `baseUrl` — set the base URL
+  /// - `connectTimeout`, `sendTimeout`, `receiveTimeout` — set timeouts (ms)
+  /// - `followRedirects`, `maxRedirects` — redirect settings
+  /// - `setHeaders` — add/overwrite default headers
+  /// - `removeHeaders` — remove default headers by name
+  /// - `addCourier` — add a built-in courier by type name
+  /// - `removeCourierAt` — remove a courier by chain index
+  /// - `clearCouriers` — remove all couriers
+  ///
+  /// Returns a summary of applied changes and the resulting state.
+  Map<String, dynamic> configureEnvoy(Map<String, dynamic> config);
 }
 
 // ---------------------------------------------------------------------------

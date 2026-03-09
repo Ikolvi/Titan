@@ -2654,4 +2654,135 @@ class _ColossusRelayHandler implements RelayHandler {
 
     return {'type': type, 'index': index, 'config': config};
   }
+
+  @override
+  Map<String, dynamic> configureEnvoy(Map<String, dynamic> config) {
+    final envoy = Titan.find<Envoy>();
+    if (envoy == null) {
+      return {
+        'success': false,
+        'error':
+            'No Envoy instance registered in Titan DI. '
+            'Register with Titan.put(Envoy(baseUrl: ...)).',
+      };
+    }
+
+    final changes = <String>[];
+
+    // -- Base URL --
+    if (config.containsKey('baseUrl')) {
+      final old = envoy.baseUrl;
+      envoy.baseUrl = config['baseUrl'] as String;
+      changes.add('baseUrl: $old → ${envoy.baseUrl}');
+    }
+
+    // -- Timeouts --
+    if (config.containsKey('connectTimeout')) {
+      envoy.connectTimeout = Duration(
+        milliseconds: config['connectTimeout'] as int,
+      );
+      changes.add('connectTimeout: ${envoy.connectTimeout!.inMilliseconds} ms');
+    }
+    if (config.containsKey('sendTimeout')) {
+      envoy.sendTimeout = Duration(milliseconds: config['sendTimeout'] as int);
+      changes.add('sendTimeout: ${envoy.sendTimeout!.inMilliseconds} ms');
+    }
+    if (config.containsKey('receiveTimeout')) {
+      envoy.receiveTimeout = Duration(
+        milliseconds: config['receiveTimeout'] as int,
+      );
+      changes.add('receiveTimeout: ${envoy.receiveTimeout!.inMilliseconds} ms');
+    }
+
+    // -- Redirects --
+    if (config.containsKey('followRedirects')) {
+      envoy.followRedirects = config['followRedirects'] as bool;
+      changes.add('followRedirects: ${envoy.followRedirects}');
+    }
+    if (config.containsKey('maxRedirects')) {
+      envoy.maxRedirects = config['maxRedirects'] as int;
+      changes.add('maxRedirects: ${envoy.maxRedirects}');
+    }
+
+    // -- Headers --
+    if (config.containsKey('setHeaders')) {
+      final headers = config['setHeaders'] as Map<String, dynamic>;
+      for (final entry in headers.entries) {
+        envoy.defaultHeaders[entry.key] = entry.value.toString();
+      }
+      changes.add('setHeaders: ${headers.keys.join(', ')}');
+    }
+    if (config.containsKey('removeHeaders')) {
+      final keys = (config['removeHeaders'] as List<dynamic>)
+          .map((e) => e.toString())
+          .toList();
+      for (final key in keys) {
+        envoy.defaultHeaders.remove(key);
+      }
+      changes.add('removeHeaders: ${keys.join(', ')}');
+    }
+
+    // -- Clear couriers --
+    if (config['clearCouriers'] == true) {
+      final count = envoy.couriers.length;
+      envoy.clearCouriers();
+      changes.add('clearCouriers: removed $count couriers');
+    }
+
+    // -- Remove courier by index (before adding) --
+    if (config.containsKey('removeCourierAt')) {
+      final index = config['removeCourierAt'] as int;
+      if (index >= 0 && index < envoy.couriers.length) {
+        final removed = envoy.couriers[index];
+        envoy.removeCourier(removed);
+        changes.add('removeCourierAt[$index]: ${removed.runtimeType}');
+      } else {
+        changes.add(
+          'removeCourierAt[$index]: SKIPPED — '
+          'out of range (0..${envoy.couriers.length - 1})',
+        );
+      }
+    }
+
+    // -- Add courier by type name --
+    if (config.containsKey('addCourier')) {
+      final typeName = config['addCourier'] as String;
+      final courier = _createCourier(typeName);
+      if (courier != null) {
+        envoy.addCourier(courier);
+        changes.add(
+          'addCourier: $typeName (at index ${envoy.couriers.length - 1})',
+        );
+      } else {
+        changes.add(
+          'addCourier: $typeName — FAILED (unsupported or requires '
+          'configuration; supported defaults: LogCourier, RetryCourier, '
+          'DedupCourier, CookieCourier)',
+        );
+      }
+    }
+
+    return {
+      'success': true,
+      'changesApplied': changes.length,
+      'changes': changes,
+      'currentState': inspectEnvoy(),
+    };
+  }
+
+  /// Create a default [Courier] instance by type name.
+  ///
+  /// Only couriers with all-optional constructor parameters can be created:
+  /// [LogCourier], [RetryCourier], [DedupCourier], [CookieCourier].
+  /// Returns `null` for types that require configuration (AuthCourier,
+  /// CacheCourier, MetricsCourier) or unknown types.
+  Courier? _createCourier(String typeName) {
+    return switch (typeName) {
+      'LogCourier' => LogCourier(),
+      'RetryCourier' => RetryCourier(),
+      'DedupCourier' => DedupCourier(),
+      'CookieCourier' => CookieCourier(),
+      _ => null,
+    };
+  }
 }
