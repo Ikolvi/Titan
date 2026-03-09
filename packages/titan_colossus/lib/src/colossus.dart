@@ -201,6 +201,50 @@ class Colossus extends Pillar {
   /// Maximum number of framework errors to retain.
   static const int _maxFrameworkErrors = 200;
 
+  // -----------------------------------------------------------------------
+  // API Metrics (Envoy integration)
+  // -----------------------------------------------------------------------
+
+  /// Tracked API metrics from Envoy HTTP client (newest last).
+  ///
+  /// Populated via [trackApiMetric] callback. Connect Envoy's
+  /// [MetricsCourier] to this method for MCP-accessible API monitoring.
+  final List<Map<String, dynamic>> _apiMetrics = [];
+
+  /// Maximum number of API metrics to retain.
+  static const int _maxApiMetrics = 500;
+
+  /// All tracked API metrics since initialization (newest last).
+  ///
+  /// Each entry is a JSON-serializable map with keys:
+  /// `method`, `url`, `statusCode`, `durationMs`, `success`,
+  /// `error`, `timestamp`, `cached`.
+  ///
+  /// ```dart
+  /// final metrics = Colossus.instance.apiMetrics;
+  /// final slow = metrics.where((m) => (m['durationMs'] as int) > 1000);
+  /// print('Slow API calls: ${slow.length}');
+  /// ```
+  List<Map<String, dynamic>> get apiMetrics => List.unmodifiable(_apiMetrics);
+
+  /// Tracks an API metric from Envoy's [MetricsCourier].
+  ///
+  /// Pass the result of [EnvoyMetric.toJson()] to this method.
+  /// Metrics are stored in-memory and accessible via Relay HTTP
+  /// endpoints and MCP tools.
+  ///
+  /// ```dart
+  /// envoy.addCourier(MetricsCourier(
+  ///   onMetric: (m) => Colossus.instance.trackApiMetric(m.toJson()),
+  /// ));
+  /// ```
+  void trackApiMetric(Map<String, dynamic> metric) {
+    _apiMetrics.add(metric);
+    if (_apiMetrics.length > _maxApiMetrics) {
+      _apiMetrics.removeAt(0);
+    }
+  }
+
   /// The original [FlutterError.onError] handler, restored on dispose.
   FlutterExceptionHandler? _previousErrorHandler;
 
@@ -1708,5 +1752,36 @@ class _ColossusRelayHandler implements RelayHandler {
       },
       'stratagemCount': export.stratagems.length,
     };
+  }
+
+  @override
+  Map<String, dynamic> getApiMetrics() {
+    final metrics = _colossus.apiMetrics;
+    final successful = metrics.where((m) => m['success'] == true).length;
+    final failed = metrics.length - successful;
+    final avgDuration = metrics.isEmpty
+        ? 0
+        : metrics
+                  .map((m) => (m['durationMs'] as num?) ?? 0)
+                  .fold<num>(0, (a, b) => a + b) /
+              metrics.length;
+
+    return {
+      'totalMetrics': metrics.length,
+      'successful': successful,
+      'failed': failed,
+      'avgDurationMs': avgDuration.round(),
+      'maxStored': Colossus._maxApiMetrics,
+      'metrics': metrics,
+    };
+  }
+
+  @override
+  Map<String, dynamic> getApiErrors() {
+    final errors = _colossus.apiMetrics
+        .where((m) => m['success'] != true)
+        .toList();
+
+    return {'totalErrors': errors.length, 'errors': errors};
   }
 }

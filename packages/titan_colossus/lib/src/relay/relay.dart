@@ -210,6 +210,18 @@ abstract interface class RelayHandler {
   /// AI prompt text. Useful for MCP servers or external tools
   /// that handle file I/O outside the app sandbox.
   Map<String, dynamic> getBlueprintData();
+
+  /// Get tracked API metrics from Envoy HTTP client.
+  ///
+  /// Returns a summary with total count, recent metrics, and optional
+  /// filtering by success/failure. Populated via
+  /// [Colossus.trackApiMetric].
+  Map<String, dynamic> getApiMetrics();
+
+  /// Get tracked API errors (non-successful requests).
+  ///
+  /// Returns only failed API calls for quick triage.
+  Map<String, dynamic> getApiErrors();
 }
 
 // ---------------------------------------------------------------------------

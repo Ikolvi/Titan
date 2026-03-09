@@ -206,6 +206,12 @@ class RelayPlatform {
         case ('GET', '/debug/tree'):
           await _handleDebugTree(request);
 
+        case ('GET', '/api/metrics'):
+          _handleGetApiMetrics(request);
+
+        case ('GET', '/api/errors'):
+          _handleGetApiErrors(request);
+
         default:
           _sendError(
             request.response,
@@ -580,14 +586,8 @@ class RelayPlatform {
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.json
         ..headers.set('X-Terrain-Screens', '${terrain['screens'] ?? 0}')
-        ..headers.set(
-          'X-Terrain-Transitions',
-          '${terrain['transitions'] ?? 0}',
-        )
-        ..headers.set(
-          'X-Stratagem-Count',
-          '${data['stratagemCount'] ?? 0}',
-        );
+        ..headers.set('X-Terrain-Transitions', '${terrain['transitions'] ?? 0}')
+        ..headers.set('X-Stratagem-Count', '${data['stratagemCount'] ?? 0}');
 
       // Serialize and write in chunks to avoid a single large allocation.
       const encoder = JsonEncoder.withIndent('  ');
@@ -799,5 +799,33 @@ class RelayPlatform {
               .map((e) => '${e.key}: ${e.value}')
               .toList(),
     });
+  }
+
+  void _handleGetApiMetrics(HttpRequest request) {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getApiMetrics());
+  }
+
+  void _handleGetApiErrors(HttpRequest request) {
+    final handler = _handler;
+    if (handler == null) {
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Colossus not available',
+      );
+      return;
+    }
+
+    _sendJson(request.response, handler.getApiErrors());
   }
 }

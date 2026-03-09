@@ -803,6 +803,27 @@ class _BlueprintMcpServer {
               },
             },
           },
+          {
+            'name': 'get_api_metrics',
+            'description':
+                'Get tracked API metrics from Envoy HTTP client. '
+                'Shows all HTTP requests made through Envoy, '
+                'including method, URL, status code, duration, '
+                'success/failure, and caching status. Useful for '
+                'understanding API performance and identifying '
+                'slow or failing endpoints. Requires Envoy to be '
+                'connected via MetricsCourier → Colossus.trackApiMetric.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
+          {
+            'name': 'get_api_errors',
+            'description':
+                'Get only failed API requests from Envoy HTTP client. '
+                'Filters API metrics to show non-successful calls '
+                'for quick error triage. Shows method, URL, status code, '
+                'duration, and error message for each failed request.',
+            'inputSchema': {'type': 'object', 'properties': {}},
+          },
         ],
       },
       'id': id,
@@ -841,6 +862,8 @@ class _BlueprintMcpServer {
       'start_recording',
       'stop_recording',
       'export_blueprint',
+      'get_api_metrics',
+      'get_api_errors',
     };
 
     if (relayOnlyTools.contains(toolName)) {
@@ -865,6 +888,8 @@ class _BlueprintMcpServer {
         'start_recording' => await _startRecording(toolArgs),
         'stop_recording' => await _stopRecording(),
         'export_blueprint' => await _exportBlueprint(toolArgs),
+        'get_api_metrics' => await _getApiMetrics(),
+        'get_api_errors' => await _getApiErrors(),
         _ => 'Unknown tool: $toolName',
       };
 
@@ -2437,8 +2462,7 @@ class _BlueprintMcpServer {
       }
 
       // Read summary from response headers (avoids parsing the JSON).
-      final screens =
-          jsonResponse.headers.value('X-Terrain-Screens') ?? '0';
+      final screens = jsonResponse.headers.value('X-Terrain-Screens') ?? '0';
       final transitions =
           jsonResponse.headers.value('X-Terrain-Transitions') ?? '0';
       final stratagemCount =
@@ -3723,6 +3747,128 @@ class _BlueprintMcpServer {
     } finally {
       client.close();
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // API Metrics (Envoy integration)
+  // -----------------------------------------------------------------------
+
+  /// Fetch API metrics from the running app's Colossus instance.
+  Future<String> _getApiMetrics() async {
+    return _fetchAndFormat('/api/metrics', _formatApiMetrics);
+  }
+
+  /// Fetch API errors (failed requests only) from the running app.
+  Future<String> _getApiErrors() async {
+    return _fetchAndFormat('/api/errors', _formatApiErrors);
+  }
+
+  /// Format API metrics JSON into readable Markdown.
+  String _formatApiMetrics(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final total = data['totalMetrics'] as int? ?? 0;
+    final successful = data['successful'] as int? ?? 0;
+    final failed = data['failed'] as int? ?? 0;
+    final avgMs = data['avgDurationMs'] as int? ?? 0;
+    final maxStored = data['maxStored'] as int? ?? 500;
+    final metrics = data['metrics'] as List<dynamic>? ?? [];
+
+    buf.writeln('# API Metrics (Envoy)');
+    buf.writeln();
+    buf.writeln(
+      '**Total:** $total | '
+      '**Successful:** $successful | '
+      '**Failed:** $failed | '
+      '**Avg Duration:** ${avgMs}ms | '
+      '**Max Stored:** $maxStored',
+    );
+    buf.writeln();
+
+    if (metrics.isEmpty) {
+      buf.writeln(
+        'No API metrics tracked yet. Connect Envoy to Colossus:\n\n'
+        '```dart\n'
+        'envoy.addCourier(MetricsCourier(\n'
+        '  onMetric: (m) => Colossus.instance.trackApiMetric(m.toJson()),\n'
+        '));\n'
+        '```',
+      );
+      return buf.toString();
+    }
+
+    buf.writeln('| # | Method | URL | Status | Duration | Cached | Time |');
+    buf.writeln('|---|--------|-----|--------|----------|--------|------|');
+    for (var i = 0; i < metrics.length; i++) {
+      final m = metrics[i] as Map<String, dynamic>;
+      final url = m['url'] as String? ?? '?';
+      // Truncate long URLs for readability
+      final displayUrl = url.length > 50 ? '${url.substring(0, 47)}...' : url;
+      buf.writeln(
+        '| ${i + 1} '
+        '| ${m['method'] ?? '?'} '
+        '| $displayUrl '
+        '| ${m['statusCode'] ?? '?'} '
+        '| ${m['durationMs'] ?? '?'}ms '
+        '| ${m['cached'] == true ? 'Yes' : 'No'} '
+        '| ${m['timestamp'] ?? ''} |',
+      );
+    }
+    buf.writeln();
+
+    // Show error summary if any
+    if (failed > 0) {
+      buf.writeln('## Errors');
+      buf.writeln();
+      for (final m in metrics) {
+        final entry = m as Map<String, dynamic>;
+        if (entry['success'] != true) {
+          buf.writeln(
+            '- **${entry['method']} ${entry['url']}** → '
+            '${entry['statusCode']}: ${entry['error'] ?? 'unknown error'}',
+          );
+        }
+      }
+      buf.writeln();
+    }
+
+    return buf.toString();
+  }
+
+  /// Format API errors JSON into Markdown.
+  String _formatApiErrors(Map<String, dynamic> data) {
+    final buf = StringBuffer();
+    final total = data['totalErrors'] as int? ?? 0;
+    final errors = data['errors'] as List<dynamic>? ?? [];
+
+    buf.writeln('# API Errors (Envoy)');
+    buf.writeln();
+    buf.writeln('**Total Errors:** $total');
+    buf.writeln();
+
+    if (errors.isEmpty) {
+      buf.writeln('No API errors recorded. All requests successful.');
+      return buf.toString();
+    }
+
+    buf.writeln('| # | Method | URL | Status | Duration | Error | Time |');
+    buf.writeln('|---|--------|-----|--------|----------|-------|------|');
+    for (var i = 0; i < errors.length; i++) {
+      final m = errors[i] as Map<String, dynamic>;
+      final url = m['url'] as String? ?? '?';
+      final displayUrl = url.length > 50 ? '${url.substring(0, 47)}...' : url;
+      buf.writeln(
+        '| ${i + 1} '
+        '| ${m['method'] ?? '?'} '
+        '| $displayUrl '
+        '| ${m['statusCode'] ?? '?'} '
+        '| ${m['durationMs'] ?? '?'}ms '
+        '| ${m['error'] ?? 'unknown'} '
+        '| ${m['timestamp'] ?? ''} |',
+      );
+    }
+    buf.writeln();
+
+    return buf.toString();
   }
 
   // -----------------------------------------------------------------------

@@ -14,4 +14,5 @@ workspace:
   - packages/titan_atlas
   - packages/titan_argus
   - packages/titan_colossus
+  - packages/titan_envoy
   - packages/titan_example

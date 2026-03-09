@@ -599,6 +599,44 @@ void main() {
       expect(handler.getFrameworkErrorsCallCount, 1);
     });
 
+    // -- GET /api/metrics --
+
+    test('GET /api/metrics returns API metrics', () async {
+      await startRelay();
+
+      final request = await client.get('127.0.0.1', port, '/api/metrics');
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['totalMetrics'], 2);
+      expect(body['metrics'], isList);
+      final metrics = body['metrics'] as List;
+      expect(metrics.length, 2);
+      expect(metrics[0]['method'], 'GET');
+      expect(metrics[0]['success'], true);
+      expect(metrics[1]['method'], 'POST');
+      expect(metrics[1]['success'], false);
+    });
+
+    // -- GET /api/errors --
+
+    test('GET /api/errors returns API errors', () async {
+      await startRelay();
+
+      final request = await client.get('127.0.0.1', port, '/api/errors');
+      final response = await request.close();
+      final body = await _readBody(response);
+
+      expect(response.statusCode, 200);
+      expect(body['totalErrors'], 1);
+      expect(body['errors'], isList);
+      final errors = body['errors'] as List;
+      expect(errors.length, 1);
+      expect(errors[0]['method'], 'POST');
+      expect(errors[0]['statusCode'], 500);
+    });
+
     // -- Unknown endpoint --
 
     test('unknown endpoint returns 404', () async {
@@ -802,6 +840,71 @@ void main() {
         expect(body['stride'], isA<Map>());
         expect(body['vessel'], isA<Map>());
         expect(body['echo'], isA<Map>());
+      } finally {
+        client.close();
+        HttpOverrides.global = savedOverrides;
+      }
+    });
+
+    test('trackApiMetric stores and retrieves metrics via Relay', () async {
+      final colossus = Colossus.init(enableLensTab: false);
+
+      // Track some API metrics
+      colossus.trackApiMetric({
+        'method': 'GET',
+        'url': 'https://api.example.com/quests',
+        'statusCode': 200,
+        'durationMs': 142,
+        'success': true,
+        'cached': false,
+        'timestamp': '2025-01-01T00:00:00Z',
+      });
+      colossus.trackApiMetric({
+        'method': 'POST',
+        'url': 'https://api.example.com/quests',
+        'statusCode': 500,
+        'durationMs': 3200,
+        'success': false,
+        'error': 'Internal Server Error',
+        'cached': false,
+        'timestamp': '2025-01-01T00:01:00Z',
+      });
+
+      expect(colossus.apiMetrics.length, 2);
+
+      await colossus.startRelay(
+        config: const RelayConfig(
+          port: 0,
+          host: '127.0.0.1',
+          enableLogging: false,
+        ),
+      );
+
+      final port = colossus.relay.status.port!;
+      final savedOverrides = HttpOverrides.current;
+      HttpOverrides.global = null;
+      final client = HttpClient();
+      try {
+        // Fetch all metrics
+        final metricsReq = await client.get('127.0.0.1', port, '/api/metrics');
+        final metricsResp = await metricsReq.close();
+        final metricsBody = await _readBody(metricsResp);
+
+        expect(metricsResp.statusCode, 200);
+        expect(metricsBody['totalMetrics'], 2);
+        expect(metricsBody['successful'], 1);
+        expect(metricsBody['failed'], 1);
+
+        // Fetch errors only
+        final errorsReq = await client.get('127.0.0.1', port, '/api/errors');
+        final errorsResp = await errorsReq.close();
+        final errorsBody = await _readBody(errorsResp);
+
+        expect(errorsResp.statusCode, 200);
+        expect(errorsBody['totalErrors'], 1);
+        final errors = errorsBody['errors'] as List;
+        expect(errors.length, 1);
+        expect(errors[0]['statusCode'], 500);
       } finally {
         client.close();
         HttpOverrides.global = savedOverrides;
@@ -1104,6 +1207,53 @@ class _MockRelayHandler implements RelayHandler {
       'prompt': '# Test Blueprint',
       'terrainSummary': {'screens': 3, 'transitions': 5},
       'stratagemCount': 7,
+    };
+  }
+
+  @override
+  Map<String, dynamic> getApiMetrics() {
+    return {
+      'totalMetrics': 2,
+      'metrics': [
+        {
+          'method': 'GET',
+          'url': 'https://api.example.com/quests',
+          'statusCode': 200,
+          'durationMs': 142,
+          'success': true,
+          'cached': false,
+          'timestamp': '2025-01-01T00:00:00.000Z',
+        },
+        {
+          'method': 'POST',
+          'url': 'https://api.example.com/quests',
+          'statusCode': 500,
+          'durationMs': 3200,
+          'success': false,
+          'error': 'Internal Server Error',
+          'cached': false,
+          'timestamp': '2025-01-01T00:01:00.000Z',
+        },
+      ],
+    };
+  }
+
+  @override
+  Map<String, dynamic> getApiErrors() {
+    return {
+      'totalErrors': 1,
+      'errors': [
+        {
+          'method': 'POST',
+          'url': 'https://api.example.com/quests',
+          'statusCode': 500,
+          'durationMs': 3200,
+          'success': false,
+          'error': 'Internal Server Error',
+          'cached': false,
+          'timestamp': '2025-01-01T00:01:00.000Z',
+        },
+      ],
     };
   }
 }
