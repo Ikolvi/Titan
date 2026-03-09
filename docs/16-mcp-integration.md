@@ -22,6 +22,8 @@ Titan provides a Model Context Protocol (MCP) server that gives AI assistants re
   - [Cline (VS Code)](#cline)
 - [App Configuration](#app-configuration)
 - [Server CLI Options](#server-cli-options)
+  - [TLS / SSL](#tls--ssl)
+  - [Authentication](#authentication)
 - [Tool Reference](#tool-reference)
   - [Screen Observation (Scry)](#screen-observation-scry)
   - [Blueprint Analysis](#blueprint-analysis)
@@ -765,6 +767,7 @@ The MCP server reads these files for static analysis tools (`get_terrain`, `get_
 | `--transport` | `stdio` | Transport type: `stdio`, `sse`, `ws`, `streamable`, or `auto` |
 | `--tls-cert` | *(none)* | Path to TLS certificate chain (PEM). Enables HTTPS/WSS when paired with `--tls-key` |
 | `--tls-key` | *(none)* | Path to TLS private key (PEM). Enables HTTPS/WSS when paired with `--tls-cert` |
+| `--auth-token` | *(none)* | Require Bearer token authentication on all data endpoints (health check remains public) |
 
 ### TLS / SSL
 
@@ -792,6 +795,69 @@ final client = McpWebSocketClient(
   trustSelfSigned: true, // Development only — do not use in production
 );
 await client.connect();
+```
+
+### Authentication
+
+All HTTP-based transports support Bearer token authentication when
+`--auth-token` is provided. The health check endpoint (`GET /health`) always
+remains public so monitoring tools can verify the server is running.
+
+```bash
+# Start the server with authentication
+dart run titan_colossus:blueprint_mcp_server \
+  --transport auto --auto-port 3001 \
+  --auth-token my-secret-token
+```
+
+Clients must include the token in the `Authorization` header:
+
+```
+Authorization: Bearer my-secret-token
+```
+
+For **WebSocket** connections, browsers cannot set custom headers during the
+handshake. As a fallback, the token can also be sent as a query parameter:
+
+```
+ws://localhost:3001/ws?token=my-secret-token
+```
+
+The `McpWebSocketClient` sends the token via both mechanisms automatically:
+
+```dart
+final client = McpWebSocketClient(
+  Uri.parse('ws://localhost:3001/ws'),
+  authToken: 'my-secret-token',
+);
+await client.connect();
+```
+
+Combine TLS and authentication for production deployments:
+
+```bash
+dart run titan_colossus:blueprint_mcp_server \
+  --transport auto --auto-port 3001 \
+  --tls-cert cert.pem --tls-key key.pem \
+  --auth-token my-secret-token
+```
+
+```dart
+final client = McpWebSocketClient(
+  Uri.parse('wss://localhost:3001/ws'),
+  authToken: 'my-secret-token',
+  trustSelfSigned: true, // Only for self-signed certs in development
+);
+```
+
+Requests without a valid token receive a **401** JSON-RPC error response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "error": { "code": -32001, "message": "Unauthorized" },
+  "id": null
+}
 ```
 
 ### Running manually (for testing)

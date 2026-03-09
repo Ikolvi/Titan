@@ -66,6 +66,9 @@ class McpWebSocketClient {
   ///   (default: 90s). Set to `null` to disable heartbeat monitoring.
   /// - [trustSelfSigned]: When `true`, accepts self-signed TLS certificates
   ///   for `wss://` connections. **Do not use in production.**
+  /// - [authToken]: Optional Bearer token for authentication. Sent as
+  ///   an `Authorization: Bearer <token>` header, or as a `?token=`
+  ///   query parameter if the URL already has query params.
   McpWebSocketClient(
     this.url, {
     this.maxRetries = 10,
@@ -73,6 +76,7 @@ class McpWebSocketClient {
     this.maxDelay = const Duration(seconds: 30),
     this.heartbeatTimeout = const Duration(seconds: 90),
     this.trustSelfSigned = false,
+    this.authToken,
   });
 
   /// The WebSocket URL to connect to.
@@ -98,6 +102,13 @@ class McpWebSocketClient {
   /// for `wss://` connections. Useful for local development with
   /// self-signed certs. **Do not use in production.**
   final bool trustSelfSigned;
+
+  /// Optional Bearer token for authentication.
+  ///
+  /// When set, the token is included either as an HTTP header
+  /// (`Authorization: Bearer <token>`) or as a query parameter
+  /// (`?token=<token>`) depending on the WebSocket implementation.
+  final String? authToken;
 
   WebSocket? _socket;
   int _retryCount = 0;
@@ -202,16 +213,33 @@ class McpWebSocketClient {
     try {
       _statusController.add(McpConnectionStatus.connecting);
 
+      // Build the connection URL with optional auth query parameter
+      final connectUrl = authToken != null
+          ? url.replace(
+              queryParameters: {...url.queryParameters, 'token': authToken!},
+            )
+          : url;
+
+      // Build optional headers for auth
+      final headers = <String, dynamic>{};
+      if (authToken != null) {
+        headers['Authorization'] = 'Bearer $authToken';
+      }
+
       if (trustSelfSigned && url.scheme == 'wss') {
         // Create a custom HttpClient that accepts self-signed certificates
         final httpClient = HttpClient()
           ..badCertificateCallback = (_, _, _) => true;
         _socket = await WebSocket.connect(
-          url.toString(),
+          connectUrl.toString(),
+          headers: headers.isEmpty ? null : headers,
           customClient: httpClient,
         );
       } else {
-        _socket = await WebSocket.connect(url.toString());
+        _socket = await WebSocket.connect(
+          connectUrl.toString(),
+          headers: headers.isEmpty ? null : headers,
+        );
       }
 
       _retryCount = 0;

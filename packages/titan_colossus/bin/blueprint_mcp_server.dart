@@ -148,6 +148,8 @@ Future<void> main(List<String> args) async {
           server._tlsCertPath = args[i + 1];
         case '--tls-key':
           server._tlsKeyPath = args[i + 1];
+        case '--auth-token':
+          server._authToken = args[i + 1];
       }
     }
   }
@@ -189,12 +191,78 @@ class _BlueprintMcpServer {
   String _autoHost = '127.0.0.1';
   String? _tlsCertPath;
   String? _tlsKeyPath;
+  String? _authToken;
 
   /// Whether TLS is enabled (both cert and key provided).
   bool get _tlsEnabled => _tlsCertPath != null && _tlsKeyPath != null;
 
   /// The scheme prefix based on TLS config (`https` or `http`).
   String get _scheme => _tlsEnabled ? 'https' : 'http';
+
+  /// Validates the `Authorization: Bearer <token>` header on [request].
+  ///
+  /// Returns `true` if auth is not required (no [_authToken] set) or
+  /// the header matches. Returns `false` and sends a 401 response if
+  /// the token is missing or invalid.
+  bool _checkAuth(HttpRequest request) {
+    if (_authToken == null) return true;
+
+    final header = request.headers.value('Authorization');
+    if (header == 'Bearer $_authToken') return true;
+
+    request.response
+      ..statusCode = 401
+      ..headers.contentType = ContentType.json
+      ..write(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'error': {
+            'code': -32600,
+            'message': 'Unauthorized: missing or invalid Bearer token',
+          },
+          'id': null,
+        }),
+      )
+      ..close();
+    return false;
+  }
+
+  /// Validates auth for a WebSocket upgrade request.
+  ///
+  /// Checks the `Authorization` header and also supports passing the
+  /// token via the `token` query parameter (useful for browser clients
+  /// that cannot set headers on WebSocket upgrades):
+  ///
+  /// ```
+  /// ws://host:port/ws?token=SECRET
+  /// ```
+  bool _checkWsAuth(HttpRequest request) {
+    if (_authToken == null) return true;
+
+    // Check Authorization header first
+    final header = request.headers.value('Authorization');
+    if (header == 'Bearer $_authToken') return true;
+
+    // Fallback: check query parameter (for browser WebSocket clients)
+    final queryToken = request.uri.queryParameters['token'];
+    if (queryToken == _authToken) return true;
+
+    request.response
+      ..statusCode = 401
+      ..headers.contentType = ContentType.json
+      ..write(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'error': {
+            'code': -32600,
+            'message': 'Unauthorized: missing or invalid Bearer token',
+          },
+          'id': null,
+        }),
+      )
+      ..close();
+    return false;
+  }
 
   /// Binds an HTTP server with optional TLS.
   ///
@@ -306,6 +374,9 @@ class _BlueprintMcpServer {
           ..close();
         continue;
       }
+
+      // Authenticate all non-health requests
+      if (!_checkAuth(request)) continue;
 
       // SSE endpoint — server→client stream
       if (method == 'GET' && path == '/sse') {
@@ -453,6 +524,9 @@ class _BlueprintMcpServer {
 
       // WebSocket upgrade
       if (method == 'GET' && path == '/ws') {
+        // Auth check — supports header and query parameter
+        if (!_checkWsAuth(request)) continue;
+
         final isUpgrade = WebSocketTransformer.isUpgradeRequest(request);
         if (!isUpgrade) {
           request.response
@@ -589,6 +663,9 @@ class _BlueprintMcpServer {
           ..close();
         continue;
       }
+
+      // Authenticate all non-health requests
+      if (!_checkAuth(request)) continue;
 
       // --- MCP endpoint ---
       if (path == '/mcp') {
@@ -862,6 +939,9 @@ class _BlueprintMcpServer {
 
       // ── WebSocket: GET /ws ──
       if (method == 'GET' && path == '/ws') {
+        // Auth check — supports header and query parameter
+        if (!_checkWsAuth(request)) continue;
+
         if (!WebSocketTransformer.isUpgradeRequest(request)) {
           request.response
             ..statusCode = 400
@@ -916,6 +996,9 @@ class _BlueprintMcpServer {
 
       // ── Legacy SSE: GET /sse ──
       if (method == 'GET' && path == '/sse') {
+        // Auth check
+        if (!_checkAuth(request)) continue;
+
         request.response.headers
           ..set('Content-Type', 'text/event-stream')
           ..set('Cache-Control', 'no-cache')
@@ -937,6 +1020,9 @@ class _BlueprintMcpServer {
 
       // ── Legacy SSE: POST /message ──
       if (method == 'POST' && path == '/message') {
+        // Auth check
+        if (!_checkAuth(request)) continue;
+
         try {
           final body = await utf8.decodeStream(request);
           final rpcRequest = jsonDecode(body) as Map<String, dynamic>;
@@ -982,6 +1068,9 @@ class _BlueprintMcpServer {
 
       // ── Streamable HTTP: /mcp ──
       if (path == '/mcp') {
+        // Auth check
+        if (!_checkAuth(request)) continue;
+
         // DELETE — terminate session
         if (method == 'DELETE') {
           final sessionId = request.headers.value('mcp-session-id');
