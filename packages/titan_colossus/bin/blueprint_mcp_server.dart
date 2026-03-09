@@ -806,13 +806,14 @@ class _BlueprintMcpServer {
           {
             'name': 'get_api_metrics',
             'description':
-                'Get tracked API metrics from Envoy HTTP client. '
-                'Shows all HTTP requests made through Envoy, '
-                'including method, URL, status code, duration, '
-                'success/failure, and caching status. Useful for '
-                'understanding API performance and identifying '
-                'slow or failing endpoints. Requires Envoy to be '
-                'connected via MetricsCourier → Colossus.trackApiMetric.',
+                'Get tracked API metrics from Envoy HTTP client with '
+                'latency percentiles (p50/p95/p99), success rate, and '
+                'endpoint grouping. Shows all HTTP requests made through '
+                'Envoy, including method, URL, status code, duration, '
+                'success/failure, and caching status. Endpoints are '
+                'auto-grouped by URL pattern (numeric IDs and UUIDs '
+                'normalized). Requires Envoy to be connected via '
+                'MetricsCourier → Colossus.trackApiMetric.',
             'inputSchema': {'type': 'object', 'properties': {}},
           },
           {
@@ -3769,9 +3770,14 @@ class _BlueprintMcpServer {
     final total = data['totalMetrics'] as int? ?? 0;
     final successful = data['successful'] as int? ?? 0;
     final failed = data['failed'] as int? ?? 0;
+    final successRate = data['successRate'] ?? 100.0;
     final avgMs = data['avgDurationMs'] as int? ?? 0;
+    final p50 = data['p50Ms'] as int? ?? 0;
+    final p95 = data['p95Ms'] as int? ?? 0;
+    final p99 = data['p99Ms'] as int? ?? 0;
     final maxStored = data['maxStored'] as int? ?? 500;
     final metrics = data['metrics'] as List<dynamic>? ?? [];
+    final byEndpoint = data['byEndpoint'] as List<dynamic>? ?? [];
 
     buf.writeln('# API Metrics (Envoy)');
     buf.writeln();
@@ -3779,7 +3785,7 @@ class _BlueprintMcpServer {
       '**Total:** $total | '
       '**Successful:** $successful | '
       '**Failed:** $failed | '
-      '**Avg Duration:** ${avgMs}ms | '
+      '**Success Rate:** $successRate% | '
       '**Max Stored:** $maxStored',
     );
     buf.writeln();
@@ -3796,6 +3802,36 @@ class _BlueprintMcpServer {
       return buf.toString();
     }
 
+    // Latency percentiles
+    buf.writeln('## Latency Percentiles');
+    buf.writeln();
+    buf.writeln('| Avg | p50 | p95 | p99 |');
+    buf.writeln('|-----|-----|-----|-----|');
+    buf.writeln('| ${avgMs}ms | ${p50}ms | ${p95}ms | ${p99}ms |');
+    buf.writeln();
+
+    // Endpoint grouping
+    if (byEndpoint.isNotEmpty) {
+      buf.writeln('## Endpoint Breakdown');
+      buf.writeln();
+      buf.writeln('| Endpoint | Requests | Avg | p95 | Error Rate |');
+      buf.writeln('|----------|----------|-----|-----|------------|');
+      for (final ep in byEndpoint) {
+        final entry = ep as Map<String, dynamic>;
+        buf.writeln(
+          '| ${entry['pattern']} '
+          '| ${entry['count']} '
+          '| ${entry['avgMs']}ms '
+          '| ${entry['p95Ms']}ms '
+          '| ${entry['errorRate']}% |',
+        );
+      }
+      buf.writeln();
+    }
+
+    // Recent requests table
+    buf.writeln('## Recent Requests');
+    buf.writeln();
     buf.writeln('| # | Method | URL | Status | Duration | Cached | Time |');
     buf.writeln('|---|--------|-----|--------|----------|--------|------|');
     for (var i = 0; i < metrics.length; i++) {

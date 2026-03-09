@@ -76,6 +76,9 @@ enum MarkCategory {
   /// Widget rebuild metric.
   rebuild,
 
+  /// API / HTTP request metric.
+  api,
+
   /// User-defined custom metric.
   custom,
 }

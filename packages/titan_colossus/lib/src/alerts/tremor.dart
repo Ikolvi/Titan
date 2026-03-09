@@ -186,6 +186,52 @@ class Tremor {
     );
   }
 
+  /// Alert when API average latency exceeds [threshold] duration.
+  ///
+  /// Evaluates the average duration of recent API requests and fires
+  /// when it exceeds the given threshold.
+  ///
+  /// ```dart
+  /// Tremor.apiLatency(threshold: Duration(milliseconds: 500))
+  /// ```
+  factory Tremor.apiLatency({
+    Duration threshold = const Duration(milliseconds: 500),
+    TremorSeverity severity = TremorSeverity.warning,
+    bool once = false,
+  }) {
+    return Tremor(
+      name: 'api_latency_high',
+      category: MarkCategory.api,
+      severity: severity,
+      once: once,
+      check: (ctx) =>
+          ctx.apiRequestCount > 0 &&
+          ctx.apiAvgLatencyMs > threshold.inMilliseconds,
+    );
+  }
+
+  /// Alert when API error rate exceeds [threshold] percent (0.0–100.0).
+  ///
+  /// Evaluates the percentage of failed API requests and fires when
+  /// it exceeds the given threshold.
+  ///
+  /// ```dart
+  /// Tremor.apiErrorRate(threshold: 10) // Alert when > 10% errors
+  /// ```
+  factory Tremor.apiErrorRate({
+    double threshold = 10,
+    TremorSeverity severity = TremorSeverity.warning,
+    bool once = false,
+  }) {
+    return Tremor(
+      name: 'api_error_rate',
+      category: MarkCategory.api,
+      severity: severity,
+      once: once,
+      check: (ctx) => ctx.apiRequestCount > 0 && ctx.apiErrorRate > threshold,
+    );
+  }
+
   @override
   String toString() => 'Tremor($name, ${severity.name})';
 }
@@ -226,6 +272,15 @@ class TremorContext {
   /// Widget rebuild counts by label.
   final Map<String, int> rebuildsPerWidget;
 
+  /// Average API request latency in milliseconds.
+  final double apiAvgLatencyMs;
+
+  /// API error rate as a percentage (0.0–100.0).
+  final double apiErrorRate;
+
+  /// Total number of API requests tracked.
+  final int apiRequestCount;
+
   /// Creates a [TremorContext].
   const TremorContext({
     required this.fps,
@@ -234,6 +289,9 @@ class TremorContext {
     required this.leakSuspects,
     required this.lastPageLoad,
     required this.rebuildsPerWidget,
+    this.apiAvgLatencyMs = 0,
+    this.apiErrorRate = 0,
+    this.apiRequestCount = 0,
   });
 }
 

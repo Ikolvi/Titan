@@ -246,6 +246,7 @@ class Colossus extends Pillar {
     if (_apiMetrics.length > _maxApiMetrics) {
       _apiMetrics.removeAt(0);
     }
+    _evaluateTremors();
   }
 
   // -----------------------------------------------------------------------
@@ -720,6 +721,19 @@ class Colossus extends Pillar {
   void _evaluateTremors() {
     if (_tremors.isEmpty) return;
 
+    // Compute API stats for TremorContext
+    final apiCount = _apiMetrics.length;
+    double apiAvgLatency = 0;
+    double apiErrRate = 0;
+    if (apiCount > 0) {
+      final totalDuration = _apiMetrics
+          .map((m) => ((m['durationMs'] as num?) ?? 0).toDouble())
+          .fold<double>(0, (a, b) => a + b);
+      apiAvgLatency = totalDuration / apiCount;
+      final failed = _apiMetrics.where((m) => m['success'] != true).length;
+      apiErrRate = (failed / apiCount) * 100;
+    }
+
     final context = TremorContext(
       fps: pulse.fps,
       jankRate: pulse.jankRate,
@@ -727,6 +741,9 @@ class Colossus extends Pillar {
       leakSuspects: vessel.leakSuspects,
       lastPageLoad: stride.lastPageLoad,
       rebuildsPerWidget: _rebuildsPerWidget,
+      apiAvgLatencyMs: apiAvgLatency,
+      apiErrorRate: apiErrRate,
+      apiRequestCount: apiCount,
     );
 
     for (final tremor in _tremors) {
@@ -768,6 +785,12 @@ class Colossus extends Pillar {
       'excessive_rebuilds' => 'Excessive rebuilds detected',
       'leak_detected' =>
         'Leak suspects: ${context.leakSuspects.map((s) => s.typeName).join(', ')}',
+      'api_latency_high' =>
+        'API avg latency ${context.apiAvgLatencyMs.toStringAsFixed(0)}ms '
+            '(${context.apiRequestCount} requests)',
+      'api_error_rate' =>
+        'API error rate ${context.apiErrorRate.toStringAsFixed(1)}% '
+            '(${context.apiRequestCount} requests)',
       _ => '${tremor.name} threshold breached',
     };
   }
@@ -1830,21 +1853,122 @@ class _ColossusRelayHandler implements RelayHandler {
     final metrics = _colossus.apiMetrics;
     final successful = metrics.where((m) => m['success'] == true).length;
     final failed = metrics.length - successful;
-    final avgDuration = metrics.isEmpty
-        ? 0
-        : metrics
-                  .map((m) => (m['durationMs'] as num?) ?? 0)
-                  .fold<num>(0, (a, b) => a + b) /
-              metrics.length;
+
+    // Compute durations list
+    final durations = metrics
+        .map((m) => ((m['durationMs'] as num?) ?? 0).toDouble())
+        .toList();
+
+    final avgDuration = durations.isEmpty
+        ? 0.0
+        : durations.fold<double>(0, (a, b) => a + b) / durations.length;
+
+    // Percentiles
+    final p50 = _percentile(durations, 50);
+    final p95 = _percentile(durations, 95);
+    final p99 = _percentile(durations, 99);
+
+    // Success rate
+    final successRate = metrics.isEmpty
+        ? 100.0
+        : (successful / metrics.length) * 100;
+
+    // Endpoint grouping
+    final byEndpoint = _groupByEndpoint(metrics);
 
     return {
       'totalMetrics': metrics.length,
       'successful': successful,
       'failed': failed,
+      'successRate': double.parse(successRate.toStringAsFixed(1)),
       'avgDurationMs': avgDuration.round(),
+      'p50Ms': p50.round(),
+      'p95Ms': p95.round(),
+      'p99Ms': p99.round(),
       'maxStored': Colossus._maxApiMetrics,
+      'byEndpoint': byEndpoint,
       'metrics': metrics,
     };
+  }
+
+  /// Compute the [percentile]-th percentile from a list of values.
+  ///
+  /// Returns 0 for an empty list.
+  static double _percentile(List<double> values, int percentile) {
+    if (values.isEmpty) return 0;
+    final sorted = List<double>.from(values)..sort();
+    final index = ((percentile / 100) * (sorted.length - 1)).round();
+    return sorted[index.clamp(0, sorted.length - 1)];
+  }
+
+  /// Group API metrics by endpoint pattern and compute per-group stats.
+  static List<Map<String, dynamic>> _groupByEndpoint(
+    List<Map<String, dynamic>> metrics,
+  ) {
+    final groups = <String, List<Map<String, dynamic>>>{};
+
+    for (final m in metrics) {
+      final url = (m['url'] as String?) ?? '';
+      final pattern = _normalizeEndpoint(url);
+      (groups[pattern] ??= []).add(m);
+    }
+
+    final result = <Map<String, dynamic>>[];
+    for (final entry in groups.entries) {
+      final groupMetrics = entry.value;
+      final groupDurations = groupMetrics
+          .map((m) => ((m['durationMs'] as num?) ?? 0).toDouble())
+          .toList();
+      final groupSuccessful = groupMetrics
+          .where((m) => m['success'] == true)
+          .length;
+      final errorRate = groupMetrics.isEmpty
+          ? 0.0
+          : ((groupMetrics.length - groupSuccessful) / groupMetrics.length) *
+                100;
+      final avgMs = groupDurations.isEmpty
+          ? 0.0
+          : groupDurations.fold<double>(0, (a, b) => a + b) /
+                groupDurations.length;
+
+      result.add({
+        'pattern': entry.key,
+        'count': groupMetrics.length,
+        'avgMs': avgMs.round(),
+        'p95Ms': _percentile(groupDurations, 95).round(),
+        'errorRate': double.parse(errorRate.toStringAsFixed(1)),
+      });
+    }
+
+    // Sort by count descending
+    result.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+
+    return result;
+  }
+
+  /// Normalize a URL into an endpoint pattern by replacing numeric
+  /// path segments and UUIDs with `:id`.
+  static String _normalizeEndpoint(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final segments = uri.pathSegments.map((s) {
+        // Replace UUIDs
+        if (RegExp(
+          r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+          r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+        ).hasMatch(s)) {
+          return ':id';
+        }
+        // Replace pure numeric segments
+        if (RegExp(r'^\d+$').hasMatch(s)) {
+          return ':id';
+        }
+        return s;
+      });
+      return '/${segments.join('/')}';
+    } catch (_) {
+      return url;
+    }
   }
 
   @override
