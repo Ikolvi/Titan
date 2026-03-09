@@ -228,8 +228,14 @@ class RelayPlatform {
       final message = jsonDecode(dataStr) as Map<String, dynamic>;
       final id = message['id'] as String?;
       final method = message['method'] as String? ?? 'GET';
-      final path = message['path'] as String? ?? '/';
+      final rawPath = message['path'] as String? ?? '/';
       final body = message['body'] as Map<String, dynamic>?;
+
+      // Strip query parameters — route matching uses path only.
+      // Query params are parsed separately when needed.
+      final uri = Uri.tryParse(rawPath);
+      final path = uri?.path ?? rawPath;
+      final queryParams = uri?.queryParameters ?? const {};
 
       if (id == null) {
         _chronicle?.warning('Relay received message without id');
@@ -239,7 +245,7 @@ class RelayPlatform {
       _requestsHandled++;
 
       // Route the command asynchronously.
-      unawaited(_handleCommand(id, method, path, body));
+      unawaited(_handleCommand(id, method, path, body, queryParams));
     } catch (e) {
       _chronicle?.warning('Relay message parse error: $e');
     }
@@ -250,6 +256,7 @@ class RelayPlatform {
     String method,
     String path,
     Map<String, dynamic>? body,
+    Map<String, String> queryParams,
   ) async {
     final handler = _handler;
     if (handler == null) {
@@ -258,7 +265,13 @@ class RelayPlatform {
     }
 
     try {
-      final result = await _routeCommand(handler, method, path, body);
+      final result = await _routeCommand(
+        handler,
+        method,
+        path,
+        body,
+        queryParams,
+      );
       _sendResponse(id, 200, body: result);
     } catch (e, st) {
       _chronicle?.warning('Relay command error ($method $path): $e');
@@ -274,6 +287,7 @@ class RelayPlatform {
     String method,
     String path,
     Map<String, dynamic>? body,
+    Map<String, String> queryParams,
   ) async {
     switch ((method, path)) {
       case ('GET', '/health'):
@@ -397,7 +411,10 @@ class RelayPlatform {
         return handler.getRouteHistory();
 
       case ('GET', '/screenshot'):
-        final pixelRatio = (body?['pixelRatio'] as num?)?.toDouble() ?? 0.5;
+        final pixelRatio =
+            (body?['pixelRatio'] as num?)?.toDouble() ??
+            double.tryParse(queryParams['pixelRatio'] ?? '') ??
+            0.5;
         return await handler.captureScreenshot(pixelRatio: pixelRatio);
 
       case ('GET', '/accessibility'):
