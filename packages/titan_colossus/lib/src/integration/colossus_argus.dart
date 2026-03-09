@@ -49,6 +49,33 @@ class ColossusArgus {
   /// Whether Argus auth events are currently being forwarded to Colossus.
   static bool get isConnected => _dispose != null;
 
+  // ── Counters & timestamps ──────────────────────────────────────────
+
+  /// Total login events observed since [connect].
+  static int get loginCount => _loginCount;
+  static int _loginCount = 0;
+
+  /// Total logout events observed since [connect].
+  static int get logoutCount => _logoutCount;
+  static int _logoutCount = 0;
+
+  /// Timestamp of the most recent login event, or `null`.
+  static DateTime? get lastLoginTime => _lastLoginTime;
+  static DateTime? _lastLoginTime;
+
+  /// Timestamp of the most recent logout event, or `null`.
+  static DateTime? get lastLogoutTime => _lastLogoutTime;
+  static DateTime? _lastLogoutTime;
+
+  /// Start of the current authenticated session, or `null` if logged out.
+  static DateTime? get currentSessionStart => _currentSessionStart;
+  static DateTime? _currentSessionStart;
+
+  /// Durations of completed sessions (login → logout), newest last.
+  static List<Duration> get sessionDurations =>
+      List.unmodifiable(_sessionDurations);
+  static final List<Duration> _sessionDurations = [];
+
   /// Connects the DI-registered [Argus] to [Colossus] for automatic
   /// auth event tracking.
   ///
@@ -72,6 +99,22 @@ class ColossusArgus {
     final argus = Titan.get<Argus>();
     _dispose = argus.isLoggedIn.listen((loggedIn) {
       if (!Colossus.isActive) return;
+
+      final now = DateTime.now();
+
+      if (loggedIn) {
+        _loginCount++;
+        _lastLoginTime = now;
+        _currentSessionStart = now;
+      } else {
+        _logoutCount++;
+        _lastLogoutTime = now;
+        if (_currentSessionStart != null) {
+          _sessionDurations.add(now.difference(_currentSessionStart!));
+          _currentSessionStart = null;
+        }
+      }
+
       Colossus.instance.trackEvent({
         'source': 'argus',
         'type': loggedIn ? 'login' : 'logout',
@@ -85,5 +128,11 @@ class ColossusArgus {
   static void disconnect() {
     _dispose?.call();
     _dispose = null;
+    _loginCount = 0;
+    _logoutCount = 0;
+    _lastLoginTime = null;
+    _lastLogoutTime = null;
+    _currentSessionStart = null;
+    _sessionDurations.clear();
   }
 }

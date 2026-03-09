@@ -96,6 +96,7 @@ export 'src/relay.dart';
 export 'src/integration/blueprint_lens_tab.dart';
 export 'src/integration/bridge_lens_tab.dart';
 export 'src/integration/envoy_lens_tab.dart';
+export 'src/integration/argus_lens_tab.dart';
 export 'src/integration/colossus_argus.dart';
 export 'src/integration/colossus_atlas_observer.dart';
 export 'src/integration/colossus_basalt.dart';

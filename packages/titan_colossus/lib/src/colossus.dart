@@ -19,6 +19,7 @@ import 'export/inscribe.dart';
 import 'integration/blueprint_lens_tab.dart';
 import 'integration/bridge_lens_tab.dart';
 import 'integration/envoy_lens_tab.dart';
+import 'integration/argus_lens_tab.dart';
 import 'integration/colossus_lens_tab.dart';
 import 'integration/shade_lens_tab.dart';
 import 'metrics/decree.dart';
@@ -322,6 +323,7 @@ class Colossus extends Pillar {
   BlueprintLensTab? _blueprintLensTab;
   BridgeLensTab? _bridgeLensTab;
   EnvoyLensTab? _envoyLensTab;
+  ArgusLensTab? _argusLensTab;
 
   /// The embedded HTTP server for AI-driven campaign execution.
   ///
@@ -571,6 +573,8 @@ class Colossus extends Pillar {
       Lens.registerPlugin(_bridgeLensTab!);
       _envoyLensTab = EnvoyLensTab(this);
       Lens.registerPlugin(_envoyLensTab!);
+      _argusLensTab = ArgusLensTab(this);
+      Lens.registerPlugin(_argusLensTab!);
     }
 
     // Register Spark text controller factory so useTextController()
@@ -629,6 +633,10 @@ class Colossus extends Pillar {
     if (_envoyLensTab != null) {
       Lens.unregisterPlugin(_envoyLensTab!);
       _envoyLensTab = null;
+    }
+    if (_argusLensTab != null) {
+      Lens.unregisterPlugin(_argusLensTab!);
+      _argusLensTab = null;
     }
 
     // Stop Relay server
