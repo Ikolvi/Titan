@@ -144,6 +144,10 @@ Future<void> main(List<String> args) async {
           server._autoPort = int.parse(args[i + 1]);
         case '--host':
           server._autoHost = args[i + 1];
+        case '--tls-cert':
+          server._tlsCertPath = args[i + 1];
+        case '--tls-key':
+          server._tlsKeyPath = args[i + 1];
       }
     }
   }
@@ -183,6 +187,29 @@ class _BlueprintMcpServer {
   String _streamableHost = '127.0.0.1';
   int _autoPort = 3000;
   String _autoHost = '127.0.0.1';
+  String? _tlsCertPath;
+  String? _tlsKeyPath;
+
+  /// Whether TLS is enabled (both cert and key provided).
+  bool get _tlsEnabled => _tlsCertPath != null && _tlsKeyPath != null;
+
+  /// The scheme prefix based on TLS config (`https` or `http`).
+  String get _scheme => _tlsEnabled ? 'https' : 'http';
+
+  /// Binds an HTTP server with optional TLS.
+  ///
+  /// When [_tlsCertPath] and [_tlsKeyPath] are both set, uses
+  /// [HttpServer.bindSecure] with the provided certificate chain and
+  /// private key. Otherwise, uses plain [HttpServer.bind].
+  Future<HttpServer> _bindServer(String host, int port) async {
+    if (_tlsEnabled) {
+      final context = SecurityContext()
+        ..useCertificateChain(_tlsCertPath!)
+        ..usePrivateKey(_tlsKeyPath!);
+      return HttpServer.bindSecure(host, port, context);
+    }
+    return HttpServer.bind(host, port);
+  }
 
   /// Directory containing the blueprint files, derived from [_blueprintPath].
   String get _blueprintDir => _blueprintPath.contains('/')
@@ -228,8 +255,10 @@ class _BlueprintMcpServer {
   /// Per the MCP spec (2024-11-05), the SSE transport enables browser-based
   /// and remote AI clients to connect without stdio.
   Future<void> runSse() async {
-    final httpServer = await HttpServer.bind(_sseHost, _ssePort);
-    stderr.writeln('MCP SSE server listening on http://$_sseHost:$_ssePort');
+    final httpServer = await _bindServer(_sseHost, _ssePort);
+    stderr.writeln(
+      'MCP SSE server listening on $_scheme://$_sseHost:$_ssePort',
+    );
     stderr.writeln('  SSE endpoint:     GET  /sse');
     stderr.writeln('  Message endpoint: POST /message');
     stderr.writeln('  Health check:     GET  /health');
@@ -377,9 +406,9 @@ class _BlueprintMcpServer {
   /// provides full-duplex communication on a single connection. Each
   /// message is a complete JSON-RPC request or response.
   Future<void> runWs() async {
-    final httpServer = await HttpServer.bind(_wsHost, _wsPort);
+    final httpServer = await _bindServer(_wsHost, _wsPort);
     stderr.writeln(
-      'MCP WebSocket server listening on http://$_wsHost:$_wsPort',
+      'MCP WebSocket server listening on $_scheme://$_wsHost:$_wsPort',
     );
     stderr.writeln('  WebSocket endpoint: GET  /ws');
     stderr.writeln('  Health check:       GET  /health');
@@ -438,19 +467,13 @@ class _BlueprintMcpServer {
         stderr.writeln('WebSocket client connected');
 
         // Heartbeat ping every 30s to detect dead connections
-        final heartbeat = Timer.periodic(
-          const Duration(seconds: 30),
-          (_) {
-            try {
-              socket.add(jsonEncode({
-                'jsonrpc': '2.0',
-                'method': 'ping',
-              }));
-            } catch (_) {
-              // Connection dead — will be cleaned up by onDone
-            }
-          },
-        );
+        final heartbeat = Timer.periodic(const Duration(seconds: 30), (_) {
+          try {
+            socket.add(jsonEncode({'jsonrpc': '2.0', 'method': 'ping'}));
+          } catch (_) {
+            // Connection dead — will be cleaned up by onDone
+          }
+        });
 
         socket.listen(
           (data) async {
@@ -510,10 +533,10 @@ class _BlueprintMcpServer {
   ///
   /// Session management uses the `Mcp-Session-Id` header per the spec.
   Future<void> runStreamable() async {
-    final httpServer = await HttpServer.bind(_streamableHost, _streamablePort);
+    final httpServer = await _bindServer(_streamableHost, _streamablePort);
     stderr.writeln(
       'MCP Streamable HTTP server listening on '
-      'http://$_streamableHost:$_streamablePort',
+      '$_scheme://$_streamableHost:$_streamablePort',
     );
     stderr.writeln('  MCP endpoint:  POST/GET/DELETE /mcp');
     stderr.writeln('  Health check:  GET /health');
@@ -771,9 +794,9 @@ class _BlueprintMcpServer {
   /// - `DELETE /mcp` — Terminate session (Streamable HTTP)
   /// - `GET /health` — Health check
   Future<void> runAuto() async {
-    final httpServer = await HttpServer.bind(_autoHost, _autoPort);
+    final httpServer = await _bindServer(_autoHost, _autoPort);
     stderr.writeln(
-      'MCP auto-detect server listening on http://$_autoHost:$_autoPort',
+      'MCP auto-detect server listening on $_scheme://$_autoHost:$_autoPort',
     );
     stderr.writeln('  Streamable HTTP: POST/GET/DELETE /mcp');
     stderr.writeln('  WebSocket:       GET /ws');
@@ -852,19 +875,13 @@ class _BlueprintMcpServer {
         stderr.writeln('WebSocket client connected (auto)');
 
         // Heartbeat ping every 30s to detect dead connections
-        final heartbeat = Timer.periodic(
-          const Duration(seconds: 30),
-          (_) {
-            try {
-              socket.add(jsonEncode({
-                'jsonrpc': '2.0',
-                'method': 'ping',
-              }));
-            } catch (_) {
-              // Connection dead — will be cleaned up by onDone
-            }
-          },
-        );
+        final heartbeat = Timer.periodic(const Duration(seconds: 30), (_) {
+          try {
+            socket.add(jsonEncode({'jsonrpc': '2.0', 'method': 'ping'}));
+          } catch (_) {
+            // Connection dead — will be cleaned up by onDone
+          }
+        });
 
         socket.listen(
           (data) async {

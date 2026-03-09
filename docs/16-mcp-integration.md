@@ -762,6 +762,37 @@ The MCP server reads these files for static analysis tools (`get_terrain`, `get_
 | `--relay-host` | `127.0.0.1` | Relay HTTP server hostname |
 | `--relay-port` | `8642` | Relay HTTP server port |
 | `--relay-token` | *(none)* | Optional auth token for Relay requests |
+| `--transport` | `stdio` | Transport type: `stdio`, `sse`, `ws`, `streamable`, or `auto` |
+| `--tls-cert` | *(none)* | Path to TLS certificate chain (PEM). Enables HTTPS/WSS when paired with `--tls-key` |
+| `--tls-key` | *(none)* | Path to TLS private key (PEM). Enables HTTPS/WSS when paired with `--tls-cert` |
+
+### TLS / SSL
+
+All HTTP-based transports (SSE, WebSocket, Streamable HTTP, Auto) support TLS
+when `--tls-cert` and `--tls-key` are both provided:
+
+```bash
+# Generate a self-signed certificate (for development)
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem \
+  -days 365 -nodes -subj '/CN=localhost'
+
+# Start the server with TLS
+dart run titan_colossus:blueprint_mcp_server \
+  --transport ws --ws-port 3001 \
+  --tls-cert cert.pem --tls-key key.pem
+```
+
+Clients then connect over `https://` or `wss://` instead of `http://` or `ws://`.
+
+For the Dart `McpWebSocketClient`, use `trustSelfSigned: true` with self-signed certs:
+
+```dart
+final client = McpWebSocketClient(
+  Uri.parse('wss://localhost:3001/ws'),
+  trustSelfSigned: true, // Development only — do not use in production
+);
+await client.connect();
+```
 
 ### Running manually (for testing)
 

@@ -26,6 +26,25 @@ import 'dart:math';
 /// await client.close();
 /// ```
 ///
+/// ## TLS / WSS
+///
+/// For TLS-secured connections, use a `wss://` URL:
+///
+/// ```dart
+/// final client = McpWebSocketClient(
+///   Uri.parse('wss://my-server.example.com:3001/ws'),
+/// );
+/// ```
+///
+/// For local development with self-signed certificates:
+///
+/// ```dart
+/// final client = McpWebSocketClient(
+///   Uri.parse('wss://localhost:3001/ws'),
+///   trustSelfSigned: true, // DO NOT use in production
+/// );
+/// ```
+///
 /// ## Reconnection Strategy
 ///
 /// On disconnect, the client waits with exponential backoff before
@@ -45,15 +64,21 @@ class McpWebSocketClient {
   /// - [maxDelay]: Maximum delay between retries (default: 30s).
   /// - [heartbeatTimeout]: Max time without a ping before reconnect
   ///   (default: 90s). Set to `null` to disable heartbeat monitoring.
+  /// - [trustSelfSigned]: When `true`, accepts self-signed TLS certificates
+  ///   for `wss://` connections. **Do not use in production.**
   McpWebSocketClient(
     this.url, {
     this.maxRetries = 10,
     this.baseDelay = const Duration(milliseconds: 500),
     this.maxDelay = const Duration(seconds: 30),
     this.heartbeatTimeout = const Duration(seconds: 90),
+    this.trustSelfSigned = false,
   });
 
-  /// The WebSocket URL to connect to (e.g., `ws://localhost:3001/ws`).
+  /// The WebSocket URL to connect to.
+  ///
+  /// Use `ws://` for plain connections or `wss://` for TLS-secured
+  /// connections (e.g., `wss://localhost:3001/ws`).
   final Uri url;
 
   /// Maximum number of consecutive reconnect attempts before giving up.
@@ -68,6 +93,11 @@ class McpWebSocketClient {
   /// If no heartbeat ping is received within this duration, the client
   /// reconnects. Set to `null` to disable heartbeat monitoring.
   final Duration? heartbeatTimeout;
+
+  /// When `true`, accepts self-signed or untrusted TLS certificates
+  /// for `wss://` connections. Useful for local development with
+  /// self-signed certs. **Do not use in production.**
+  final bool trustSelfSigned;
 
   WebSocket? _socket;
   int _retryCount = 0;
@@ -171,7 +201,19 @@ class McpWebSocketClient {
   Future<void> _connect() async {
     try {
       _statusController.add(McpConnectionStatus.connecting);
-      _socket = await WebSocket.connect(url.toString());
+
+      if (trustSelfSigned && url.scheme == 'wss') {
+        // Create a custom HttpClient that accepts self-signed certificates
+        final httpClient = HttpClient()
+          ..badCertificateCallback = (_, _, _) => true;
+        _socket = await WebSocket.connect(
+          url.toString(),
+          customClient: httpClient,
+        );
+      } else {
+        _socket = await WebSocket.connect(url.toString());
+      }
+
       _retryCount = 0;
       _statusController.add(McpConnectionStatus.connected);
       _resetHeartbeat();
