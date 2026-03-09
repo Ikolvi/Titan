@@ -25,6 +25,7 @@ class RelayPlatform {
   Future<void> start({
     required RelayConfig config,
     required RelayHandler handler,
+    void Function(bool connected)? onStatusChange,
   }) async {
     // Web platform cannot host HTTP servers.
     // Relay is silently disabled.

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:titan_atlas/titan_atlas.dart';
@@ -357,12 +355,13 @@ class ColossusPlugin extends TitanPlugin {
 
     // Start Relay HTTP server for AI-driven campaign execution.
     // Scheduled post-frame so Colossus is fully initialized first.
-    // Updates Lens.relayConnected reactively so the FAB auto-hides.
+    // The onStatusChange callback reactively hides/shows the FAB.
     if (enableRelay) {
+      instance.relay.onStatusChange = (connected) {
+        Lens.relayConnected.value = connected;
+      };
       SchedulerBinding.instance.addPostFrameCallback((_) {
-        instance.startRelay(config: relayConfig).then((_) {
-          _monitorRelay(instance);
-        });
+        instance.startRelay(config: relayConfig);
       });
     }
 
@@ -393,7 +392,7 @@ class ColossusPlugin extends TitanPlugin {
     // Check whether the MCP Relay is connected — used to hide the
     // ShadeListener indicator (MCP agents control recording via Scry
     // tools instead). The Lens FAB uses Lens.relayConnected notifier
-    // for reactive hiding (set in _monitorRelay).
+    // for reactive hiding (set via Relay.onStatusChange callback).
     final relayRunning = enableRelay && Colossus.isActive
         ? Colossus.instance.relay.status.isRunning
         : false;
@@ -419,9 +418,7 @@ class ColossusPlugin extends TitanPlugin {
 
   @override
   void onDetach() {
-    // Stop relay monitoring
-    _relayMonitor?.cancel();
-    _relayMonitor = null;
+    // Reset relay connection state
     Lens.relayConnected.value = false;
 
     // Auto-export Blueprint data before shutdown
@@ -519,35 +516,6 @@ class ColossusPlugin extends TitanPlugin {
       }
     } catch (_) {
       // Atlas already shut down or not available — no cleanup needed.
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // Relay monitoring — reactive FAB/indicator hiding
-  // -----------------------------------------------------------------------
-
-  static Timer? _relayMonitor;
-
-  /// Polls relay status and updates [Lens.relayConnected] reactively.
-  ///
-  /// On web, the WebSocket connection is async and may reconnect
-  /// after drops. A periodic check ensures the FAB stays hidden
-  /// while the relay is active and reappears when it disconnects.
-  void _monitorRelay(Colossus instance) {
-    // Set initial state
-    _updateRelayConnected(instance);
-
-    // Poll every 2 seconds for status changes (reconnects, drops)
-    _relayMonitor = Timer.periodic(
-      const Duration(seconds: 2),
-      (_) => _updateRelayConnected(instance),
-    );
-  }
-
-  void _updateRelayConnected(Colossus instance) {
-    final connected = instance.relay.isRunning;
-    if (Lens.relayConnected.value != connected) {
-      Lens.relayConnected.value = connected;
     }
   }
 

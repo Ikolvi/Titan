@@ -43,6 +43,7 @@ class RelayPlatform {
   Future<void> start({
     required RelayConfig config,
     required RelayHandler handler,
+    void Function(bool connected)? onStatusChange,
   }) async {
     if (_server != null) return; // Already running
 
@@ -64,6 +65,8 @@ class RelayPlatform {
       if (config.authToken != null) {
         _chronicle?.info('Auth token: ${config.authToken}');
       }
+
+      onStatusChange?.call(true);
 
       // Process requests without blocking the caller
       unawaited(_listen());

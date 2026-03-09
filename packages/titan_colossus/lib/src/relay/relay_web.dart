@@ -46,6 +46,7 @@ class RelayPlatform {
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
   bool _stopping = false;
+  void Function(bool connected)? _onStatusChange;
 
   /// Maximum reconnect delay (exponential backoff cap).
   static const _maxReconnectDelay = Duration(seconds: 30);
@@ -67,11 +68,13 @@ class RelayPlatform {
   Future<void> start({
     required RelayConfig config,
     required RelayHandler handler,
+    void Function(bool connected)? onStatusChange,
   }) async {
     if (_ws != null) return; // Already connected
 
     _config = config;
     _handler = handler;
+    _onStatusChange = onStatusChange;
     _stopping = false;
 
     if (config.enableLogging) {
@@ -137,6 +140,7 @@ class RelayPlatform {
         _startedAt = DateTime.now();
         _reconnectAttempts = 0;
         _chronicle?.info('Relay connected to $url');
+        _onStatusChange?.call(true);
 
         if (!openCompleter.isCompleted) {
           openCompleter.complete();
@@ -152,6 +156,7 @@ class RelayPlatform {
           'Relay WebSocket closed: ${event.code} ${event.reason}',
         );
         _ws = null;
+        _onStatusChange?.call(false);
 
         if (!_stopping) {
           _scheduleReconnect();
