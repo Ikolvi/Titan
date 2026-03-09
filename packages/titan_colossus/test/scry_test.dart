@@ -1067,6 +1067,71 @@ void main() {
 
       expect(step.containsKey('scrollDelta'), isFalse);
     });
+
+    test('swipe includes swipeDirection in step', () {
+      final campaign = scry.buildActionCampaign(
+        action: 'swipe',
+        label: 'Trove',
+        direction: 'left',
+      );
+
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+      final step = steps[0] as Map<String, dynamic>;
+
+      expect(step['swipeDirection'], 'left');
+      expect(step.containsKey('scrollDelta'), isFalse);
+    });
+
+    test('swipe includes swipeDistance when scrollAmount provided', () {
+      final campaign = scry.buildActionCampaign(
+        action: 'swipe',
+        label: 'Tab1',
+        direction: 'right',
+        scrollAmount: 200,
+      );
+
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+      final step = steps[0] as Map<String, dynamic>;
+
+      expect(step['swipeDirection'], 'right');
+      expect(step['swipeDistance'], 200);
+    });
+
+    test('swipe direction in multi-action campaign', () {
+      final campaign = scry.buildMultiActionCampaign([
+        {'action': 'swipe', 'label': 'TabBar', 'direction': 'left'},
+      ]);
+
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+      final step = steps[0] as Map<String, dynamic>;
+
+      expect(step['swipeDirection'], 'left');
+    });
+
+    test('non-swipe action does not include swipeDirection', () {
+      final campaign = scry.buildActionCampaign(
+        action: 'tap',
+        label: 'OK',
+        direction: 'left',
+      );
+
+      final entries = campaign['entries'] as List;
+      final stratagem =
+          (entries[0] as Map)['stratagem'] as Map<String, dynamic>;
+      final steps = stratagem['steps'] as List;
+      final step = steps[0] as Map<String, dynamic>;
+
+      expect(step.containsKey('swipeDirection'), isFalse);
+    });
   });
 
   // ===================================================================

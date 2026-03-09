@@ -1937,6 +1937,11 @@ class Scry {
         'dragTo': {'x': resolvedDragToX, 'y': resolvedDragToY},
       // ignore: use_null_aware_elements
       if (scrollDelta != null) 'scrollDelta': scrollDelta,
+      // For swipe actions, include direction and distance so
+      // StratagemRunner can resolve them from the step JSON.
+      if (action == 'swipe' && direction != null) 'swipeDirection': direction,
+      if (action == 'swipe' && scrollAmount != null)
+        'swipeDistance': scrollAmount,
     };
 
     // For back/navigate, add route
@@ -2059,6 +2064,11 @@ class Scry {
           'dragTo': {'x': resolvedDragToX, 'y': resolvedDragToY},
         // ignore: use_null_aware_elements
         if (scrollDelta != null) 'scrollDelta': scrollDelta,
+        // For swipe actions, include direction and distance.
+        if (action == 'swipe' && entryDirection != null)
+          'swipeDirection': entryDirection,
+        if (action == 'swipe' && entryAmount != null)
+          'swipeDistance': entryAmount,
       };
 
       if (action == 'navigate' && value != null) {

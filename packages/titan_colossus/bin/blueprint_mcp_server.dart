@@ -1934,17 +1934,22 @@ class _BlueprintMcpServer {
                 'direction': {
                   'type': 'string',
                   'description':
-                      'Scroll direction: "down" (default), "up", '
-                      '"left", or "right". Only used with '
-                      'action="scroll".',
+                      'Direction for scroll or swipe actions: '
+                      '"down" (default), "up", "left", or "right". '
+                      'For scroll: dispatches a pointer-scroll '
+                      'event. For swipe: simulates a finger drag '
+                      '(better for horizontal scrollables like '
+                      'TabBar). To scroll a tab bar without '
+                      'changing tabs, use action="swipe" with '
+                      'direction and a label targeting a tab.',
                   'enum': ['down', 'up', 'left', 'right'],
                 },
                 'scrollAmount': {
                   'type': 'number',
                   'description':
-                      'Scroll distance in logical pixels '
-                      '(default: 300). Only used with '
-                      'action="scroll".',
+                      'Distance in logical pixels (default: 300). '
+                      'Used with action="scroll" or '
+                      'action="swipe".',
                 },
                 'actions': {
                   'type': 'array',
@@ -1998,14 +2003,14 @@ class _BlueprintMcpServer {
                       'direction': {
                         'type': 'string',
                         'description':
-                            'Scroll direction: down (default), '
-                            'up, left, right.',
+                            'Direction for scroll or swipe: down '
+                            '(default), up, left, right.',
                         'enum': ['down', 'up', 'left', 'right'],
                       },
                       'scrollAmount': {
                         'type': 'number',
                         'description':
-                            'Scroll distance in pixels '
+                            'Distance in pixels for scroll/swipe '
                             '(default: 300).',
                       },
                     },
