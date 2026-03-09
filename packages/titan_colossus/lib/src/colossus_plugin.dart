@@ -6,6 +6,7 @@ import 'package:titan_bastion/titan_bastion.dart';
 import 'colossus.dart';
 import 'export/blueprint_export.dart';
 import 'integration/colossus_atlas_observer.dart';
+import 'integration/colossus_envoy.dart';
 import 'integration/lens.dart';
 import 'relay/relay.dart';
 import 'widgets/shade_listener.dart';
@@ -220,6 +221,29 @@ class ColossusPlugin extends TitanPlugin {
   /// ```
   final RelayConfig relayConfig;
 
+  /// Whether to auto-connect Envoy HTTP metrics to Colossus.
+  ///
+  /// When `true` (default), ColossusPlugin will look for an [Envoy]
+  /// registered in Titan DI (`Titan.get<Envoy>()`) and automatically
+  /// wire a [MetricsCourier] that forwards every HTTP request metric
+  /// to [Colossus.trackApiMetric]. Zero user configuration needed.
+  ///
+  /// Requires [EnvoyModule.install] to be called before [runApp]:
+  ///
+  /// ```dart
+  /// EnvoyModule.production(baseUrl: 'https://api.example.com');
+  ///
+  /// runApp(
+  ///   Beacon(
+  ///     plugins: [ColossusPlugin()], // auto-wires Envoy → Colossus
+  ///     child: MyApp(),
+  ///   ),
+  /// );
+  /// ```
+  ///
+  /// Gracefully degrades — no error if Envoy is not registered.
+  final bool autoEnvoyMetrics;
+
   /// Creates a ColossusPlugin with the given configuration.
   ///
   /// All parameters mirror [Colossus.init] options. The plugin
@@ -244,6 +268,7 @@ class ColossusPlugin extends TitanPlugin {
     this.blueprintExportDirectory,
     this.enableRelay = false,
     this.relayConfig = const RelayConfig(),
+    this.autoEnvoyMetrics = true,
   });
 
   @override
@@ -296,6 +321,13 @@ class ColossusPlugin extends TitanPlugin {
         instance.startRelay(config: relayConfig);
       });
     }
+
+    // Auto-connect Envoy HTTP metrics to Colossus.
+    // Checks Titan DI for a registered Envoy instance and wires a
+    // MetricsCourier that forwards every request to trackApiMetric().
+    if (autoEnvoyMetrics) {
+      ColossusEnvoy.connect();
+    }
   }
 
   @override
@@ -320,6 +352,11 @@ class ColossusPlugin extends TitanPlugin {
     // Auto-export Blueprint data before shutdown
     if (blueprintExportDirectory != null) {
       _tryBlueprintExport();
+    }
+
+    // Disconnect Envoy metrics before Colossus shuts down.
+    if (autoEnvoyMetrics) {
+      ColossusEnvoy.disconnect();
     }
 
     // Remove Atlas observer before shutdown
