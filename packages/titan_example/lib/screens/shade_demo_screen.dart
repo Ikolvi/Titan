@@ -131,6 +131,10 @@ class _ShadeDemoScreenState extends State<ShadeDemoScreen> {
 
             // --- Interaction Playground ---
             _buildPlayground(theme, colors),
+            const SizedBox(height: 16),
+
+            // --- Gesture Detection Showcase ---
+            _buildGestureDetectionCard(theme, colors),
           ],
         ),
       ),
@@ -1002,6 +1006,238 @@ class _ShadeDemoScreenState extends State<ShadeDemoScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Gesture Detection Showcase (Scry v2.0.3)
+  // -----------------------------------------------------------------------
+
+  Widget _buildGestureDetectionCard(ThemeData theme, ColorScheme colors) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.visibility, color: colors.tertiary),
+                const SizedBox(width: 8),
+                Text(
+                  'Gesture Detection — Scry Visibility',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Scry detects these interactive widgets even when they '
+              'wrap non-text children. Labels are resolved from text '
+              'content, widget Key, or position.',
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.outline),
+            ),
+            const SizedBox(height: 16),
+
+            // 1. GestureDetector with text child — label from text
+            Text(
+              'GestureDetector (text child)',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.outline,
+              ),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => _showGestureSnackBar(context, 'Tap detected!'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.touch_app, color: colors.onPrimaryContainer),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Tap Me — Scry reads this text',
+                      style: TextStyle(color: colors.onPrimaryContainer),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 2. GestureDetector with Key, no text — label from Key
+            Text(
+              'GestureDetector (ValueKey, no text)',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.outline,
+              ),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              key: const ValueKey('quest_action'),
+              onTap: () => _showGestureSnackBar(context, 'Keyed tap!'),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colors.secondaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.star,
+                  size: 32,
+                  color: colors.onSecondaryContainer,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 3. GestureDetector with no text or key — positional fallback
+            Text(
+              'GestureDetector (positional fallback)',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.outline,
+              ),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onDoubleTap: () =>
+                  _showGestureSnackBar(context, 'Double-tap detected!'),
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: colors.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.ads_click, color: colors.onTertiaryContainer),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 4. InkWell with custom child
+            Text(
+              'InkWell (ripple effect)',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.outline,
+              ),
+            ),
+            const SizedBox(height: 4),
+            InkWell(
+              key: const ValueKey('hero_action'),
+              onTap: () => _showGestureSnackBar(context, 'InkWell tapped!'),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: colors.outline),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.water_drop, color: colors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'InkWell with ripple — Scry sees this',
+                      style: TextStyle(color: colors.onSurface),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 5. Disabled GestureDetector — Scry marks as disabled
+            Text(
+              'GestureDetector (disabled — no callbacks)',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.outline,
+              ),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              // No onTap, onLongPress, or onDoubleTap → Scry marks disabled
+              child: Opacity(
+                opacity: 0.4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.block, color: colors.outline),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Disabled — Scry detects no callbacks',
+                        style: TextStyle(color: colors.outline),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 6. GestureDetector with long press
+            Text(
+              'GestureDetector (long press)',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.outline,
+              ),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              key: const ValueKey('long_press_action'),
+              onLongPress: () => _showGestureSnackBar(context, 'Long press!'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.pan_tool, color: colors.onErrorContainer),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Hold me — long press gesture',
+                      style: TextStyle(color: colors.onErrorContainer),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showGestureSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(milliseconds: 800),
       ),
     );
   }
