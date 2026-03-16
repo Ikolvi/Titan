@@ -5,6 +5,13 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] - 2026-03-17
+
+### Performance
+- **Epoch** — Optimized setter: removed redundant `peek() == newValue` check (already done by `TitanState.set()`), skip `_redoStack.clear()` when already empty. ~24% improvement in Epoch Overhead benchmark (2.2× → 1.66×).
+- **TitanComputed / TitanEffect** — Made `_dependencies` Set lazy-nullable. Avoids allocating an empty `HashSet` for nodes that are never tracked, saving ~56 bytes per instance.
+- **TitanObserver** — Added fast-path empty guards on 6 notification methods (`notifyCreated`, `notifyUpdated`, `notifyDisposed`, `notifyDependencyChanged`, `notifyError`, `notifyBatchComplete`). Skips iterator allocation and virtual dispatch when no observers are registered.
+
 ## [1.1.3] - 2026-03-05
 
 ### Performance

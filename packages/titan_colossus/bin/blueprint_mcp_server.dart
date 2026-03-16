@@ -5486,11 +5486,8 @@ class _BlueprintMcpServer {
 
       final result = await _executeRawCampaign(campaign);
 
-      // Settle delay for screen to update after navigation transitions.
-      await Future<void>.delayed(const Duration(milliseconds: 1000));
-
-      // Observe the new screen state
-      final newGaze = await _observeCurrentScreen();
+      // Wait for the screen to settle after navigation transitions.
+      final newGaze = await _settleAndObserve();
       _lastGaze = newGaze;
 
       return _scryEngine.formatActionResult(
@@ -5584,11 +5581,8 @@ class _BlueprintMcpServer {
       final campaign = _scryEngine.buildMultiActionCampaign(resolvedActions);
       final result = await _executeRawCampaign(campaign);
 
-      // Settle delay
-      await Future<void>.delayed(const Duration(milliseconds: 1000));
-
-      // Observe the new screen state
-      final newGaze = await _observeCurrentScreen();
+      // Wait for the screen to settle after navigation transitions.
+      final newGaze = await _settleAndObserve();
       _lastGaze = newGaze;
 
       return _scryEngine.formatMultiActionResult(
@@ -5662,6 +5656,36 @@ class _BlueprintMcpServer {
     final glyphs = tableau['glyphs'] as List<dynamic>? ?? [];
     final route = tableau['route'] as String?;
     return _scryEngine.observe(glyphs, route: route);
+  }
+
+  /// Wait for the screen to settle after an action, then observe.
+  ///
+  /// Polls the Relay at intervals, comparing the route and glyph count.
+  /// Returns once two consecutive reads produce the same route and glyph
+  /// count, or after [maxWait] elapses.
+  Future<ScryGaze> _settleAndObserve() async {
+    const pollInterval = Duration(milliseconds: 300);
+    const maxWait = Duration(milliseconds: 2000);
+    final deadline = DateTime.now().add(maxWait);
+
+    // Initial delay to let the framework process the frame.
+    await Future<void>.delayed(pollInterval);
+
+    var previous = await _observeCurrentScreen();
+    while (DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(pollInterval);
+      final current = await _observeCurrentScreen();
+      if (current.route == previous.route &&
+          current.glyphCount == previous.glyphCount) {
+        _lastGaze = current;
+        return current;
+      }
+      previous = current;
+    }
+
+    // Deadline reached — return the latest observation.
+    _lastGaze = previous;
+    return previous;
   }
 
   // -----------------------------------------------------------------------

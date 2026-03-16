@@ -1215,6 +1215,43 @@ class ScryGaze {
 /// // - **Complete Quest** (IconButton, ×7)
 /// // ...
 /// ```
+
+/// Pre-extracted glyph fields to avoid repeated map lookups and type casts.
+///
+/// Each raw glyph `Map<String, dynamic>` is converted once at the start of
+/// [Scry.observe], then all downstream passes access typed fields directly.
+class _Glyph {
+  _Glyph(Map<String, dynamic> raw)
+    : label = ((raw['l'] as String?) ?? '').trim(),
+      wt = (raw['wt'] as String?) ?? '',
+      x = (raw['x'] as num?)?.toDouble(),
+      y = (raw['y'] as num?)?.toDouble(),
+      w = (raw['w'] as num?)?.toDouble(),
+      h = (raw['h'] as num?)?.toDouble(),
+      depth = (raw['d'] as int?) ?? 0,
+      interactive = raw['ia'] == true,
+      it = raw['it'] as String?,
+      fieldId = raw['fid'] as String?,
+      cv = raw['cv'] as String?,
+      sr = raw['sr'] as String?,
+      enabled = (raw['en'] as bool?) ?? true,
+      key = raw['k'] as String?,
+      ancestors = (raw['anc'] as List<dynamic>?) ?? const [];
+
+  final String label;
+  final String wt;
+  final double? x, y, w, h;
+  final int depth;
+  final bool interactive;
+  final String? it, fieldId, cv, sr;
+  final bool enabled;
+  final String? key;
+  final List<dynamic> ancestors;
+
+  /// Whether label passes length and icon-data filters used in Pass 1/2.
+  bool get validLabel => label.length >= 2 && !label.startsWith('IconData(');
+}
+
 class Scry {
   /// Creates a const [Scry].
   const Scry();
@@ -1256,6 +1293,9 @@ class Scry {
   /// print(gaze.buttons.length); // number of tappable buttons
   /// ```
   ScryGaze observe(List<dynamic> glyphs, {String? route}) {
+    // Pre-extract all glyph data once to avoid repeated map lookups/casts.
+    final gs = [for (final g in glyphs) _Glyph(g as Map<String, dynamic>)];
+
     final interactiveLabels = <String>{};
     final navigationLabels = <String>{};
     final structuralLabels = <String>{};
@@ -1265,128 +1305,87 @@ class Scry {
     final preferredInteractionType = <String, String>{};
     final preferredSemanticRole = <String, String>{};
     final preferredCurrentValue = <String, String>{};
-    // Track interactive label counts for multiplicity.
-    // Only interactive elements can be meaningfully repeated
-    // (e.g. 7 "Delete" buttons in a list). Non-interactive duplicates
-    // (like RichText + Tooltip for the same label) are alternate
-    // representations and should be deduplicated.
     final interactiveLabelCounts = <String, int>{};
 
-    // --- Early overlay detection from raw glyphs ---
-    // Scan before label filtering since dialog widgets (AboutDialog,
-    // AlertDialog) often have no text label and would be filtered out.
+    // --- Pass 1: Classify labels + overlay detection + maxDepth ---
     String? rawOverlayType;
     int rawOverlayDepth = 0;
-    for (final g in glyphs) {
-      final glyph = g as Map<String, dynamic>;
-      final wt = glyph['wt'] as String? ?? '';
-      if (_overlayTypes.contains(wt)) {
-        rawOverlayType = wt;
-        rawOverlayDepth = glyph['d'] as int? ?? 0;
-        break;
+    var maxDepth = 0;
+    for (final g in gs) {
+      // Track maxDepth for overlay detection
+      if (g.depth > maxDepth) maxDepth = g.depth;
+
+      // Overlay detection (first match only)
+      if (rawOverlayType == null && _overlayTypes.contains(g.wt)) {
+        rawOverlayType = g.wt;
+        rawOverlayDepth = g.depth;
       }
-    }
 
-    // --- Pass 1: Classify labels ---
-    for (final g in glyphs) {
-      final glyph = g as Map<String, dynamic>;
-      final label = (glyph['l'] as String? ?? '').trim();
-      if (label.isEmpty || label.length < 2) continue;
-      if (label.startsWith('IconData(')) continue;
-      // Skip PUA icons
-      if (label.length == 1 && label.codeUnitAt(0) > 0xE000) continue;
+      if (!g.validLabel) continue;
 
-      final isInteractive = glyph['ia'] == true;
-      final wt = glyph['wt'] as String? ?? '';
+      final label = g.label;
+      final wt = g.wt;
       final wtLower = wt.toLowerCase();
-      final fieldId = glyph['fid'] as String?;
-      final ancestors = glyph['anc'] as List<dynamic>? ?? [];
 
       // Count interactive occurrences of each label
-      if (isInteractive) {
+      if (g.interactive) {
         interactiveLabelCounts[label] =
             (interactiveLabelCounts[label] ?? 0) + 1;
-      }
-
-      // Track interactive labels
-      if (isInteractive) {
         interactiveLabels.add(label);
       }
 
       // Track field IDs
-      if (fieldId != null && fieldId.isNotEmpty) {
-        fieldIds[label] = fieldId;
+      if (g.fieldId != null && g.fieldId!.isNotEmpty) {
+        fieldIds[label] = g.fieldId!;
       }
 
       // Track text input widgets — these take classification priority
       if (_isTextInputWidget(wt)) {
         textInputLabels.add(label);
         preferredWidgetType[label] = wt;
-        final it = glyph['it'] as String?;
-        if (it != null) preferredInteractionType[label] = it;
-        final sr = glyph['sr'] as String?;
-        if (sr != null) preferredSemanticRole[label] = sr;
-        final cv = glyph['cv'] as String?;
-        if (cv != null) preferredCurrentValue[label] = cv;
+        if (g.it != null) preferredInteractionType[label] = g.it!;
+        if (g.sr != null) preferredSemanticRole[label] = g.sr!;
+        if (g.cv != null) preferredCurrentValue[label] = g.cv!;
       }
 
       // Track interactive widgets as preferred (if no text input yet)
-      if (isInteractive && !preferredWidgetType.containsKey(label)) {
+      if (g.interactive && !preferredWidgetType.containsKey(label)) {
         preferredWidgetType[label] = wt;
-        final it = glyph['it'] as String?;
-        if (it != null) preferredInteractionType[label] = it;
-        final sr = glyph['sr'] as String?;
-        if (sr != null) preferredSemanticRole[label] = sr;
+        if (g.it != null) preferredInteractionType[label] = g.it!;
+        if (g.sr != null) preferredSemanticRole[label] = g.sr!;
       }
 
       // Detect navigation elements
-      if (_isNavigationWidget(wtLower, ancestors)) {
+      if (_isNavigationWidget(wtLower, g.ancestors)) {
         navigationLabels.add(label);
       }
 
       // Detect structural elements (AppBar, toolbar, etc.)
-      if (_isStructuralWidget(wtLower, ancestors)) {
+      if (_isStructuralWidget(wtLower, g.ancestors)) {
         structuralLabels.add(label);
       }
     }
 
     // --- Pass 2: Build elements with spatial/key/depth data ---
-    // For labels that appear only once interactively, dedup as before.
-    // For labels with multiple interactive glyphs, create indexed entries.
-    final elementList = <ScryElement>[];
+    var elementList = <ScryElement>[];
     final seenUnique = <String>{};
     final labelOccurrence = <String, int>{};
 
-    // Find max depth across all glyphs for overlay detection
-    var maxDepth = 0;
-    for (final g in glyphs) {
-      final glyph = g as Map<String, dynamic>;
-      final d = glyph['d'] as int? ?? 0;
-      if (d > maxDepth) maxDepth = d;
-    }
+    for (final g in gs) {
+      if (!g.validLabel) continue;
 
-    for (final g in glyphs) {
-      final glyph = g as Map<String, dynamic>;
-      final label = (glyph['l'] as String? ?? '').trim();
-      if (label.isEmpty || label.length < 2) continue;
-      if (label.startsWith('IconData(')) continue;
-      if (label.length == 1 && label.codeUnitAt(0) > 0xE000) continue;
-
-      final isInteractive = glyph['ia'] == true;
+      final label = g.label;
+      final isInteractive = g.interactive;
       final totalInteractive = interactiveLabelCounts[label] ?? 0;
       final isRepeated = totalInteractive > 1;
 
-      // Multiplicity: only keep multiple instances for interactive elements
-      // with >1 interactive occurrence. Non-interactive duplicates dedup.
       if (isRepeated && isInteractive) {
         // Allow multiple interactive elements with indices
       } else {
-        // Dedup: first occurrence wins
         if (seenUnique.contains(label)) continue;
         seenUnique.add(label);
       }
 
-      // Track occurrence index for repeated interactive labels
       final occurrenceIdx = isRepeated && isInteractive
           ? (labelOccurrence[label] ?? 0)
           : null;
@@ -1395,27 +1394,14 @@ class Scry {
       }
 
       // Use the preferred widget type from Pass 1.
-      final wt = preferredWidgetType[label] ?? (glyph['wt'] as String? ?? '');
-      final sr = preferredSemanticRole[label] ?? (glyph['sr'] as String?);
-      final it = preferredInteractionType[label] ?? (glyph['it'] as String?);
-      final cv = preferredCurrentValue[label] ?? (glyph['cv'] as String?);
-      final isEnabled = glyph['en'] as bool? ?? true;
+      final wt = preferredWidgetType[label] ?? g.wt;
+      final sr = preferredSemanticRole[label] ?? g.sr;
+      final it = preferredInteractionType[label] ?? g.it;
+      final cv = preferredCurrentValue[label] ?? g.cv;
       final fieldId = fieldIds[label];
       final isTextField = textInputLabels.contains(label);
 
-      // Spatial data
-      final x = (glyph['x'] as num?)?.toDouble();
-      final y = (glyph['y'] as num?)?.toDouble();
-      final w = (glyph['w'] as num?)?.toDouble();
-      final h = (glyph['h'] as num?)?.toDouble();
-      final depth = glyph['d'] as int?;
-      final key = glyph['k'] as String?;
-      final ancestors = glyph['anc'] as List<dynamic>? ?? [];
-
-      // Extract ancestor context
-      final context = _extractAncestorContext(ancestors);
-
-      // Determine element kind
+      final context = _extractAncestorContext(g.ancestors);
       final kind = _classifyElement(
         label: label,
         widgetType: wt,
@@ -1427,11 +1413,8 @@ class Scry {
         isTextField: isTextField,
       );
 
-      // Check if this action is gated (destructive)
       final gated = interactiveLabels.contains(label) && _isGatedAction(label);
-
-      // Infer screen region from Y position
-      final region = _inferRegion(y: y, h: h, ancestors: ancestors);
+      final region = _inferRegion(y: g.y, h: g.h, ancestors: g.ancestors);
 
       elementList.add(
         ScryElement(
@@ -1443,14 +1426,14 @@ class Scry {
           currentValue: cv,
           semanticRole: sr,
           interactionType: it,
-          isEnabled: isEnabled,
+          isEnabled: g.enabled,
           gated: gated,
-          x: x,
-          y: y,
-          w: w,
-          h: h,
-          depth: depth,
-          key: key,
+          x: g.x,
+          y: g.y,
+          w: g.w,
+          h: g.h,
+          depth: g.depth,
+          key: g.key,
           context: context,
           occurrenceIndex: isRepeated && isInteractive ? occurrenceIdx : null,
           totalOccurrences: isRepeated && isInteractive
@@ -1462,31 +1445,27 @@ class Scry {
     }
 
     // --- Pass 3: Overlap/occlusion detection ---
-    _detectOverlaps(elementList, maxDepth);
+    elementList = _detectOverlaps(elementList, maxDepth);
 
     // --- Pass 4: Intelligence layer ---
     final alerts = _detectAlerts(
-      glyphs,
+      gs,
       interactiveLabels: interactiveLabels,
       navigationLabels: navigationLabels,
     );
     final dataFields = _extractKeyValuePairs(
-      glyphs,
+      gs,
       interactiveLabels: interactiveLabels,
       navigationLabels: navigationLabels,
     );
     final screenType = _classifyScreen(elementList, alerts, dataFields);
     final suggestions = _generateSuggestions(elementList, screenType, alerts);
-    final formStatus = _analyzeFormStatus(elementList, glyphs);
+    final formStatus = _analyzeFormStatus(elementList, gs);
 
-    // --- Pass 5: Scoring & analysis ---
-    _applyTargetScoring(elementList);
-    _applyReachability(elementList);
-    _applyProminence(elementList);
-    _applyInputTypes(elementList);
-    _applyActionImpacts(elementList);
+    // --- Pass 5: All scoring in a single combined pass ---
+    elementList = _applyAllScoring(elementList);
     final scrollInfo = _analyzeScroll(elementList);
-    final groups = _groupElements(elementList, glyphs);
+    final groups = _groupElements(elementList, gs);
     final landmarks = _detectLandmarks(elementList, screenType);
     final overlay = _analyzeOverlay(
       elementList,
@@ -1500,7 +1479,7 @@ class Scry {
     return ScryGaze(
       elements: elementList,
       route: route,
-      glyphCount: glyphs.length,
+      glyphCount: gs.length,
       screenType: screenType,
       alerts: alerts,
       dataFields: dataFields,
@@ -2519,7 +2498,7 @@ class Scry {
 
   /// Detect errors, warnings, loading states, and notices from raw glyphs.
   List<ScryAlert> _detectAlerts(
-    List<dynamic> glyphs, {
+    List<_Glyph> glyphs, {
     required Set<String> interactiveLabels,
     required Set<String> navigationLabels,
   }) {
@@ -2527,11 +2506,8 @@ class Scry {
     final seenMessages = <String>{};
 
     for (final g in glyphs) {
-      final glyph = g as Map<String, dynamic>;
-      final wt = glyph['wt'] as String? ?? '';
-      final label = (glyph['l'] as String? ?? '').trim();
-      final ancestors = glyph['anc'] as List<dynamic>? ?? [];
-      final ancestorStr = ancestors.join(' ');
+      final wt = g.wt;
+      final label = g.label;
 
       // ErrorWidget — Flutter red error screen (framework / build error)
       if (wt == 'ErrorWidget') {
@@ -2567,15 +2543,11 @@ class Scry {
 
       // Snackbar / MaterialBanner / Toast (by widget type or ancestor)
       if (_noticeWidgetPattern.hasMatch(wt) ||
-          _noticeWidgetPattern.hasMatch(ancestorStr)) {
-        // Skip interactive labels (button text inside a banner)
+          g.ancestors.any((a) => _noticeWidgetPattern.hasMatch(a as String))) {
         if (interactiveLabels.contains(label)) continue;
-        // Skip navigation labels
         if (navigationLabels.contains(label)) continue;
-        // Skip very short labels (likely icon characters, not messages)
         if (label.length < 2) continue;
         if (label.isNotEmpty && seenMessages.add(label)) {
-          // Classify as error if text contains error keywords
           final severity = _errorTextPattern.hasMatch(label)
               ? ScryAlertSeverity.error
               : ScryAlertSeverity.info;
@@ -2587,12 +2559,9 @@ class Scry {
       }
 
       // Error text detection (by content keywords)
-      // Only if the text is short enough to be a message (not paragraphs)
       if (label.isNotEmpty &&
           label.length < 200 &&
           _errorTextPattern.hasMatch(label)) {
-        // Only flag as error if it's clearly an error message, not
-        // random content containing the word "error".
         final lower = label.toLowerCase();
         final isLikelyError =
             lower.startsWith('error') ||
@@ -2637,7 +2606,7 @@ class Scry {
   static final _rawGlyphPattern = RegExp(r'^[\uE000-\uF8FF\uDB80-\uDBFF]');
 
   List<ScryKeyValue> _extractKeyValuePairs(
-    List<dynamic> glyphs, {
+    List<_Glyph> glyphs, {
     required Set<String> interactiveLabels,
     required Set<String> navigationLabels,
   }) {
@@ -2645,33 +2614,25 @@ class Scry {
     final usedLabels = <String>{};
     final seenPairs = <String>{};
 
-    // Pre-populate usedLabels with interactive and navigation labels.
-    // Non-interactive text glyphs sharing the same label as a button or
-    // nav tab should never be paired as key-value data.
     usedLabels.addAll(interactiveLabels);
     usedLabels.addAll(navigationLabels);
 
     // --- Strategy 1: Inline "Key: Value" patterns ---
     for (final g in glyphs) {
-      final glyph = g as Map<String, dynamic>;
-      final label = (glyph['l'] as String? ?? '').trim();
-      if (label.isEmpty) continue;
+      if (g.label.isEmpty) continue;
+      if (g.interactive) continue;
 
-      // Only consider non-interactive, non-structural text
-      if (glyph['ia'] == true) continue;
-
-      final match = _kvInlinePattern.firstMatch(label);
+      final match = _kvInlinePattern.firstMatch(g.label);
       if (match != null) {
         final key = match.group(1)!.trim();
         final value = match.group(2)!.trim();
-        // Skip if key is too long (probably not a label:value pair)
         if (key.length <= 30 && value.isNotEmpty) {
           final pairKey = '$key\x00$value';
           if (seenPairs.add(pairKey)) {
             pairs.add(ScryKeyValue(key: key, value: value));
           }
           usedLabels
-            ..add(label)
+            ..add(g.label)
             ..add(key)
             ..add(value);
         }
@@ -2679,25 +2640,18 @@ class Scry {
     }
 
     // --- Strategy 2: Proximity-based pairing ---
-    // Collect non-interactive text glyphs with positions
     final positioned = <({String label, double x, double y, double w})>[];
     for (final g in glyphs) {
-      final glyph = g as Map<String, dynamic>;
-      final label = (glyph['l'] as String? ?? '').trim();
-      if (label.isEmpty || label.length < 2) continue;
-      if (glyph['ia'] == true) continue;
-      if (usedLabels.contains(label)) continue;
+      if (g.label.isEmpty || g.label.length < 2) continue;
+      if (g.interactive) continue;
+      if (usedLabels.contains(g.label)) continue;
 
-      // Skip icon codepoint labels — not useful as data
-      if (_iconDataPattern.hasMatch(label)) continue;
-      if (_rawGlyphPattern.hasMatch(label)) continue;
+      if (_iconDataPattern.hasMatch(g.label)) continue;
+      if (_rawGlyphPattern.hasMatch(g.label)) continue;
 
-      final x = (glyph['x'] as num?)?.toDouble();
-      final y = (glyph['y'] as num?)?.toDouble();
-      final w = (glyph['w'] as num?)?.toDouble();
-      if (x == null || y == null || w == null) continue;
+      if (g.x == null || g.y == null || g.w == null) continue;
 
-      positioned.add((label: label, x: x, y: y, w: w));
+      positioned.add((label: g.label, x: g.x!, y: g.y!, w: g.w!));
     }
 
     // Sort by y (rows), then x (left to right)
@@ -2957,9 +2911,9 @@ class Scry {
   /// Detect elements obscured by higher-depth overlays.
   ///
   /// A Dialog or modal at depth 50 obscures elements at depth 10
-  /// if their bounding boxes overlap. This mutates element list
-  /// in place by replacing obscured elements with copies.
-  void _detectOverlaps(List<ScryElement> elements, int maxDepth) {
+  /// if their bounding boxes overlap. Returns a new list with
+  /// obscured elements replaced by copies with `obscured: true`.
+  List<ScryElement> _detectOverlaps(List<ScryElement> elements, int maxDepth) {
     // Find the overlay threshold — elements inside Dialog/BottomSheet
     // are typically much deeper than background content.
     // We use the context field to identify overlay elements.
@@ -2974,7 +2928,7 @@ class Scry {
         )
         .toList();
 
-    if (overlayElements.isEmpty) return;
+    if (overlayElements.isEmpty) return elements;
 
     // Compute the bounding box of the overlay
     double? overlayMinX, overlayMinY, overlayMaxX, overlayMaxY;
@@ -3010,43 +2964,36 @@ class Scry {
         overlayMinY == null ||
         overlayMaxX == null ||
         overlayMaxY == null) {
-      return;
+      return elements;
     }
 
-    // Mark non-overlay elements as obscured if they overlap spatially
-    // and have lower depth than the overlay.
-    for (var i = 0; i < elements.length; i++) {
-      final e = elements[i];
-      if (e.context == 'Dialog' ||
-          e.context == 'AlertDialog' ||
-          e.context == 'SimpleDialog' ||
-          e.context == 'BottomSheet' ||
-          e.context == 'ModalBottomSheet') {
-        continue; // Don't mark overlay elements themselves
-      }
+    // Replace non-overlay elements with obscured copies if they overlap
+    // spatially and have lower depth than the overlay.
+    final oMinX = overlayMinX;
+    final oMinY = overlayMinY;
+    final oMaxX = overlayMaxX;
+    final oMaxY = overlayMaxY;
 
-      if (e.depth != null &&
-          e.depth! < overlayMinDepth &&
-          e.x != null &&
-          e.y != null) {
-        // Check spatial overlap
-        final ex = e.x!;
-        final ey = e.y!;
-        final ew = e.w ?? 0;
-        final eh = e.h ?? 0;
-
-        final overlaps =
-            ex < overlayMaxX &&
-            ex + ew > overlayMinX &&
-            ey < overlayMaxY &&
-            ey + eh > overlayMinY;
-
-        if (overlaps) {
-          // Replace with an obscured copy
-          elements[i] = _copyWith(e, obscured: true);
-        }
-      }
-    }
+    return [
+      for (final e in elements)
+        if (e.context == 'Dialog' ||
+            e.context == 'AlertDialog' ||
+            e.context == 'SimpleDialog' ||
+            e.context == 'BottomSheet' ||
+            e.context == 'ModalBottomSheet')
+          e
+        else if (e.depth != null &&
+            e.depth! < overlayMinDepth &&
+            e.x != null &&
+            e.y != null &&
+            e.x! < oMaxX &&
+            (e.x! + (e.w ?? 0)) > oMinX &&
+            e.y! < oMaxY &&
+            (e.y! + (e.h ?? 0)) > oMinY)
+          _copyWith(e, obscured: true)
+        else
+          e,
+    ];
   }
 
   // -----------------------------------------------------------------------
@@ -3064,7 +3011,7 @@ class Scry {
   /// Analyze form field status — fill state, validation, readiness.
   ScryFormStatus? _analyzeFormStatus(
     List<ScryElement> elements,
-    List<dynamic> glyphs,
+    List<_Glyph> glyphs,
   ) {
     final fields = elements
         .where((e) => e.kind == ScryElementKind.field)
@@ -3093,29 +3040,19 @@ class Scry {
     for (final f in fields) {
       if (f.y == null) continue;
 
-      // Look for error helper text below each field (within ~50px)
       for (final g in glyphs) {
-        final glyph = g as Map<String, dynamic>;
-        final label = (glyph['l'] as String? ?? '').trim();
-        if (label.isEmpty) continue;
-        if (glyph['ia'] == true) continue; // Skip interactive elements
+        if (g.label.isEmpty) continue;
+        if (g.interactive) continue;
+        if (g.y == null) continue;
 
-        final gy = (glyph['y'] as num?)?.toDouble();
-        if (gy == null) continue;
-
-        // Error text is typically directly below the field
-        final dy = gy - f.y!;
+        final dy = g.y! - f.y!;
         if (dy < 5 || dy > 50) continue;
 
-        // Check X proximity too
-        if (f.x != null) {
-          final gx = (glyph['x'] as num?)?.toDouble();
-          if (gx != null && (gx - f.x!).abs() > 20) continue;
-        }
+        if (f.x != null && g.x != null && (g.x! - f.x!).abs() > 20) continue;
 
-        if (_validationErrorPattern.hasMatch(label)) {
+        if (_validationErrorPattern.hasMatch(g.label)) {
           validationErrors.add(
-            ScryFieldError(fieldLabel: f.label, errorMessage: label),
+            ScryFieldError(fieldLabel: f.label, errorMessage: g.label),
           );
         }
       }
@@ -3137,14 +3074,71 @@ class Scry {
   /// Score each element's targeting reliability and recommend strategy.
   ///
   /// Mutates [elements] in place by replacing each with a scored copy.
-  void _applyTargetScoring(List<ScryElement> elements) {
-    for (var i = 0; i < elements.length; i++) {
-      final e = elements[i];
-      if (!e.isInteractive) continue;
+  // -----------------------------------------------------------------------
+  // Pass 5: Combined scoring pass
+  // -----------------------------------------------------------------------
 
-      final (score, strategy) = _scoreTarget(e);
-      elements[i] = _copyWith(e, targetScore: score, targetStrategy: strategy);
+  /// Apply target scoring, reachability, prominence, input types, and action
+  /// impacts in a single iteration, returning a new list with scored copies.
+  List<ScryElement> _applyAllScoring(List<ScryElement> elements) {
+    // Pre-pass: find max area for prominence normalization.
+    var maxArea = 1.0;
+    for (final e in elements) {
+      final area = (e.w ?? 0) * (e.h ?? 0);
+      if (area > maxArea) maxArea = area;
     }
+
+    // Single pass: compute all scoring fields, emit one _copyWith per element.
+    return [
+      for (final e in elements)
+        () {
+          // Target scoring (interactive only)
+          int targetScore = e.targetScore;
+          ScryTargetStrategy targetStrategy = e.targetStrategy;
+          if (e.isInteractive) {
+            final (score, strategy) = _scoreTarget(e);
+            targetScore = score;
+            targetStrategy = strategy;
+          }
+
+          // Reachability (interactive only)
+          bool reachable = e.reachable;
+          if (e.isInteractive) {
+            reachable =
+                e.isEnabled &&
+                !e.obscured &&
+                (e.y == null || e.y! < _defaultViewportHeight);
+          }
+
+          // Prominence (all elements)
+          final area = (e.w ?? 0) * (e.h ?? 0);
+          final normalized = area / maxArea;
+          final regionWeight = _regionWeights[e.region] ?? 1.0;
+          final prominence = (normalized * regionWeight)
+              .clamp(0.0, 1.0)
+              .toDouble();
+
+          // Input types (field elements only)
+          final inputType = e.kind == ScryElementKind.field
+              ? _inferFieldType(e)
+              : e.inputType;
+
+          // Action impacts (interactive only)
+          final predictedImpact = e.isInteractive
+              ? _predictImpact(e)
+              : e.predictedImpact;
+
+          return _copyWith(
+            e,
+            targetScore: targetScore,
+            targetStrategy: targetStrategy,
+            reachable: reachable,
+            prominence: prominence,
+            inputType: inputType,
+            predictedImpact: predictedImpact,
+          );
+        }(),
+    ];
   }
 
   /// Compute targeting score and strategy for a single element.
@@ -3155,32 +3149,52 @@ class Scry {
     return (40, ScryTargetStrategy.indexedLabel);
   }
 
+  /// Create a copy of [e] with selectively overridden scoring fields.
+  ScryElement _copyWith(
+    ScryElement e, {
+    bool? obscured,
+    int? targetScore,
+    ScryTargetStrategy? targetStrategy,
+    bool? reachable,
+    double? prominence,
+    ScryFieldValueType? inputType,
+    ScryActionImpact? predictedImpact,
+  }) => ScryElement(
+    kind: e.kind,
+    label: e.label,
+    widgetType: e.widgetType,
+    isInteractive: e.isInteractive,
+    fieldId: e.fieldId,
+    currentValue: e.currentValue,
+    semanticRole: e.semanticRole,
+    interactionType: e.interactionType,
+    isEnabled: e.isEnabled,
+    gated: e.gated,
+    x: e.x,
+    y: e.y,
+    w: e.w,
+    h: e.h,
+    depth: e.depth,
+    key: e.key,
+    context: e.context,
+    obscured: obscured ?? e.obscured,
+    occurrenceIndex: e.occurrenceIndex,
+    totalOccurrences: e.totalOccurrences,
+    region: e.region,
+    targetScore: targetScore ?? e.targetScore,
+    targetStrategy: targetStrategy ?? e.targetStrategy,
+    reachable: reachable ?? e.reachable,
+    prominence: prominence ?? e.prominence,
+    inputType: inputType ?? e.inputType,
+    predictedImpact: predictedImpact ?? e.predictedImpact,
+  );
+
   // -----------------------------------------------------------------------
   // Pass 5: Reachability analysis
   // -----------------------------------------------------------------------
 
   /// Typical viewport height for reachability checks.
   static const _defaultViewportHeight = 800.0;
-
-  /// Assess whether each interactive element can actually be reached.
-  ///
-  /// An element is unreachable if it is disabled, obscured, or
-  /// positioned offscreen (Y > viewport height).
-  void _applyReachability(List<ScryElement> elements) {
-    for (var i = 0; i < elements.length; i++) {
-      final e = elements[i];
-      if (!e.isInteractive) continue;
-
-      final reachable =
-          e.isEnabled &&
-          !e.obscured &&
-          (e.y == null || e.y! < _defaultViewportHeight);
-
-      if (!reachable) {
-        elements[i] = _copyWith(e, reachable: false);
-      }
-    }
-  }
 
   // -----------------------------------------------------------------------
   // Pass 5: Visual prominence scoring
@@ -3194,31 +3208,6 @@ class Scry {
     ScryScreenRegion.bottomNav: 0.8,
     ScryScreenRegion.unknown: 0.5,
   };
-
-  /// Score each element's visual prominence (0.0–1.0).
-  ///
-  /// Based on bounding box area relative to the largest element,
-  /// screen region, and depth.
-  void _applyProminence(List<ScryElement> elements) {
-    // Find max area for normalization
-    var maxArea = 1.0;
-    for (final e in elements) {
-      final area = (e.w ?? 0) * (e.h ?? 0);
-      if (area > maxArea) maxArea = area;
-    }
-
-    for (var i = 0; i < elements.length; i++) {
-      final e = elements[i];
-      final area = (e.w ?? 0) * (e.h ?? 0);
-      final normalized = area / maxArea; // 0.0-1.0
-      final regionWeight = _regionWeights[e.region] ?? 1.0;
-      final prominence = (normalized * regionWeight).clamp(0.0, 1.0);
-
-      if (prominence > 0) {
-        elements[i] = _copyWith(e, prominence: prominence);
-      }
-    }
-  }
 
   // -----------------------------------------------------------------------
   // Pass 5: Scroll / viewport analysis
@@ -3268,34 +3257,30 @@ class Scry {
   /// Group elements by shared ancestor container.
   List<ScryElementGroup> _groupElements(
     List<ScryElement> elements,
-    List<dynamic> glyphs,
+    List<_Glyph> glyphs,
   ) {
     // Build a mapping from element label to its ancestors
     final labelAncestors = <String, List<dynamic>>{};
     for (final g in glyphs) {
-      final glyph = g as Map<String, dynamic>;
-      final label = (glyph['l'] as String? ?? '').trim();
-      if (label.isEmpty) continue;
-      final anc = glyph['anc'] as List<dynamic>? ?? [];
-      // Keep first (most interactive) for dedup
-      labelAncestors.putIfAbsent(label, () => anc);
+      if (g.label.isEmpty) continue;
+      labelAncestors.putIfAbsent(g.label, () => g.ancestors);
     }
 
-    // Group: find elements whose ancestors contain a group container
+    // Group: find elements whose ancestors contain a group container.
     final groups = <String, List<ScryElement>>{};
     for (final e in elements) {
       final ancestors = labelAncestors[e.label] ?? [];
-      final ancestorStr = ancestors.join(' ');
       for (final container in _groupContainers) {
-        if (ancestorStr.contains(container)) {
+        final found = ancestors.any((a) => (a as String).contains(container));
+        if (found) {
           groups.putIfAbsent(container, () => []).add(e);
-          break; // Only first match
+          break;
         }
       }
     }
 
     return groups.entries
-        .where((e) => e.value.length >= 2) // Only groups with 2+ elements
+        .where((e) => e.value.length >= 2)
         .map((e) => ScryElementGroup(containerType: e.key, elements: e.value))
         .toList();
   }
@@ -3369,50 +3354,6 @@ class Scry {
   }
 
   // -----------------------------------------------------------------------
-  // Helper: copy ScryElement with overridden fields
-  // -----------------------------------------------------------------------
-
-  /// Create a copy of [e] with specified fields overridden.
-  ScryElement _copyWith(
-    ScryElement e, {
-    bool? obscured,
-    int? targetScore,
-    ScryTargetStrategy? targetStrategy,
-    bool? reachable,
-    double? prominence,
-    ScryFieldValueType? inputType,
-    ScryActionImpact? predictedImpact,
-  }) => ScryElement(
-    kind: e.kind,
-    label: e.label,
-    widgetType: e.widgetType,
-    isInteractive: e.isInteractive,
-    fieldId: e.fieldId,
-    currentValue: e.currentValue,
-    semanticRole: e.semanticRole,
-    interactionType: e.interactionType,
-    isEnabled: e.isEnabled,
-    gated: e.gated,
-    x: e.x,
-    y: e.y,
-    w: e.w,
-    h: e.h,
-    depth: e.depth,
-    key: e.key,
-    context: e.context,
-    obscured: obscured ?? e.obscured,
-    occurrenceIndex: e.occurrenceIndex,
-    totalOccurrences: e.totalOccurrences,
-    region: e.region,
-    targetScore: targetScore ?? e.targetScore,
-    targetStrategy: targetStrategy ?? e.targetStrategy,
-    reachable: reachable ?? e.reachable,
-    prominence: prominence ?? e.prominence,
-    inputType: inputType ?? e.inputType,
-    predictedImpact: predictedImpact ?? e.predictedImpact,
-  );
-
-  // -----------------------------------------------------------------------
   // Pass 5: Field input type inference
   // -----------------------------------------------------------------------
 
@@ -3441,19 +3382,6 @@ class Scry {
     r'\b(url|website|link|href|domain|homepage)\b',
     caseSensitive: false,
   );
-
-  /// Infer the expected input type for each text field element.
-  void _applyInputTypes(List<ScryElement> elements) {
-    for (var i = 0; i < elements.length; i++) {
-      final e = elements[i];
-      if (e.kind != ScryElementKind.field) continue;
-
-      final type = _inferFieldType(e);
-      if (type != null) {
-        elements[i] = _copyWith(e, inputType: type);
-      }
-    }
-  }
 
   /// Determine the input type from label, fieldId, and value patterns.
   ScryFieldValueType? _inferFieldType(ScryElement e) {
@@ -3500,17 +3428,6 @@ class Scry {
     caseSensitive: false,
   );
 
-  /// Predict the impact of interacting with each interactive element.
-  void _applyActionImpacts(List<ScryElement> elements) {
-    for (var i = 0; i < elements.length; i++) {
-      final e = elements[i];
-      if (!e.isInteractive) continue;
-
-      final impact = _predictImpact(e);
-      elements[i] = _copyWith(e, predictedImpact: impact);
-    }
-  }
-
   /// Predict what will happen when the user interacts with this element.
   ScryActionImpact _predictImpact(ScryElement e) {
     final label = e.label.toLowerCase();
@@ -3553,7 +3470,7 @@ class Scry {
   // -----------------------------------------------------------------------
 
   /// Overlay container types to detect.
-  static const _overlayTypes = [
+  static const _overlayTypes = {
     'AboutDialog',
     'AlertDialog',
     'Dialog',
@@ -3563,7 +3480,7 @@ class Scry {
     'Snackbar',
     'DatePicker',
     'TimePicker',
-  ];
+  };
 
   /// Analyze overlay structure when elements are obscured.
   ///

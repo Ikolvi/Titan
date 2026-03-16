@@ -1469,7 +1469,10 @@ class Colossus extends Pillar {
   /// // Send context to AI along with prompt
   /// ```
   Future<Map<String, dynamic>> getAiContext() async {
-    final tableau = await TableauCapture.capture(index: 0);
+    final tableau = await TableauCapture.capture(
+      index: 0,
+      route: shade.getCurrentRoute?.call(),
+    );
 
     return {
       'screenDimensions': {

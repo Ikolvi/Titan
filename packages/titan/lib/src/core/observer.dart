@@ -109,6 +109,7 @@ abstract class TitanObserver {
 
   /// Notifies all observers of a Pillar initialization.
   static void notifyPillarInit(Pillar pillar) {
+    if (instance == null && _observers.isEmpty) return;
     instance?.onPillarInit(pillar);
     for (final observer in _observers) {
       observer.onPillarInit(pillar);
@@ -117,6 +118,7 @@ abstract class TitanObserver {
 
   /// Notifies all observers of a Pillar disposal.
   static void notifyPillarDispose(Pillar pillar) {
+    if (instance == null && _observers.isEmpty) return;
     instance?.onPillarDispose(pillar);
     for (final observer in _observers) {
       observer.onPillarDispose(pillar);
@@ -125,6 +127,7 @@ abstract class TitanObserver {
 
   /// Notifies all observers that a batch has started.
   static void notifyBatchStart() {
+    if (instance == null && _observers.isEmpty) return;
     instance?.onBatchStart();
     for (final observer in _observers) {
       observer.onBatchStart();
@@ -133,6 +136,7 @@ abstract class TitanObserver {
 
   /// Notifies all observers that a batch has ended.
   static void notifyBatchEnd() {
+    if (instance == null && _observers.isEmpty) return;
     instance?.onBatchEnd();
     for (final observer in _observers) {
       observer.onBatchEnd();
@@ -141,6 +145,7 @@ abstract class TitanObserver {
 
   /// Notifies all observers that an effect ran.
   static void notifyEffectRun(TitanEffect effect) {
+    if (instance == null && _observers.isEmpty) return;
     instance?.onEffectRun(effect);
     for (final observer in _observers) {
       observer.onEffectRun(effect);
@@ -153,6 +158,7 @@ abstract class TitanObserver {
     Object error,
     StackTrace stackTrace,
   ) {
+    if (instance == null && _observers.isEmpty) return;
     instance?.onEffectError(effect, error, stackTrace);
     for (final observer in _observers) {
       observer.onEffectError(effect, error, stackTrace);

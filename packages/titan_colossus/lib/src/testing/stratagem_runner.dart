@@ -112,6 +112,9 @@ class StratagemRunner {
   /// Pointer ID counter for synthetic events.
   int _pointerCounter = 200;
 
+  /// Monotonic elapsed time for pointer event timestamps.
+  Duration _elapsed = Duration.zero;
+
   /// Errors captured during execution via FlutterError hook.
   final List<String> _capturedErrors = [];
 
@@ -375,6 +378,7 @@ class StratagemRunner {
 
       case StratagemAction.doubleTap:
         await _dispatchTap(target!.centerX, target.centerY);
+        _elapsed += const Duration(milliseconds: 50);
         await Future<void>.delayed(const Duration(milliseconds: 50));
         await _dispatchTap(target.centerX, target.centerY);
 
@@ -575,18 +579,21 @@ class StratagemRunner {
       PointerDownEvent(
         pointer: pointer,
         position: position,
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.touch,
         device: pointer,
         buttons: kPrimaryButton,
       ),
     );
 
+    _elapsed += const Duration(milliseconds: 16);
     await Future<void>.delayed(const Duration(milliseconds: 16));
 
     binding.handlePointerEvent(
       PointerUpEvent(
         pointer: pointer,
         position: position,
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.touch,
         device: pointer,
       ),
@@ -603,18 +610,21 @@ class StratagemRunner {
       PointerDownEvent(
         pointer: pointer,
         position: position,
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.touch,
         device: pointer,
         buttons: kPrimaryButton,
       ),
     );
 
+    _elapsed += const Duration(milliseconds: 550);
     await Future<void>.delayed(const Duration(milliseconds: 550));
 
     binding.handlePointerEvent(
       PointerUpEvent(
         pointer: pointer,
         position: position,
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.touch,
         device: pointer,
       ),
@@ -629,6 +639,7 @@ class StratagemRunner {
       PointerScrollEvent(
         position: Offset(x, y),
         scrollDelta: Offset(dx, dy),
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.mouse,
         device: _pointerCounter++,
       ),
@@ -658,6 +669,7 @@ class StratagemRunner {
       PointerDownEvent(
         pointer: pointer,
         position: start,
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.touch,
         device: pointer,
         buttons: kPrimaryButton,
@@ -666,7 +678,9 @@ class StratagemRunner {
 
     // Animate the drag with intermediate points
     const steps = 10;
+    const stepDuration = Duration(milliseconds: 8);
     for (var i = 1; i <= steps; i++) {
+      _elapsed += stepDuration;
       final t = i / steps;
       final pos = Offset(
         start.dx + (end.dx - start.dx) * t,
@@ -676,6 +690,7 @@ class StratagemRunner {
         PointerMoveEvent(
           pointer: pointer,
           position: pos,
+          timeStamp: _elapsed,
           delta: Offset(
             (end.dx - start.dx) / steps,
             (end.dy - start.dy) / steps,
@@ -685,13 +700,15 @@ class StratagemRunner {
           buttons: kPrimaryButton,
         ),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 8));
+      await Future<void>.delayed(stepDuration);
     }
 
+    _elapsed += const Duration(milliseconds: 2);
     binding.handlePointerEvent(
       PointerUpEvent(
         pointer: pointer,
         position: end,
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.touch,
         device: pointer,
       ),
@@ -707,6 +724,7 @@ class StratagemRunner {
       PointerDownEvent(
         pointer: pointer,
         position: from,
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.touch,
         device: pointer,
         buttons: kPrimaryButton,
@@ -714,7 +732,9 @@ class StratagemRunner {
     );
 
     const steps = 10;
+    const stepDuration = Duration(milliseconds: 8);
     for (var i = 1; i <= steps; i++) {
+      _elapsed += stepDuration;
       final t = i / steps;
       final pos = Offset(
         from.dx + (to.dx - from.dx) * t,
@@ -724,19 +744,22 @@ class StratagemRunner {
         PointerMoveEvent(
           pointer: pointer,
           position: pos,
+          timeStamp: _elapsed,
           delta: Offset((to.dx - from.dx) / steps, (to.dy - from.dy) / steps),
           kind: PointerDeviceKind.touch,
           device: pointer,
           buttons: kPrimaryButton,
         ),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 8));
+      await Future<void>.delayed(stepDuration);
     }
 
+    _elapsed += const Duration(milliseconds: 2);
     binding.handlePointerEvent(
       PointerUpEvent(
         pointer: pointer,
         position: to,
+        timeStamp: _elapsed,
         kind: PointerDeviceKind.touch,
         device: pointer,
       ),

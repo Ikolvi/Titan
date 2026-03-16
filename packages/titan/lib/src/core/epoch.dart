@@ -94,20 +94,23 @@ class Epoch<T> extends TitanState<T> {
     // Let TitanState handle equality check and notification
     super.value = newValue;
 
-    // Only record history if value actually changed
-    if (!identical(peek(), current) && peek() == newValue) {
-      // Write to ring buffer at the next position
-      if (_undoCount < maxHistory) {
-        // Buffer not yet full
-        _undoBuffer[_undoCount] = current;
-        _undoCount++;
-      } else {
-        // Buffer full — overwrite oldest entry (O(1))
-        _undoBuffer[_undoHead] = current;
-        _undoHead = (_undoHead + 1) % maxHistory;
-      }
-      _redoStack.clear();
+    // Only record history if value actually changed.
+    // After super.value=, peek() returns the (possibly conduit-piped) result.
+    // If it's still the same object as before, nothing changed.
+    final after = peek();
+    if (identical(after, current)) return;
+
+    // Write to ring buffer at the next position
+    if (_undoCount < maxHistory) {
+      // Buffer not yet full
+      _undoBuffer[_undoCount] = current;
+      _undoCount++;
+    } else {
+      // Buffer full — overwrite oldest entry (O(1))
+      _undoBuffer[_undoHead] = current;
+      _undoHead = (_undoHead + 1) % maxHistory;
     }
+    if (_redoStack.isNotEmpty) _redoStack.clear();
   }
 
   /// Whether there is a previous state to revert to.

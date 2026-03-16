@@ -38,7 +38,7 @@ class TitanComputed<T> extends ReactiveNode {
   late T _value;
   T? _previousValue;
   bool _isDirty = true;
-  Set<ReactiveNode> _dependencies = {};
+  Set<ReactiveNode>? _dependencies;
   bool _hasEverComputed = false;
 
   /// Creates a computed reactive value.
@@ -95,7 +95,7 @@ class TitanComputed<T> extends ReactiveNode {
       // Fast path: re-evaluate without clearing dependencies.
       // Track new dependencies in a temporary set, then diff.
       final oldDeps = _dependencies;
-      _dependencies = {};
+      _dependencies = <ReactiveNode>{};
 
       final previous = ReactiveScope.pushTracker(this);
       try {
@@ -121,8 +121,8 @@ class TitanComputed<T> extends ReactiveNode {
       }
 
       // Remove stale dependencies only (ones in old but not in new)
-      for (final dep in oldDeps) {
-        if (!_dependencies.contains(dep)) {
+      for (final dep in oldDeps ?? const <ReactiveNode>{}) {
+        if (!(_dependencies?.contains(dep) ?? false)) {
           dep.removeDependent(this);
         }
       }
@@ -155,16 +155,18 @@ class TitanComputed<T> extends ReactiveNode {
   }
 
   void _clearDependencies() {
-    for (final dep in _dependencies) {
+    final deps = _dependencies;
+    if (deps == null) return;
+    for (final dep in deps) {
       dep.removeDependent(this);
     }
-    _dependencies.clear();
+    deps.clear();
   }
 
   @override
   @protected
   void onTracked(ReactiveNode source) {
-    _dependencies.add(source);
+    (_dependencies ??= {}).add(source);
   }
 
   @override

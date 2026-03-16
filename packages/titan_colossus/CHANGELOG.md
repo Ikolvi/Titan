@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.5] - 2026-03-17
+
+### Fixed
+- **Stale Tableau** — `getAiContext()` now passes the current route to `TableauCapture.capture()`, fixing stale screen data when navigated away from root.
+- **StrikeAt FakeAsync** — Replaced `Future.delayed` with `pump(duration)` to avoid test hangs in FakeAsync zones. Added monotonic `timeStamp` on swipe/drag PointerEvents for VelocityTracker. Added `pumpAndSettle()` for double-tap.
+- **StratagemRunner timestamps** — Added `_elapsed` Duration field for monotonically increasing timestamps during stratagem execution.
+- **flutter_test dependency** — Moved `flutter_test` from `dev_dependencies` to `dependencies` since `strike_at.dart` is in `lib/`.
+
+### Added
+- **StrikeAt export** — `strike_at.dart` is now exported from the package barrel file.
+
+### Performance
+- **Scry observation pipeline** — Merged overlay scan + maxDepth into Pass 1 (−2 glyph iterations). Merged 5 scoring sub-passes into 1 combined `_applyAllScoring` pass (−4 element iterations). Added `_Glyph` pre-extraction class to eliminate repeated map lookups/casts across 7+ passes. Converted `_overlayTypes` from List to Set for O(1) lookup. Eliminated `ancestors.join(' ')` in `_groupElements` and `_detectAlerts`. Result: Scry Small −25%, Form −21%, Medium/Large/DataRich −11%.
+
 ## [2.0.4] - 2026-03-16
 
 ### Fixed

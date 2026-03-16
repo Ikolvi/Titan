@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.2
+
+### Changed
+- Updated `titan` dependency to `^1.1.4`
+- Updated `titan_basalt` dependency to `^1.12.7`
+
 ## 1.1.1
 
 ### Fixed

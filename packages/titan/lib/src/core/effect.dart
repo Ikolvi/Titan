@@ -52,7 +52,7 @@ class TitanEffect extends ReactiveNode {
   final void Function()? _onNotify;
   final bool Function()? _guard;
   Function()? _cleanup;
-  Set<ReactiveNode> _dependencies = {};
+  Set<ReactiveNode>? _dependencies;
   final String? _name;
   bool _isRunning = false;
   bool _hasEverExecuted = false;
@@ -129,7 +129,7 @@ class TitanEffect extends ReactiveNode {
 
     // Diff: remove stale dependencies
     if (_hasEverExecuted) {
-      for (final dep in oldDeps) {
+      for (final dep in oldDeps ?? const <ReactiveNode>{}) {
         if (!newDeps.contains(dep)) {
           dep.removeDependent(this);
         }
@@ -144,15 +144,17 @@ class TitanEffect extends ReactiveNode {
   }
 
   void _clearDependencies() {
-    for (final dep in _dependencies) {
+    final deps = _dependencies;
+    if (deps == null) return;
+    for (final dep in deps) {
       dep.removeDependent(this);
     }
-    _dependencies.clear();
+    deps.clear();
   }
 
   @override
   void onTracked(ReactiveNode source) {
-    _dependencies.add(source);
+    (_dependencies ??= {}).add(source);
   }
 
   @override

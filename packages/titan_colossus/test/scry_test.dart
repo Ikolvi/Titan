@@ -1481,8 +1481,8 @@ void main() {
   // ===================================================================
   group('Scry.formatMultiActionResult', () {
     test('formats successful multi-action result', () {
-      final gaze = ScryGaze(
-        elements: const [
+      const gaze = ScryGaze(
+        elements: [
           ScryElement(
             kind: ScryElementKind.content,
             label: 'Welcome',
@@ -1510,7 +1510,7 @@ void main() {
     });
 
     test('formats failed multi-action result with error', () {
-      final gaze = ScryGaze(elements: const [], route: '/login', glyphCount: 0);
+      const gaze = ScryGaze(elements: [], route: '/login', glyphCount: 0);
 
       final md = scry.formatMultiActionResult(
         actions: [
@@ -5105,7 +5105,7 @@ void main() {
     });
 
     test('inputType appears in toJson', () {
-      final element = ScryElement(
+      const element = ScryElement(
         kind: ScryElementKind.field,
         label: 'Email',
         widgetType: 'TextField',
@@ -5270,7 +5270,7 @@ void main() {
     });
 
     test('predictedImpact appears in toJson', () {
-      final element = ScryElement(
+      const element = ScryElement(
         kind: ScryElementKind.button,
         label: 'Submit',
         widgetType: 'ElevatedButton',
