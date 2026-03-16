@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.4] - 2026-03-16
+
+### Fixed
+- **Fresco Screenshot on Inner Pages** — Screenshots captured via Relay on navigated (non-root) pages returned blank white images (375 bytes). Root cause: `RenderRepaintBoundary.toImage()` produced stale composited layers after route changes. Fixed by capturing directly from `RenderView.layer` (the fully composited screen output) and pumping a frame via `endOfFrame` before capture. Screenshots now work on all pages regardless of `RepaintBoundary` presence.
+
 ## [2.0.3] - 2026-03-14
 
 ### Fixed

@@ -39,9 +39,14 @@ class Fresco {
 
   /// Capture the current screen as PNG bytes.
   ///
-  /// Uses [RenderRepaintBoundary.toImage] to capture the screen
-  /// content. Returns `null` if capture fails (e.g., no render
-  /// boundary available, or if called outside a paint cycle).
+  /// Captures directly from the [RenderView]'s composited layer,
+  /// which contains the fully rendered frame output regardless of
+  /// internal [RepaintBoundary] states. Falls back to finding a
+  /// [RenderRepaintBoundary] if the render view approach fails.
+  ///
+  /// Pumps a frame via [WidgetsBinding.endOfFrame] before capturing
+  /// to ensure the render tree is fully composited after navigation
+  /// or route changes.
   ///
   /// [pixelRatio] controls resolution:
   /// - `1.0` = logical resolution (default)
@@ -55,6 +60,43 @@ class Fresco {
   /// recording (not in production) and is async.
   static Future<Uint8List?> capture({double pixelRatio = 1.0}) async {
     try {
+      // Wait for the current frame to finish compositing. This ensures
+      // layers reflect the latest page after navigation or route changes.
+      // Use a timeout so test environments (which don't pump frames
+      // automatically) don't hang.
+      final binding = WidgetsBinding.instance;
+      binding.scheduleFrame();
+      await binding.endOfFrame.timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {},
+      );
+
+      // Primary: capture from the RenderView's composited layer.
+      // This captures the entire screen output regardless of
+      // internal RepaintBoundary layer states.
+      final renderView = WidgetsBinding.instance.renderViews.firstOrNull;
+      if (renderView != null) {
+        // ignore: invalid_use_of_protected_member
+        final layer = renderView.layer;
+        if (layer is OffsetLayer) {
+          final image = await layer.toImage(
+            renderView.paintBounds,
+            pixelRatio: pixelRatio,
+          );
+          try {
+            final byteData = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            if (byteData != null) {
+              return byteData.buffer.asUint8List();
+            }
+          } finally {
+            image.dispose();
+          }
+        }
+      }
+
+      // Fallback: find the first RenderRepaintBoundary.
       final boundary = _findRepaintBoundary();
       if (boundary == null) return null;
 
@@ -73,9 +115,10 @@ class Fresco {
 
   /// Find the root [RenderRepaintBoundary] for screen capture.
   ///
-  /// Walks up from the root render object to find the first
+  /// Walks down from the root render object to find the first
   /// [RenderRepaintBoundary], which typically wraps the entire
-  /// app content.
+  /// app content. Used as a fallback when the [RenderView] layer
+  /// approach is not available.
   static RenderRepaintBoundary? _findRepaintBoundary() {
     final binding = WidgetsBinding.instance;
     final rootElement = binding.rootElement;
