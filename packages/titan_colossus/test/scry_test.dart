@@ -279,6 +279,137 @@ void main() {
       expect(gaze.buttons.map((e) => e.label), contains('About'));
     });
 
+    test('detects single-char digit keypad buttons', () {
+      final glyphs = [
+        for (final d in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+          glyph(
+            label: d,
+            interactive: true,
+            widgetType: 'InkWell',
+            key: 'keypad_$d',
+          ),
+      ];
+
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.buttons, hasLength(10));
+      expect(gaze.buttons.map((e) => e.label).toSet(), {
+        '0',
+        '1',
+        '2',
+        '3',
+        '4',
+        '5',
+        '6',
+        '7',
+        '8',
+        '9',
+      });
+    });
+
+    test('detects single-char dot and operator buttons', () {
+      final glyphs = [
+        glyph(
+          label: '.',
+          interactive: true,
+          widgetType: 'InkWell',
+          key: 'keypad_.',
+        ),
+        glyph(
+          label: 'Add',
+          interactive: true,
+          widgetType: 'InkWell',
+          key: 'keypad_+',
+        ),
+        glyph(
+          label: 'Subtract',
+          interactive: true,
+          widgetType: 'InkWell',
+          key: 'keypad_-',
+        ),
+        glyph(
+          label: 'Delete last digit',
+          interactive: true,
+          widgetType: 'InkWell',
+          key: 'keypad_backspace',
+        ),
+      ];
+
+      final gaze = scry.observe(glyphs);
+
+      expect(gaze.buttons, hasLength(4));
+      expect(gaze.buttons.map((e) => e.label).toSet(), {
+        '.',
+        'Add',
+        'Subtract',
+        'Delete last digit',
+      });
+    });
+
+    test('single-char non-interactive labels are still filtered', () {
+      final glyphs = [
+        glyph(label: 'X', interactive: false, widgetType: 'Text'),
+        glyph(label: 'Y', interactive: false, widgetType: 'Text'),
+        glyph(label: 'OK', interactive: false, widgetType: 'Text'),
+      ];
+
+      final gaze = scry.observe(glyphs);
+
+      // Only 'OK' (length >= 2) should pass
+      expect(gaze.content, hasLength(1));
+      expect(gaze.content.first.label, 'OK');
+    });
+
+    test('full keypad with Done button detected', () {
+      final glyphs = [
+        // Digit buttons
+        for (final d in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+          glyph(
+            label: d,
+            interactive: true,
+            widgetType: 'InkWell',
+            key: 'keypad_$d',
+          ),
+        // Operators
+        glyph(
+          label: '.',
+          interactive: true,
+          widgetType: 'InkWell',
+          key: 'keypad_.',
+        ),
+        glyph(
+          label: 'Add',
+          interactive: true,
+          widgetType: 'InkWell',
+          key: 'keypad_+',
+        ),
+        glyph(
+          label: 'Subtract',
+          interactive: true,
+          widgetType: 'InkWell',
+          key: 'keypad_-',
+        ),
+        glyph(
+          label: 'Delete last digit',
+          interactive: true,
+          widgetType: 'InkWell',
+          key: 'keypad_backspace',
+        ),
+        // Done button
+        glyph(
+          label: 'Done',
+          interactive: true,
+          widgetType: 'FilledButton',
+          key: 'keypad_done',
+        ),
+      ];
+
+      final gaze = scry.observe(glyphs);
+
+      // All 15 buttons: 10 digits + dot + Add + Subtract + Delete + Done
+      expect(gaze.buttons, hasLength(15));
+    });
+
     test('classifies text fields', () {
       final glyphs = [
         glyph(

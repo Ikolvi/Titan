@@ -2197,6 +2197,9 @@ class _ColossusRelayHandler implements RelayHandler {
 
     final severity = _parseSeverity(config['severity'] as String?);
     final once = config['once'] as bool? ?? false;
+    final cooldown = Duration(
+      seconds: (config['cooldownSeconds'] as num?)?.toInt() ?? 30,
+    );
 
     Tremor tremor;
     try {
@@ -2205,11 +2208,13 @@ class _ColossusRelayHandler implements RelayHandler {
           threshold: (config['threshold'] as num?)?.toDouble() ?? 50,
           severity: severity,
           once: once,
+          cooldown: cooldown,
         ),
         'jankRate' => Tremor.jankRate(
           threshold: (config['threshold'] as num?)?.toDouble() ?? 5,
           severity: severity,
           once: once,
+          cooldown: cooldown,
         ),
         'pageLoad' => Tremor.pageLoad(
           threshold: Duration(
@@ -2217,30 +2222,39 @@ class _ColossusRelayHandler implements RelayHandler {
           ),
           severity: severity,
           once: once,
+          cooldown: cooldown,
         ),
         'memory' => Tremor.memory(
           maxPillars: (config['maxPillars'] as num?)?.toInt() ?? 50,
           severity: severity,
           once: once,
+          cooldown: cooldown,
         ),
         'rebuilds' => Tremor.rebuilds(
           threshold: (config['threshold'] as num?)?.toInt() ?? 100,
           widget: config['widget'] as String? ?? '',
           severity: severity,
           once: once,
+          cooldown: cooldown,
         ),
-        'leaks' => Tremor.leaks(severity: severity, once: once),
+        'leaks' => Tremor.leaks(
+          severity: severity,
+          once: once,
+          cooldown: cooldown,
+        ),
         'apiLatency' => Tremor.apiLatency(
           threshold: Duration(
             milliseconds: (config['thresholdMs'] as num?)?.toInt() ?? 500,
           ),
           severity: severity,
           once: once,
+          cooldown: cooldown,
         ),
         'apiErrorRate' => Tremor.apiErrorRate(
           threshold: (config['threshold'] as num?)?.toDouble() ?? 10,
           severity: severity,
           once: once,
+          cooldown: cooldown,
         ),
         _ => throw ArgumentError('Unknown tremor type: $type'),
       };

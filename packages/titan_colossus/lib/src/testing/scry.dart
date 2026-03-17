@@ -1249,7 +1249,14 @@ class _Glyph {
   final List<dynamic> ancestors;
 
   /// Whether label passes length and icon-data filters used in Pass 1/2.
-  bool get validLabel => label.length >= 2 && !label.startsWith('IconData(');
+  ///
+  /// Interactive widgets (buttons, keypads) are allowed single-character
+  /// labels (e.g. digit keys "0"–"9", operators "+", "-").
+  bool get validLabel {
+    if (label.isEmpty || label.startsWith('IconData(')) return false;
+    if (interactive) return true;
+    return label.length >= 2;
+  }
 }
 
 class Scry {

@@ -348,4 +348,189 @@ void main() {
       expect(glyph.isEnabled, true);
     });
   });
+
+  group('TableauCapture — single-char keypad button detection', () {
+    testWidgets('captures InkWell with single-digit text child', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Material(
+              child: InkWell(
+                key: const ValueKey('keypad_5'),
+                onTap: () {},
+                child: const SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: Center(child: Text('5')),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final tableau = await TableauCapture.capture(index: 0);
+      final glyph = tableau.glyphs.firstWhere((g) => g.widgetType == 'InkWell');
+
+      expect(glyph.label, '5');
+      expect(glyph.isInteractive, true);
+      expect(glyph.isEnabled, true);
+      expect(glyph.key, 'keypad_5');
+    });
+
+    testWidgets('captures InkWell with dot text child', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Material(
+              child: InkWell(
+                key: const ValueKey('keypad_.'),
+                onTap: () {},
+                child: const SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: Center(child: Text('.')),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final tableau = await TableauCapture.capture(index: 0);
+      final glyph = tableau.glyphs.firstWhere((g) => g.widgetType == 'InkWell');
+
+      expect(glyph.label, '.');
+      expect(glyph.isInteractive, true);
+    });
+
+    testWidgets('InkWell with icon-only child uses Semantics ancestor label', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Semantics(
+              label: 'Delete last digit',
+              button: true,
+              child: Material(
+                child: InkWell(
+                  key: const ValueKey('keypad_backspace'),
+                  onTap: () {},
+                  child: const SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: Center(child: Icon(Icons.backspace_outlined)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final tableau = await TableauCapture.capture(index: 0);
+      final glyph = tableau.glyphs.firstWhere((g) => g.widgetType == 'InkWell');
+
+      expect(glyph.label, 'Delete last digit');
+      expect(glyph.isInteractive, true);
+      expect(glyph.key, 'keypad_backspace');
+    });
+
+    testWidgets('InkWell with icon-only child and no Semantics uses key', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Material(
+              child: InkWell(
+                key: const ValueKey('keypad_backspace'),
+                onTap: () {},
+                child: const SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: Center(child: Icon(Icons.backspace_outlined)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final tableau = await TableauCapture.capture(index: 0);
+      final glyph = tableau.glyphs.firstWhere((g) => g.widgetType == 'InkWell');
+
+      expect(glyph.label, 'keypad_backspace');
+      expect(glyph.isInteractive, true);
+    });
+
+    testWidgets('captures multiple keypad-style digit buttons', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                for (final d in ['1', '2', '3'])
+                  Expanded(
+                    child: Material(
+                      child: InkWell(
+                        key: ValueKey('keypad_$d'),
+                        onTap: () {},
+                        child: SizedBox(
+                          height: 64,
+                          child: Center(child: Text(d)),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final tableau = await TableauCapture.capture(index: 0);
+      final inkWells = tableau.glyphs
+          .where((g) => g.widgetType == 'InkWell')
+          .toList();
+
+      expect(inkWells.length, 3);
+      expect(inkWells.map((g) => g.label).toSet(), {'1', '2', '3'});
+    });
+
+    testWidgets('Semantics label preferred over icon codepoint for operators', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Semantics(
+              label: 'Add',
+              button: true,
+              child: Material(
+                child: InkWell(
+                  key: const ValueKey('keypad_+'),
+                  onTap: () {},
+                  child: const SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: Center(child: Icon(Icons.add_rounded)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final tableau = await TableauCapture.capture(index: 0);
+      final glyph = tableau.glyphs.firstWhere((g) => g.widgetType == 'InkWell');
+
+      expect(glyph.label, 'Add');
+      expect(glyph.isInteractive, true);
+    });
+  });
 }

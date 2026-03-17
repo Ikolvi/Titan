@@ -64,7 +64,7 @@ void main() {
     // ---------------------------------------------------------
 
     test('evaluates FPS tremor correctly', () {
-      final tremor = Tremor.fps(threshold: 55.0);
+      final tremor = Tremor.fps(threshold: 55.0, cooldown: Duration.zero);
 
       // FPS above threshold → no alert
       final goodContext = TremorContext(
@@ -92,6 +92,7 @@ void main() {
     test('evaluates page load tremor correctly', () {
       final tremor = Tremor.pageLoad(
         threshold: const Duration(milliseconds: 500),
+        cooldown: Duration.zero,
       );
 
       // No page load → no alert
@@ -228,8 +229,12 @@ void main() {
       expect(tremor.evaluate(badContext), false); // Already fired
     });
 
-    test('recurring mode fires every time', () {
-      final tremor = Tremor.fps(threshold: 55.0, once: false);
+    test('recurring mode fires every time when cooldown is zero', () {
+      final tremor = Tremor.fps(
+        threshold: 55.0,
+        once: false,
+        cooldown: Duration.zero,
+      );
 
       final badContext = TremorContext(
         fps: 40.0,
@@ -241,6 +246,47 @@ void main() {
       );
 
       expect(tremor.evaluate(badContext), true);
+      expect(tremor.evaluate(badContext), true);
+    });
+
+    test('cooldown suppresses repeated firings', () {
+      final tremor = Tremor.fps(
+        threshold: 55.0,
+        cooldown: const Duration(seconds: 30),
+      );
+
+      final badContext = TremorContext(
+        fps: 40.0,
+        jankRate: 20.0,
+        pillarCount: 3,
+        leakSuspects: [],
+        lastPageLoad: null,
+        rebuildsPerWidget: {},
+      );
+
+      expect(tremor.evaluate(badContext), true);
+      // Immediate re-evaluation is suppressed by cooldown
+      expect(tremor.evaluate(badContext), false);
+    });
+
+    test('reset clears cooldown allowing immediate re-fire', () {
+      final tremor = Tremor.fps(
+        threshold: 55.0,
+        cooldown: const Duration(seconds: 30),
+      );
+
+      final badContext = TremorContext(
+        fps: 40.0,
+        jankRate: 20.0,
+        pillarCount: 3,
+        leakSuspects: [],
+        lastPageLoad: null,
+        rebuildsPerWidget: {},
+      );
+
+      expect(tremor.evaluate(badContext), true);
+      expect(tremor.evaluate(badContext), false);
+      tremor.reset();
       expect(tremor.evaluate(badContext), true);
     });
 

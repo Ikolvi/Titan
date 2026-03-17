@@ -52,7 +52,7 @@ class TableauCapture {
   static int maxDepth = 300;
 
   /// Maximum number of Glyphs per Tableau (prevents huge snapshots).
-  static int maxGlyphs = 200;
+  static int maxGlyphs = 300;
 
   // -----------------------------------------------------------------------
   // Public API
@@ -243,6 +243,13 @@ class TableauCapture {
     final isInteractive = classification == _WidgetClassification.interactive;
     var label = _extractLabel(element, widget);
 
+    // Pure icon codepoints are not useful labels for interactive widgets;
+    // null them out so the key / positional fallback below can provide a
+    // meaningful identifier instead.
+    if (label != null && isInteractive && _isIconText(label)) {
+      label = null;
+    }
+
     // Synthesize a label for label-less interactive widgets so Scry
     // can still discover and target them (e.g. GestureDetector wrapping
     // a Container, custom painter, or image).
@@ -429,7 +436,10 @@ class TableauCapture {
       return widget.properties.label;
     }
 
-    // For buttons and other interactive widgets — find child Text
+    // For buttons and other interactive widgets — find child Text.
+    // When the only child text is an icon codepoint (Private Use Area),
+    // prefer the ancestor Semantics label (e.g. "Delete last digit"
+    // instead of a backspace icon glyph).
     if (widget is ButtonStyleButton ||
         widget is InkWell ||
         widget is GestureDetector ||
@@ -439,7 +449,9 @@ class TableauCapture {
         widget is Card ||
         widget is ExpansionTile ||
         widget is SegmentedButton) {
-      return _findChildLabel(element);
+      final childLabel = _findChildLabel(element);
+      if (childLabel != null && !_isIconText(childLabel)) return childLabel;
+      return _getSemanticLabel(element) ?? childLabel;
     }
 
     // Fallback: check Semantics

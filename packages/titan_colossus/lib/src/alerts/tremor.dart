@@ -43,7 +43,14 @@ class Tremor {
   /// Whether this tremor alerts only once, or on every check cycle.
   final bool once;
 
+  /// Minimum interval between consecutive firings.
+  ///
+  /// Prevents the same tremor from flooding the console on every frame
+  /// batch while the condition holds. Defaults to 30 seconds.
+  final Duration cooldown;
+
   bool _hasFired = false;
+  DateTime? _lastFiredAt;
 
   /// Creates a custom [Tremor].
   Tremor({
@@ -52,20 +59,32 @@ class Tremor {
     required bool Function(TremorContext context) check,
     this.severity = TremorSeverity.warning,
     this.once = false,
+    this.cooldown = const Duration(seconds: 30),
   }) : _check = check;
 
   /// Evaluate the tremor against the current context.
   ///
   /// Returns `true` if the threshold is breached and an alert should fire.
+  /// Respects [cooldown] — will not fire again until the cooldown elapses.
   bool evaluate(TremorContext context) {
     if (once && _hasFired) return false;
+    if (_lastFiredAt != null &&
+        DateTime.now().difference(_lastFiredAt!) < cooldown) {
+      return false;
+    }
     final breached = _check(context);
-    if (breached) _hasFired = true;
+    if (breached) {
+      _hasFired = true;
+      _lastFiredAt = DateTime.now();
+    }
     return breached;
   }
 
-  /// Reset the fired state (for recurring checks).
-  void reset() => _hasFired = false;
+  /// Reset the fired state and cooldown (for recurring checks).
+  void reset() {
+    _hasFired = false;
+    _lastFiredAt = null;
+  }
 
   // -----------------------------------------------------------------------
   // Factory constructors for common thresholds
@@ -80,12 +99,14 @@ class Tremor {
     double threshold = 50,
     TremorSeverity severity = TremorSeverity.warning,
     bool once = false,
+    Duration cooldown = const Duration(seconds: 30),
   }) {
     return Tremor(
       name: 'fps_low',
       category: MarkCategory.frame,
       severity: severity,
       once: once,
+      cooldown: cooldown,
       check: (ctx) => ctx.fps > 0 && ctx.fps < threshold,
     );
   }
@@ -99,12 +120,14 @@ class Tremor {
     double threshold = 5,
     TremorSeverity severity = TremorSeverity.warning,
     bool once = false,
+    Duration cooldown = const Duration(seconds: 30),
   }) {
     return Tremor(
       name: 'jank_rate',
       category: MarkCategory.frame,
       severity: severity,
       once: once,
+      cooldown: cooldown,
       check: (ctx) => ctx.jankRate > threshold,
     );
   }
@@ -118,12 +141,14 @@ class Tremor {
     Duration threshold = const Duration(seconds: 1),
     TremorSeverity severity = TremorSeverity.warning,
     bool once = false,
+    Duration cooldown = const Duration(seconds: 30),
   }) {
     return Tremor(
       name: 'page_load_slow',
       category: MarkCategory.pageLoad,
       severity: severity,
       once: once,
+      cooldown: cooldown,
       check: (ctx) =>
           ctx.lastPageLoad != null && ctx.lastPageLoad!.duration > threshold,
     );
@@ -138,12 +163,14 @@ class Tremor {
     int maxPillars = 50,
     TremorSeverity severity = TremorSeverity.warning,
     bool once = false,
+    Duration cooldown = const Duration(seconds: 30),
   }) {
     return Tremor(
       name: 'memory_high',
       category: MarkCategory.memory,
       severity: severity,
       once: once,
+      cooldown: cooldown,
       check: (ctx) => ctx.pillarCount > maxPillars,
     );
   }
@@ -158,12 +185,14 @@ class Tremor {
     required String widget,
     TremorSeverity severity = TremorSeverity.warning,
     bool once = false,
+    Duration cooldown = const Duration(seconds: 30),
   }) {
     return Tremor(
       name: 'excessive_rebuilds',
       category: MarkCategory.rebuild,
       severity: severity,
       once: once,
+      cooldown: cooldown,
       check: (ctx) => (ctx.rebuildsPerWidget[widget] ?? 0) > threshold,
     );
   }
@@ -176,12 +205,14 @@ class Tremor {
   factory Tremor.leaks({
     TremorSeverity severity = TremorSeverity.error,
     bool once = true,
+    Duration cooldown = const Duration(seconds: 30),
   }) {
     return Tremor(
       name: 'leak_detected',
       category: MarkCategory.memory,
       severity: severity,
       once: once,
+      cooldown: cooldown,
       check: (ctx) => ctx.leakSuspects.isNotEmpty,
     );
   }
@@ -198,12 +229,14 @@ class Tremor {
     Duration threshold = const Duration(milliseconds: 500),
     TremorSeverity severity = TremorSeverity.warning,
     bool once = false,
+    Duration cooldown = const Duration(seconds: 30),
   }) {
     return Tremor(
       name: 'api_latency_high',
       category: MarkCategory.api,
       severity: severity,
       once: once,
+      cooldown: cooldown,
       check: (ctx) =>
           ctx.apiRequestCount > 0 &&
           ctx.apiAvgLatencyMs > threshold.inMilliseconds,
@@ -222,12 +255,14 @@ class Tremor {
     double threshold = 10,
     TremorSeverity severity = TremorSeverity.warning,
     bool once = false,
+    Duration cooldown = const Duration(seconds: 30),
   }) {
     return Tremor(
       name: 'api_error_rate',
       category: MarkCategory.api,
       severity: severity,
       once: once,
+      cooldown: cooldown,
       check: (ctx) => ctx.apiRequestCount > 0 && ctx.apiErrorRate > threshold,
     );
   }

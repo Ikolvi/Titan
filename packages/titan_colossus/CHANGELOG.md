@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.6] - 2026-03-17
+
+### Fixed
+- **Keypad Detection** — `validLabel` in Scry now allows single-character labels for interactive widgets (digits, operators). `_extractLabel` falls back to Semantics label for icon-only interactive widgets. `_extractGlyph` nulls out icon-text labels on interactive widgets to prevent duplicate labeling.
+- **Tremor Log Flooding** — Added 30-second cooldown to `Tremor.evaluate()`. Recurring tremors (e.g. `jankRate`, `fps`) now fire once per cooldown window instead of on every frame batch (~60/sec). Cooldown is configurable via the `cooldown` parameter on all factory constructors and MCP `addTremor`.
+
+### Changed
+- **maxGlyphs** — Increased from 200 to 300 to accommodate denser screens (e.g. keypads with 16+ buttons).
+
 ## [2.0.5] - 2026-03-17
 
 ### Fixed
